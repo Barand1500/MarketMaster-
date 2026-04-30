@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
 
-const API_URL = "http://127.0.0.1:5000/api";
+const API_URL = "/api"; // Production: Aynı domain üzerinden
 
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
   const { categories, products, updateCustomer, refetchProducts } = useData();

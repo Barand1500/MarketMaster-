@@ -55,7 +55,7 @@ export default function Login({ onLogin }) {
     }
   };
 
-  const API_URL = "http://127.0.0.1:5000/api";
+  const API_URL = "/api"; // Production: Aynı domain üzerinden
 
   const handleForgot = async (e) => {
     e.preventDefault();
@@ -148,7 +148,7 @@ export default function Login({ onLogin }) {
               <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
               <p style={{ margin: 0, fontSize: '12px', color: '#92400e', fontWeight: '600', lineHeight: '1.5' }}>
                 Kullanıcı adı ve şifre <strong>büyük/küçük harf duyarlıdır.</strong><br/>
-                Örneğin: <em>"Nimet Demir"</em> ile <em>"nimet demir"</em> farklıdır.
+                Örneğin: <em>"Ercan Güzel"</em> ile <em>"ercan güzel"</em> farklıdır.
               </p>
             </div>
             {error && <p className="login-error">{error}</p>}

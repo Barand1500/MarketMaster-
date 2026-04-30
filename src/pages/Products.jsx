@@ -98,6 +98,9 @@ export default function Products() {
     setModalInput('');
   };
 
+  const [modalEditing, setModalEditing] = useState({ id: null, type: null });
+  const [modalEditValue, setModalEditValue] = useState('');
+
   const renderModalList = () => {
     if (showModal === 'units') {
       const filtered = units.filter(u => u.name.toLowerCase().includes(modalSearch.toLowerCase()));
@@ -106,13 +109,37 @@ export default function Products() {
         <div key={u.id} className="pm-item">
           <div className="pm-item-left">
             <span className="pm-item-icon">⚖️</span>
-            <span className="pm-item-name">{u.name}</span>
+            {modalEditing.id === u.id && modalEditing.type === 'unit' ? (
+              <input
+                autoFocus
+                className="inline-edit"
+                value={modalEditValue}
+                onChange={e => setModalEditValue(e.target.value)}
+                onBlur={() => {
+                  if (modalEditValue.trim() && modalEditValue !== u.name) updateUnit(u.id, modalEditValue.trim());
+                  setModalEditing({ id: null, type: null });
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') e.target.blur();
+                  if (e.key === 'Escape') setModalEditing({ id: null, type: null });
+                }}
+                style={{ minWidth: 80 }}
+              />
+            ) : (
+              <span
+                className="pm-item-name"
+                onDoubleClick={() => {
+                  setModalEditing({ id: u.id, type: 'unit' });
+                  setModalEditValue(u.name);
+                }}
+                style={{ cursor: 'pointer' }}
+                title="Düzenlemek için çift tıklayın"
+              >
+                {u.name}
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button className="pm-item-edit" onClick={() => {
-              const newName = window.prompt("Birim için yeni ad:", u.name);
-              if (newName && newName.trim()) updateUnit(u.id, newName.trim());
-            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '14px', opacity: 0.6 }}>✏️</button>
             <button className="pm-item-del" onClick={() => {
               if (window.confirm(`"${u.name}" birimini silmek istediğinize emin misiniz?`)) deleteUnit(u.id);
             }}>✕</button>
@@ -128,22 +155,45 @@ export default function Products() {
       } else {
         list.sort((a, b) => a.path.localeCompare(b.path));
       }
-      
       if (list.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
       return list.map(c => (
         <div key={c.id} className="pm-item">
           <div className="pm-item-left">
             <span className="pm-item-icon">{c.parentId ? '↳' : '📁'}</span>
             <div>
-              <div className="pm-item-name">{c.name}</div>
+              {modalEditing.id === c.id && modalEditing.type === 'category' ? (
+                <input
+                  autoFocus
+                  className="inline-edit"
+                  value={modalEditValue}
+                  onChange={e => setModalEditValue(e.target.value)}
+                  onBlur={() => {
+                    if (modalEditValue.trim() && modalEditValue !== c.name) updateCategory(c.id, modalEditValue.trim());
+                    setModalEditing({ id: null, type: null });
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') e.target.blur();
+                    if (e.key === 'Escape') setModalEditing({ id: null, type: null });
+                  }}
+                  style={{ minWidth: 80 }}
+                />
+              ) : (
+                <div
+                  className="pm-item-name"
+                  onDoubleClick={() => {
+                    setModalEditing({ id: c.id, type: 'category' });
+                    setModalEditValue(c.name);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  title="Düzenlemek için çift tıklayın"
+                >
+                  {c.name}
+                </div>
+              )}
               {c.parentId && <div className="pm-item-path">{c.path}</div>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button className="pm-item-edit" onClick={() => {
-              const newName = window.prompt("Kategori için yeni ad:", c.name);
-              if (newName && newName.trim()) updateCategory(c.id, newName.trim());
-            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '14px', opacity: 0.6 }}>✏️</button>
             <button className="pm-item-del" onClick={() => {
               if (window.confirm(`"${c.name}" kategorisini kalıcı olarak silmek istediğinize emin misiniz?`)) deleteCategory(c.id);
             }}>✕</button>
@@ -378,16 +428,18 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="pm-list-section">
-                <div className="pm-search-box">
-                  <span className="icon">🔍</span>
-                  <input type="text" placeholder="Mevcutlar içinde ara..." value={modalSearch} onChange={e => setModalSearch(e.target.value)} />
+                <div className="pm-list-section">
+                  <div className="pm-search-box">
+                    <span className="icon">🔍</span>
+                    <input type="text" placeholder="Mevcutlar içinde ara..." value={modalSearch} onChange={e => setModalSearch(e.target.value)} />
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 8px 0', textAlign: 'right' }}>
+                    Düzenlemek için çift tıklayın
+                  </div>
+                  <div className="pm-list">
+                    {renderModalList()}
+                  </div>
                 </div>
-                
-                <div className="pm-list">
-                  {renderModalList()}
-                </div>
-              </div>
 
             </div>
           </div>
