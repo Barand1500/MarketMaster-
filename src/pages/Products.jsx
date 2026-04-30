@@ -100,21 +100,21 @@ export default function Products() {
 
   const renderModalList = () => {
     if (showModal === 'units') {
-      const filtered = units.filter(u => u.toLowerCase().includes(modalSearch.toLowerCase()));
+      const filtered = units.filter(u => u.name.toLowerCase().includes(modalSearch.toLowerCase()));
       if (filtered.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
       return filtered.map(u => (
-        <div key={u} className="pm-item">
+        <div key={u.id} className="pm-item">
           <div className="pm-item-left">
             <span className="pm-item-icon">⚖️</span>
-            <span className="pm-item-name">{u}</span>
+            <span className="pm-item-name">{u.name}</span>
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button className="pm-item-edit" onClick={() => {
-              const newName = window.prompt("Birim için yeni ad:", u);
-              if (newName && newName.trim()) updateUnit(u, newName.trim());
+              const newName = window.prompt("Birim için yeni ad:", u.name);
+              if (newName && newName.trim()) updateUnit(u.id, newName.trim());
             }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', fontSize: '14px', opacity: 0.6 }}>✏️</button>
             <button className="pm-item-del" onClick={() => {
-              if (window.confirm(`"${u}" birimini silmek istediğinize emin misiniz?`)) deleteUnit(u);
+              if (window.confirm(`"${u.name}" birimini silmek istediğinize emin misiniz?`)) deleteUnit(u.id);
             }}>✕</button>
           </div>
         </div>
@@ -221,7 +221,7 @@ export default function Products() {
                 }} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
                 <td>
                   <select className="lite-select" value={newRow.unit} onChange={e => setNewRow({...newRow, unit: e.target.value})}>
-                    {units.map(u => <option key={u} value={u}>{u}</option>)}
+                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                   </select>
                 </td>
                 <td>
@@ -258,8 +258,8 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => {
-                const isEditingCats = editing?.id === p.id && editing?.field === 'categoryIds';
+              {products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase())).map(p => {
+                const isEditingCats = editing?.id == p.id && editing?.field === 'categoryIds';
                 return (
                   <tr key={p.id} className={isEditingCats ? 'editing-row' : ''}>
                     <td>
@@ -294,14 +294,14 @@ export default function Products() {
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'unit' })}>
                       {editing?.id === p.id && editing?.field === 'unit' ? (
                         <select autoFocus className="lite-select" defaultValue={p.unit} onBlur={e => handleBlur(p.id, 'unit', e.target.value)} onChange={e => handleBlur(p.id, 'unit', e.target.value)}>
-                          {units.map(u => <option key={u} value={u}>{u}</option>)}
+                          {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                         </select>
                       ) : (
                         <span className="badge-unit">{p.unit}</span>
                       )}
                     </td>
                     <td onDoubleClick={(e) => { e.stopPropagation(); setEditing({ id: p.id, field: 'categoryIds' }); setCatSearch(''); }}>
-                      <div className="cat-drop-wrapper" ref={editDropRef}>
+                      <div className="cat-drop-wrapper" ref={isEditingCats ? editDropRef : null}>
                         <div className="badge-group">
                           {p.categoryIds.map(cid => {
                             const cat = categories.find(c => c.id === cid);
@@ -310,12 +310,16 @@ export default function Products() {
                           {p.categoryIds.length === 0 && <span className="no-data">YOK</span>}
                         </div>
                         {isEditingCats && (
-                          <div className="cat-drop-panel shadow-lg" onClick={e => e.stopPropagation()}>
+                          <div className="cat-drop-panel shadow-lg" style={{ zIndex: 1000 }} onClick={e => e.stopPropagation()}>
                             <input type="text" placeholder="Ara..." value={catSearch} onChange={e => setCatSearch(e.target.value)} autoFocus />
                             <div className="cat-drop-scroll">
                               {categories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).map(c => (
-                                <label key={c.id} className="cat-label">
-                                  <input type="checkbox" checked={p.categoryIds.includes(c.id)} onChange={() => toggleCategory(c.id, p.categoryIds, null, true, p.id)} />
+                                <label key={c.id} className="cat-label" onClick={e => e.stopPropagation()}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={p.categoryIds.includes(c.id)} 
+                                    onChange={() => toggleCategory(c.id, p.categoryIds, null, true, p.id)} 
+                                  />
                                   <span>{getCategoryPath(c)}</span>
                                 </label>
                               ))}
@@ -327,16 +331,16 @@ export default function Products() {
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <button 
-                        onClick={() => updateProduct(p.id, { inStock: p.inStock === false ? true : false })}
-                        style={{ background: p.inStock !== false ? 'rgba(0, 184, 148, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: p.inStock !== false ? 'var(--primary)' : 'var(--danger)', border: `1px solid ${p.inStock !== false ? 'rgba(0, 184, 148, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', width: '100%', transition: 'all 0.2s' }}
+                        onClick={() => updateProduct(p.id, { inStock: !p.inStock })}
+                        style={{ background: p.inStock ? 'rgba(0, 184, 148, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: p.inStock ? 'var(--primary)' : 'var(--danger)', border: `1px solid ${p.inStock ? 'rgba(0, 184, 148, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`, padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', width: '100%', transition: 'all 0.2s' }}
                       >
-                        {p.inStock !== false ? 'VAR' : 'YOK'}
+                        {p.inStock ? 'VAR' : 'YOK'}
                       </button>
                     </td>
                     <td>
                       <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column' }}>
-                        <span>{p.priceHistory && p.priceHistory.length > 0 ? new Date(p.priceHistory[p.priceHistory.length - 1].date).toLocaleDateString('tr-TR') : '-'}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>{p.priceHistory && p.priceHistory.length > 0 ? new Date(p.priceHistory[p.priceHistory.length - 1].date).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        <span>{p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('tr-TR') : '-'}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>{p.updatedAt ? new Date(p.updatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>

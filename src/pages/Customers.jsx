@@ -163,9 +163,9 @@ export default function Customers() {
                 <th style={{ width: '180px' }}>Müşteri Adı <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '120px' }}>TC / VKN</th>
                 <th style={{ width: '140px' }}>Telefon</th>
+                <th style={{ width: '180px' }}>E-posta <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '120px' }}>Şifre <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '100px' }}>İskonto %</th>
-                <th style={{ width: '180px' }}>E-posta <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '100px', textAlign: 'center' }}>İşlem</th>
               </tr>
               {/* EXCEL ADD ROW */}
@@ -177,9 +177,9 @@ export default function Customers() {
                   setNewRow({...newRow, taxId: val});
                 }} /></td>
                 <td><input className="lite-input" type="text" placeholder="Örn: 0530..." value={newRow.phone} onChange={e => setNewRow({...newRow, phone: formatPhoneDynamic(e.target.value)})} /></td>
+                <td><input className="lite-input" type="email" placeholder="Zorunlu..." value={newRow.email} onChange={e => setNewRow({...newRow, email: e.target.value})} /></td>
                 <td><input className="lite-input" type="password" placeholder="••••••" value={newRow.password} onChange={e => setNewRow({...newRow, password: e.target.value})} /></td>
                 <td><input className="lite-input" type="number" placeholder="0" value={newRow.discount} onChange={e => setNewRow({...newRow, discount: e.target.value})} /></td>
-                <td><input className="lite-input" type="email" placeholder="Zorunlu..." value={newRow.email} onChange={e => setNewRow({...newRow, email: e.target.value})} /></td>
                 <td style={{ textAlign: 'center', position: 'relative' }}>
                   <button className="lite-add-btn" onClick={handleAdd}>EKLE</button>
                   {errorMsg && <div style={{ 
@@ -244,6 +244,16 @@ export default function Customers() {
                     )}
                   </td>
 
+
+
+                  <td onDoubleClick={() => setEditing({ id: c.id, field: 'email' })}>
+                    {editing?.id === c.id && editing?.field === 'email' ? (
+                      <input autoFocus type="email" className="lite-input" defaultValue={c.email} onBlur={(e) => handleBlur(c.id, 'email', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                    ) : (
+                      <span className="edit-txt" style={{ color: '#3b82f6', fontWeight: '500' }}>{c.email || '-'}</span>
+                    )}
+                  </td>
+
                   <td onDoubleClick={() => setEditing({ id: c.id, field: 'password' })}>
                     {editing?.id === c.id && editing?.field === 'password' ? (
                       <input autoFocus className="lite-input" defaultValue={c.password} onBlur={(e) => handleBlur(c.id, 'password', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
@@ -268,14 +278,6 @@ export default function Customers() {
                       <input autoFocus type="number" className="lite-input" defaultValue={c.discount} onBlur={(e) => handleBlur(c.id, 'discount', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
                       <span className="edit-txt">%{c.discount || 0}</span>
-                    )}
-                  </td>
-
-                  <td onDoubleClick={() => setEditing({ id: c.id, field: 'email' })}>
-                    {editing?.id === c.id && editing?.field === 'email' ? (
-                      <input autoFocus type="email" className="lite-input" defaultValue={c.email} onBlur={(e) => handleBlur(c.id, 'email', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
-                    ) : (
-                      <span className="edit-txt" style={{ color: '#3b82f6', fontWeight: '500' }}>{c.email || '-'}</span>
                     )}
                   </td>
 
@@ -390,7 +392,11 @@ export default function Customers() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🗓️ Kayıt Tarihi</span>
-                    <span style={{ fontSize: '14px', color: '#1e293b', fontWeight: '700' }}>{new Date(infoModal.createdAt).toLocaleDateString('tr-TR')}</span>
+                    <span style={{ fontSize: '14px', color: '#1e293b', fontWeight: '700' }}>
+                      {infoModal.createdAt && !isNaN(new Date(infoModal.createdAt).getTime()) 
+                        ? new Date(infoModal.createdAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : 'Bilinmiyor'}
+                    </span>
                   </div>
                 </div>
               </div>

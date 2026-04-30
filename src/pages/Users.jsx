@@ -54,7 +54,7 @@ export default function Users() {
   };
 
   const togglePageRole = (userId, pageId, currentPages) => {
-    if (userId === 'admin') return; // Admin rolleri değiştirilemez
+    if (userId === 1 || userId === '1' || userId === 'admin') return; // Admin rolleri değiştirilemez
     let newPages = [...(currentPages || [])];
     if (newPages.includes(pageId)) {
       newPages = newPages.filter(p => p !== pageId);
@@ -158,7 +158,7 @@ export default function Users() {
             </thead>
             <tbody>
               {users.filter(u => u.contact?.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase())).map(u => {
-                const isSysAdmin = u.id === 'admin';
+                const isSysAdmin = u.id === 1 || u.id === '1' || u.id === 'admin' || u.username === 'baran';
                 const userPages = u.allowedPages || [];
                 
                 return (
@@ -204,7 +204,7 @@ export default function Users() {
                     <td>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {isSysAdmin ? (
-                          <span style={{ fontSize: '12px', background: 'var(--primary)', color: '#fff', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>Tüm Yetkilere Sahip</span>
+                          <span style={{ fontSize: '11px', background: '#3b82f6', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontWeight: '800', letterSpacing: '0.5px' }}>🛡️ SİSTEM ADMİNİ</span>
                         ) : (
                           AVAILABLE_PAGES.map(page => (
                             <label key={page.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', cursor: 'pointer', background: userPages.includes(page.id) ? 'rgba(0, 184, 148, 0.1)' : '#f1f5f9', color: userPages.includes(page.id) ? 'var(--primary)' : '#64748b', padding: '4px 8px', borderRadius: '6px', border: `1px solid ${userPages.includes(page.id) ? 'var(--primary)' : '#e2e8f0'}`, transition: 'all 0.2s' }}>

@@ -9,21 +9,47 @@ import CustomerPortal from './pages/CustomerPortal';
 
 import Navbar from './components/Navbar';
 import './components/Navbar.css';
+import { useData } from './context/DataContext';
 
 export default function App() {
+  const { loading, apiError, clearApiError } = useData();
   const [session, setSession] = useState(null);
   const [page, setPage] = useState('products');
 
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ fontSize: '48px' }}>🌿</div>
+        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>Bostan Manav</div>
+        <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Sunucuya bağlanılıyor...</div>
+      </div>
+    );
+  }
+
+  const errorToast = apiError ? (
+    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '12px', padding: '14px 18px', maxWidth: '420px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+      <span style={{ fontSize: '20px' }}>⚠️</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, color: '#991b1b', fontSize: '14px' }}>Bağlantı Hatası</div>
+        <div style={{ color: '#b91c1c', fontSize: '13px', marginTop: '2px' }}>{apiError}</div>
+      </div>
+      <button onClick={clearApiError} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', fontSize: '20px', lineHeight: 1, padding: '0' }}>×</button>
+    </div>
+  ) : null;
+
   if (!session) {
-    return <Login onLogin={setSession} />;
+    return <>{errorToast}<Login onLogin={setSession} /></>;
   }
 
   // CUSTOMER VIEW
   if (session.role === 'customer') {
     return (
-      <div className="main-content" style={{ marginLeft: 0, padding: '40px' }}>
-        <CustomerPortal customer={session} onLogout={() => setSession(null)} />
-      </div>
+      <>
+        {errorToast}
+        <div className="main-content" style={{ marginLeft: 0, padding: '40px' }}>
+          <CustomerPortal customer={session} onLogout={() => setSession(null)} onSessionUpdate={setSession} />
+        </div>
+      </>
     );
   }
 
@@ -50,17 +76,20 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
-      <Navbar
-        active={page}
-        onNav={setPage}
-        onLogout={() => setSession(null)}
-        session={session}
-      />
-      <main className="main-content" style={{ marginLeft: 0 }}>
-        {renderPage()}
-      </main>
-    </div>
+    <>
+      {errorToast}
+      <div className="app-container">
+        <Navbar
+          active={page}
+          onNav={setPage}
+          onLogout={() => setSession(null)}
+          session={session}
+        />
+        <main className="main-content" style={{ marginLeft: 0 }}>
+          {renderPage()}
+        </main>
+      </div>
+    </>
   );
 }
 

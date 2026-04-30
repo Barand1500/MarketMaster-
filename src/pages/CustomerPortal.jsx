@@ -3,8 +3,10 @@ import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
 
-export default function CustomerPortal({ customer, onLogout }) {
-  const { categories, products, updateCustomer } = useData();
+const API_URL = "http://127.0.0.1:5000/api";
+
+export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
+  const { categories, products, updateCustomer, refetchProducts } = useData();
   const [search, setSearch] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [showCatDrop, setShowCatDrop] = useState(false);
@@ -18,24 +20,37 @@ export default function CustomerPortal({ customer, onLogout }) {
     phone: customer.phone || '',
     address: customer.address || '',
     currentPass: '',
-    confirmCurrentPass: '',
-    newPass: ''
+    newPass: '',
+    confirmNewPass: ''
   });
+  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false, reset: false, resetConfirm: false });
+  const [resetStep, setResetStep] = useState('none'); // 'none', 'sending', 'verify', 'newpass'
+  const [resetData, setResetData] = useState({ code: '', newPass: '', confirmNewPass: '' });
+  const [resetTimer, setResetTimer] = useState(0);
 
-  // 20 Saniyede bir sayfayı yeniler
+  // 20 Saniyede bir urunleri yeniden cek
   useEffect(() => {
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
+      await refetchProducts();
       setLastRefreshed(new Date());
     }, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refetchProducts]);
+
+  useEffect(() => {
+    let interval;
+    if (resetTimer > 0) {
+      interval = setInterval(() => setResetTimer(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resetTimer]);
 
   const discount = customer.discount || 0;
 
   const filteredProducts = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = selectedCategories.length > 0 
-      ? selectedCategories.some(cid => p.categoryIds.includes(cid)) 
+    const matchCat = selectedCategories.length > 0
+      ? selectedCategories.some(cid => p.categoryIds.includes(cid))
       : true;
     return matchSearch && matchCat;
   });
@@ -44,8 +59,8 @@ export default function CustomerPortal({ customer, onLogout }) {
 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
-  const displayCategories = selectedCategories.length > 0 
-    ? categories.filter(c => selectedCategories.includes(c.id)) 
+  const displayCategories = selectedCategories.length > 0
+    ? categories.filter(c => selectedCategories.includes(c.id))
     : roots;
 
   return (
@@ -62,7 +77,7 @@ export default function CustomerPortal({ customer, onLogout }) {
         <div className="header-center">
           <div className="search-wrapper">
             <span style={{ fontSize: '14px', opacity: 0.5 }}>🔍</span>
-            <input 
+            <input
               type="text" placeholder="Ürün ara..." value={search}
               onChange={e => setSearch(e.target.value)}
               className="header-search-input"
@@ -128,7 +143,7 @@ export default function CustomerPortal({ customer, onLogout }) {
             <span className="pulse-dot"></span>
             Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
           </div>
-          <button onClick={() => setLastRefreshed(new Date())} className="refresh-btn-link">🔄 Yenile</button>
+          <button onClick={async () => { await refetchProducts(); setLastRefreshed(new Date()); }} className="refresh-btn-link">🔄 Yenile</button>
         </div>
       </div>
 
@@ -319,13 +334,13 @@ export default function CustomerPortal({ customer, onLogout }) {
               {cat.name}
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
-            
+
             <div className="product-grid">
               {catProducts.map(p => {
                 const discountedPrice = p.price * (1 - discount / 100);
-                const lastUpdate = p.priceHistory && p.priceHistory.length > 0 
-                  ? new Date(p.priceHistory[p.priceHistory.length - 1].date).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' })
-                  : 'Yeni';
+                const lastUpdate = p.lastPriceChange
+                  ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : 'İlk Fiyat';
 
                 return (
                   <div key={p.id} className="product-card" style={{ opacity: p.inStock === false ? 0.6 : 1, filter: p.inStock === false ? 'grayscale(0.3)' : 'none' }}>
@@ -346,29 +361,66 @@ export default function CustomerPortal({ customer, onLogout }) {
                         <span style={{ fontSize: '60px' }}>🍎</span>
                       )}
                     </div>
-                    
+
                     <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <strong style={{ fontSize: '14px', color: '#0f172a', lineHeight: '1.2' }}>{p.name}</strong>
                         <span className="badge-unit" style={{ background: '#f1f5f9', color: '#64748b', fontWeight: '600', fontSize: '11px', padding: '2px 6px' }}>{p.unit || 'Kg'}</span>
                       </div>
 
-                      <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'right' }}>
+                      <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'center' }}>
                         {discount > 0 ? (
                           <>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', marginBottom: '2px' }}>
-                              <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: '12px', fontWeight: '600' }}>{fmtPrice(p.price)}</span>
-                              <span style={{ fontSize: '9px', color: 'var(--danger)', fontWeight: '800', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '6px' }}>SANA ÖZEL</span>
+                            <div style={{ marginBottom: '12px' }}>
+                              <span style={{
+                                color: '#64748b',
+                                fontSize: '14px',
+                                fontWeight: '700',
+                                borderBottom: '1.5px solid rgba(100, 116, 139, 0.3)',
+                                paddingBottom: '2px',
+                                display: 'inline-block'
+                              }}>
+                                {fmtPrice(p.price)}
+                              </span>
                             </div>
-                            <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary)', letterSpacing: '-0.5px' }}>{fmtPrice(discountedPrice)}</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <span style={{
+                                fontSize: '8.5px',
+                                color: '#fff',
+                                fontWeight: '900',
+                                background: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)',
+                                padding: '3px 7px',
+                                borderRadius: '7px',
+                                boxShadow: '0 3px 6px rgba(214, 48, 49, 0.25)',
+                                whiteSpace: 'nowrap',
+                                transform: 'rotate(-3deg)',
+                                display: 'inline-block',
+                                letterSpacing: '0.3px',
+                                marginBottom: '2px'
+                              }}>
+                                SANA ÖZEL
+                              </span>
+                              <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
+                                {(() => {
+                                  const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                                  const parts = str.split(',');
+                                  return (
+                                    <>
+                                      {parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
                           </>
                         ) : (
-                          <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.5px' }}>{fmtPrice(p.price)}</div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
+                            {fmtPrice(p.price)}
+                          </div>
                         )}
                       </div>
-
                       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', fontSize: '10px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}>
-                        <span style={{ opacity: 0.7 }}>🕒</span> Son Fiyat Güncelleme: {lastUpdate}
+                        <span style={{ opacity: 0.7 }}>🕒</span> Son Güncelleme: {lastUpdate}
                       </div>
                     </div>
                   </div>
@@ -382,22 +434,22 @@ export default function CustomerPortal({ customer, onLogout }) {
       {/* PREMIUM PROFILE MODAL */}
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div className="premium-confirm" onClick={e => e.stopPropagation()} style={{ 
-            maxWidth: '550px', width: '100%', padding: '0', borderRadius: '24px', 
+          <div className="premium-confirm" onClick={e => e.stopPropagation()} style={{
+            maxWidth: '550px', width: '100%', padding: '0', borderRadius: '24px',
             overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: 'none'
           }}>
             {/* MODAL HEADER */}
-            <div style={{ 
-              padding: '32px 32px 24px', 
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+            <div style={{
+              padding: '32px 32px 24px',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
               borderBottom: '1px solid #e2e8f0',
               position: 'relative'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <div style={{ 
-                  width: '56px', height: '56px', 
-                  background: 'linear-gradient(135deg, var(--primary) 0%, #00d2ab 100%)', 
-                  borderRadius: '16px', display: 'flex', alignItems: 'center', 
+                <div style={{
+                  width: '56px', height: '56px',
+                  background: 'linear-gradient(135deg, var(--primary) 0%, #00d2ab 100%)',
+                  borderRadius: '16px', display: 'flex', alignItems: 'center',
                   justifyContent: 'center', color: '#fff', fontSize: '24px',
                   boxShadow: '0 8px 16px rgba(0, 184, 148, 0.2)'
                 }}>👤</div>
@@ -406,20 +458,20 @@ export default function CustomerPortal({ customer, onLogout }) {
                   <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b', fontWeight: '500' }}>Kişisel bilgilerinizi ve fatura detaylarını yönetin</p>
                 </div>
               </div>
-              <button onClick={() => setShowProfile(false)} style={{ 
-                position: 'absolute', top: '24px', right: '24px', 
+              <button onClick={() => setShowProfile(false)} style={{
+                position: 'absolute', top: '24px', right: '24px',
                 background: '#fff', border: '1px solid #e2e8f0', width: '32px', height: '32px',
                 borderRadius: '50%', fontSize: '14px', cursor: 'pointer', color: '#64748b',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s'
               }}>✕</button>
             </div>
-            
+
             <div className="confirm-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="field-group">
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ opacity: 0.7 }}>🏢</span> Ticari Ünvan / Ad Soyad
                 </label>
-                <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.title} onChange={e => setProfileData({...profileData, title: e.target.value})} />
+                <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.title} onChange={e => setProfileData({ ...profileData, title: e.target.value })} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
@@ -427,13 +479,13 @@ export default function CustomerPortal({ customer, onLogout }) {
                   <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ opacity: 0.7 }}>🆔</span> TC / VKN
                   </label>
-                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.taxId} onChange={e => setProfileData({...profileData, taxId: e.target.value})} />
+                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.taxId} onChange={e => setProfileData({ ...profileData, taxId: e.target.value })} />
                 </div>
                 <div className="field-group">
                   <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ opacity: 0.7 }}>📞</span> Telefon No
                   </label>
-                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.phone} onChange={e => setProfileData({...profileData, phone: e.target.value})} />
+                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.phone} onChange={e => setProfileData({ ...profileData, phone: e.target.value })} />
                 </div>
               </div>
 
@@ -441,25 +493,25 @@ export default function CustomerPortal({ customer, onLogout }) {
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ opacity: 0.7 }}>📧</span> E-posta Adresi
                 </label>
-                <input type="email" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.email} onChange={e => setProfileData({...profileData, email: e.target.value})} />
+                <input type="email" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.email} onChange={e => setProfileData({ ...profileData, email: e.target.value })} />
               </div>
 
               <div className="field-group">
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ opacity: 0.7 }}>📍</span> Kayıtlı Fatura Adresi
                 </label>
-                <textarea 
-                  className="lite-input" 
-                  style={{ minHeight: '100px', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0', resize: 'none', lineHeight: '1.6' }} 
-                  value={profileData.address} 
-                  onChange={e => setProfileData({...profileData, address: e.target.value})}
+                <textarea
+                  className="lite-input"
+                  style={{ minHeight: '100px', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0', resize: 'none', lineHeight: '1.6' }}
+                  value={profileData.address}
+                  onChange={e => setProfileData({ ...profileData, address: e.target.value })}
                   placeholder="Detaylı adresinizi buraya yazın..."
                 ></textarea>
               </div>
 
               {/* PASSWORD CHANGE SECTION */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '8px' }}>
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPasswordSection(!showPasswordSection)}
                   style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', fontWeight: '700', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -469,80 +521,164 @@ export default function CustomerPortal({ customer, onLogout }) {
 
                 {showPasswordSection && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div className="field-group">
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block' }}>Mevcut Şifre</label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showPass.current ? 'text' : 'password'}
+                          placeholder="••••••"
+                          className="lite-input"
+                          style={{ padding: '8px 40px 8px 12px', fontSize: '13px', width: '100%' }}
+                          value={profileData.currentPass}
+                          onChange={e => setProfileData({ ...profileData, currentPass: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPass(prev => ({ ...prev, current: !prev.current }))}
+                          style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px' }}
+                        >
+                          {showPass.current ? '🐵' : '🙈'}
+                        </button>
+                      </div>
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <div className="field-group">
-                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block' }}>Mevcut Şifre</label>
-                        <input type="password" placeholder="••••••" className="lite-input" style={{ padding: '8px 12px', fontSize: '13px' }} value={profileData.currentPass} onChange={e => setProfileData({...profileData, currentPass: e.target.value})} />
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block' }}>Yeni Şifre</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={showPass.new ? 'text' : 'password'}
+                            placeholder="Yeni şifre"
+                            className="lite-input"
+                            style={{ padding: '8px 40px 8px 12px', fontSize: '13px', width: '100%' }}
+                            value={profileData.newPass}
+                            onChange={e => setProfileData({ ...profileData, newPass: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPass(prev => ({ ...prev, new: !prev.new }))}
+                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px' }}
+                          >
+                            {showPass.new ? '🐵' : '🙈'}
+                          </button>
+                        </div>
                       </div>
                       <div className="field-group">
-                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block' }}>Mevcut Şifre (Tekrar)</label>
-                        <input type="password" placeholder="••••••" className="lite-input" style={{ padding: '8px 12px', fontSize: '13px' }} value={profileData.confirmCurrentPass} onChange={e => setProfileData({...profileData, confirmCurrentPass: e.target.value})} />
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block' }}>Yeni Şifre (Tekrar)</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={showPass.confirm ? 'text' : 'password'}
+                            placeholder="Yeni şifre tekrar"
+                            className="lite-input"
+                            style={{ padding: '8px 40px 8px 12px', fontSize: '13px', width: '100%' }}
+                            value={profileData.confirmNewPass}
+                            onChange={e => setProfileData({ ...profileData, confirmNewPass: e.target.value })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPass(prev => ({ ...prev, confirm: !prev.confirm }))}
+                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px' }}
+                          >
+                            {showPass.confirm ? '🐵' : '🙈'}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* VALIDATION ERROR */}
-                    {(profileData.currentPass || profileData.confirmCurrentPass) && (profileData.currentPass !== customer.password || profileData.confirmCurrentPass !== customer.password) && (
-                      <p style={{ margin: 0, fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>⚠️ Mevcut şifreniz uyuşmuyor veya hatalı!</p>
+                    {/* VALIDATION ERRORS */}
+                    {profileData.newPass && profileData.confirmNewPass && profileData.newPass !== profileData.confirmNewPass && (
+                      <p style={{ margin: 0, fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>⚠️ Yeni şifreler birbiriyle uyuşmuyor!</p>
                     )}
 
-                    <div className="field-group">
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '4px', display: 'block', opacity: (profileData.currentPass === customer.password && profileData.confirmCurrentPass === customer.password) ? 1 : 0.5 }}>Yeni Şifre</label>
-                      <input 
-                        type="password" 
-                        placeholder="Yeni şifrenizi girin" 
-                        className="lite-input" 
-                        style={{ padding: '8px 12px', fontSize: '13px' }} 
-                        value={profileData.newPass} 
-                        onChange={e => setProfileData({...profileData, newPass: e.target.value})}
-                        disabled={profileData.currentPass !== customer.password || profileData.confirmCurrentPass !== customer.password}
-                      />
-                    </div>
-
-                    <button 
+                    <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         if (profileData.newPass.length < 3) {
                           alert('Yeni şifre en az 3 karakter olmalıdır!');
                           return;
                         }
-                        if (window.confirm('Şifrenizi güncellemek istediğinizden emin misiniz?')) {
-                          updateCustomer(customer.id, { ...customer, password: profileData.newPass });
-                          alert('Şifreniz başarıyla güncellendi!');
-                          setProfileData({...profileData, currentPass: '', confirmCurrentPass: '', newPass: ''});
-                          setShowPasswordSection(false);
+                        if (profileData.newPass !== profileData.confirmNewPass) {
+                          alert('Yeni şifreler uyuşmuyor!');
+                          return;
                         }
+                        try {
+                          const res = await fetch(`${API_URL}/verify-password`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: customer.id, password: profileData.currentPass, role: 'customer' })
+                          });
+                          const data = await res.json();
+                          if (!data.valid) { alert('Mevcut şifreniz hatalı!'); return; }
+                          if (window.confirm('Şifrenizi güncellemek istediğinizden emin misiniz?')) {
+                            await updateCustomer(customer.id, { password: profileData.newPass });
+                            alert('Şifreniz başarıyla güncellendi!');
+                            setProfileData(prev => ({ ...prev, currentPass: '', newPass: '', confirmNewPass: '' }));
+                            setShowPasswordSection(false);
+                          }
+                        } catch { alert('Sunucu hatası. Lütfen tekrar deneyin.'); }
                       }}
-                      disabled={profileData.currentPass !== customer.password || profileData.confirmCurrentPass !== customer.password || !profileData.newPass}
-                      style={{ 
-                        background: 'var(--primary)', color: '#fff', border: 'none', 
-                        padding: '10px', borderRadius: '10px', fontWeight: '800', fontSize: '12px',
-                        cursor: 'pointer', opacity: (profileData.currentPass === customer.password && profileData.confirmCurrentPass === customer.password && profileData.newPass) ? 1 : 0.5
-                      }}
-                    >
-                      ŞİFREYİ GÜNCELLE ✅
+                      disabled={!profileData.currentPass || !profileData.newPass || !profileData.confirmNewPass || profileData.newPass !== profileData.confirmNewPass}
+                      style={{
+                        background: 'var(--primary)', color: '#fff', border: 'none',
+                        padding: '12px', borderRadius: '12px', fontWeight: '800', fontSize: '13px',
+                        cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 12px rgba(0, 184, 148, 0.2)'
+                      }}>
+                      Şifreyi Güncelle
                     </button>
 
                     <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '4px' }}>
                       <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
-                        Mevcut şifrenizi hatırlamıyor musunuz? <br/>
-                        <button type="button" onClick={() => alert('Şifre sıfırlama talebiniz e-posta adresinize gönderilecektir (Yakında).')} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline', padding: '4px 0' }}>Buraya tıklayarak sıfırlama linki isteyebilirsiniz.</button>
+                        Mevcut şifrenizi hatırlamıyor musunuz? <br />
+                        <button
+                          type="button"
+                          disabled={resetStep !== 'none' && resetStep !== 'verify'}
+                          onClick={async () => {
+                            setResetStep('sending');
+                            try {
+                              const res = await fetch(`${API_URL}/send-reset-code`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: customer.eposta || customer.email })
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                const remainingMsg = data.remaining ? `\n\n(Gunluk kalan: ${data.remaining} email)` : '';
+                                alert(data.message + remainingMsg);
+                                setResetStep('verify');
+                                setResetTimer(300); // 5 dakika
+                              } else {
+                                if (data.limitReached) {
+                                  alert('⚠️ Gunluk 100 email limitine ulasildi.\n\nLutfen yarın tekrar deneyin.\n\nBu limit guvenlik icindir.');
+                                } else {
+                                  alert(data.error);
+                                }
+                                setResetStep('none');
+                              }
+                            } catch (err) {
+                              alert('Bağlantı hatası: ' + err.message);
+                              setResetStep('none');
+                            }
+                          }}
+                          style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline', padding: '4px 0' }}
+                        >
+                          Buraya tıklayarak sıfırlama linki isteyebilirsiniz.
+                        </button>
                       </p>
                     </div>
+
+                    {/* Password reset flow moved out of here */}
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="confirm-footer" style={{ 
-              padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', 
-              display: 'flex', justifyContent: 'flex-end', gap: '12px' 
+            <div className="confirm-footer" style={{
+              padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'flex-end', gap: '12px'
             }}>
-              <button onClick={() => {
-                setShowProfile(false);
-                setShowPasswordSection(false);
-              }} style={{ 
-                background: 'transparent', color: '#64748b', border: 'none', 
-                padding: '12px 20px', fontWeight: '700', fontSize: '14px', cursor: 'pointer' 
+              <button onClick={() => { setShowProfile(false); setShowPasswordSection(false); setProfileData(prev => ({ ...prev, currentPass: '', newPass: '', confirmNewPass: '' })); }} style={{
+                background: 'transparent', color: '#64748b', border: 'none',
+                padding: '12px 20px', fontWeight: '700', fontSize: '14px', cursor: 'pointer'
               }}>Vazgeç</button>
               <button onClick={() => {
                 const updates = {
@@ -553,15 +689,209 @@ export default function CustomerPortal({ customer, onLogout }) {
                   address: profileData.address
                 };
                 updateCustomer(customer.id, updates);
+                // Header'daki musteri adini guncelle
+                if (onSessionUpdate) {
+                  onSessionUpdate(prev => ({ ...prev, name: profileData.title, taxId: profileData.taxId, email: profileData.email, phone: profileData.phone, address: profileData.address }));
+                }
                 alert('Profil bilgileriniz başarıyla güncellendi!');
                 setShowProfile(false);
-              }} style={{ 
-                background: 'var(--primary)', color: '#fff', border: 'none', 
-                padding: '12px 28px', fontWeight: '800', fontSize: '14px', 
+              }} style={{
+                background: 'var(--primary)', color: '#fff', border: 'none',
+                padding: '12px 28px', fontWeight: '800', fontSize: '14px',
                 borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0, 184, 148, 0.2)'
               }}>Değişiklikleri Kaydet</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* PREMIUM PASSWORD RESET MODAL */}
+      {resetStep !== 'none' && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            maxWidth: '450px', width: '100%', background: '#fff',
+            borderRadius: '28px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            overflow: 'hidden', animation: 'modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            {/* MODAL HEADER */}
+            <div style={{
+              padding: '24px 32px', borderBottom: '1px solid #f1f5f9',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px', height: '40px', background: 'rgba(59, 130, 246, 0.1)',
+                  borderRadius: '12px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: '#3b82f6', fontSize: '20px'
+                }}>🔑</div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>
+                  {resetStep === 'sending' ? 'Kod Gönderiliyor' : 
+                   resetStep === 'verify' ? 'Doğrulama Kodu' : 'Yeni Şifre'}
+                </h3>
+              </div>
+              {resetStep !== 'sending' && (
+                <button onClick={() => setResetStep('none')} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+              )}
+            </div>
+
+            <div style={{ padding: '32px' }}>
+              {resetStep === 'sending' ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div className="pulse-dot" style={{ width: '16px', height: '16px', margin: '0 auto 20px' }}></div>
+                  <p style={{ color: '#64748b', fontSize: '15px', fontWeight: '600' }}>Sıfırlama kodu hazırlanıyor ve gönderiliyor...</p>
+                </div>
+              ) : resetStep === 'verify' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>
+                      <strong>{customer.email || customer.eposta}</strong> adresine gönderilen 6 haneli kodu aşağıya giriniz.
+                    </p>
+                    <div style={{ display: 'inline-block', background: '#f8fafc', padding: '4px 12px', borderRadius: '8px', fontSize: '11px', color: '#3b82f6', fontWeight: '700' }}>
+                      {resetTimer > 0 ? `⏱️ ${Math.floor(resetTimer / 60)}:${(resetTimer % 60).toString().padStart(2, '0')} kaldı` : '⚠️ Süre doldu!'}
+                    </div>
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="000000"
+                      maxLength="6"
+                      autoFocus
+                      style={{
+                        width: '100%', textAlign: 'center', fontSize: '32px', 
+                        letterSpacing: '12px', fontWeight: '900', padding: '16px', 
+                        borderRadius: '16px', border: '2px solid #e2e8f0',
+                        color: '#1e293b', outline: 'none', transition: 'border-color 0.2s'
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                      value={resetData.code}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setResetData({ ...resetData, code: val });
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      if (resetData.code.length !== 6) return alert('Lütfen 6 haneli kodu girin.');
+                      try {
+                        const res = await fetch(`${API_URL}/verify-reset-code`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: customer.email || customer.eposta, code: resetData.code })
+                        });
+                        if (res.ok) {
+                          setResetStep('newpass');
+                        } else {
+                          const data = await res.json();
+                          alert(data.error || 'Kod geçersiz veya süresi dolmuş.');
+                        }
+                      } catch (err) { alert('Bağlantı hatası: ' + err.message); }
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: '#fff', border: 'none', padding: '16px', borderRadius: '16px',
+                      fontWeight: '800', fontSize: '15px', cursor: 'pointer',
+                      boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)'
+                    }}
+                  >
+                    Kodu Doğrula
+                  </button>
+
+                  <button
+                    onClick={() => setResetStep('none')}
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    İptal Et
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '4px' }}>
+                    Kimliğiniz doğrulandı. Lütfen yeni şifrenizi belirleyin.
+                  </p>
+                  
+                  <div className="field-group">
+                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'block' }}>Yeni Şifre</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPass.reset ? 'text' : 'password'}
+                        placeholder="••••••"
+                        autoFocus
+                        style={{ width: '100%', padding: '14px 44px 14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
+                        value={resetData.newPass}
+                        onChange={e => setResetData({ ...resetData, newPass: e.target.value })}
+                      />
+                      <button type="button" onClick={() => setShowPass(p => ({ ...p, reset: !p.reset }))} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                        {showPass.reset ? '🐵' : '🙈'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field-group">
+                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'block' }}>Yeni Şifre (Tekrar)</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPass.resetConfirm ? 'text' : 'password'}
+                        placeholder="••••••"
+                        style={{ width: '100%', padding: '14px 44px 14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', outline: 'none' }}
+                        value={resetData.confirmNewPass}
+                        onChange={e => setResetData({ ...resetData, confirmNewPass: e.target.value })}
+                      />
+                      <button type="button" onClick={() => setShowPass(p => ({ ...p, resetConfirm: !p.resetConfirm }))} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                        {showPass.resetConfirm ? '🐵' : '🙈'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      if (resetData.newPass.length < 3) return alert('Şifre en az 3 karakter olmalıdır.');
+                      if (resetData.newPass !== resetData.confirmNewPass) return alert('Şifreler uyuşmuyor.');
+                      try {
+                        const res = await fetch(`${API_URL}/reset-password`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: customer.email || customer.eposta, code: resetData.code, newPassword: resetData.newPass })
+                        });
+                        if (res.ok) {
+                          alert('Şifreniz başarıyla güncellendi! Yeni şifrenizle giriş yapabilirsiniz.');
+                          setResetStep('none');
+                          setShowPasswordSection(false);
+                          // Session ve DataContext'teki müşteri şifresini güncelle
+                          if (onSessionUpdate) onSessionUpdate(prev => ({ ...prev, sifre: resetData.newPass }));
+                          // Admin panelinde de güncellensin
+                          updateCustomer(customer.id, { password: resetData.newPass });
+                        } else {
+                          alert('Bir hata oluştu.');
+                        }
+                      } catch (err) { alert('Bağlantı hatası: ' + err.message); }
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, var(--primary) 0%, #00d2ab 100%)',
+                      color: '#fff', border: 'none', padding: '16px', borderRadius: '16px',
+                      fontWeight: '800', fontSize: '15px', cursor: 'pointer', marginTop: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 184, 148, 0.3)'
+                    }}
+                  >
+                    Şifreyi Güncelle ve Bitir
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <style>{`
+            @keyframes modal-pop {
+              from { opacity: 0; transform: scale(0.9) translateY(20px); }
+              to { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
         </div>
       )}
     </div>

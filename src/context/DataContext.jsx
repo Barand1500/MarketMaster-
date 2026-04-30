@@ -1,137 +1,337 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+
+const API_URL = "http://127.0.0.1:5000/api";
 
 const DataContext = createContext(null);
 
-const INITIAL_CATEGORIES = [
-  { id: uuidv4(), name: 'Meyveler', parentId: null },
-  { id: uuidv4(), name: 'Sebzeler', parentId: null },
-];
-
-const INITIAL_UNITS = ['Kg', 'Adet', 'Demet', 'Kasa', 'Paket'];
-
-const load = (key, fallback) => {
-  try {
-    const val = localStorage.getItem(key);
-    return val ? JSON.parse(val) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
 export function DataProvider({ children }) {
-  const [categories, setCategories] = useState(() => load('manav_categories', INITIAL_CATEGORIES));
-  const [products, setProducts] = useState(() => load('manav_products', []));
-  const [users, setUsers] = useState(() => load('manav_users', [{ id: 'admin', username: 'ercan', password: '123', contact: 'Yönetici', allowedPages: ['products', 'customers', 'users'] }]));
-  const [customers, setCustomers] = useState(() => load('manav_customers', []));
-  const [units, setUnits] = useState(() => load('manav_units', INITIAL_UNITS));
-  const [extraPrices, setExtraPrices] = useState(() => load('manav_extra_prices', []));
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
 
-  const safeSave = (key, data) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (e) {
-      if (e.name === 'QuotaExceededError') {
-        alert('Depolama alanı doldu! Lütfen çok büyük resimler yüklemeyin veya bazı verileri silin.');
+  // VERILERI API'DEN CEK
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [catsRes, prodsRes, unitsRes, custsRes, staffRes] = await Promise.all([
+          fetch(`${API_URL}/kategoriler`),
+          fetch(`${API_URL}/urunler`),
+          fetch(`${API_URL}/birimler`),
+          fetch(`${API_URL}/musteriler`),
+          fetch(`${API_URL}/personeller`)
+        ]);
+
+        const cats = await catsRes.json();
+        const prods = await prodsRes.json();
+        const brm = await unitsRes.json();
+        const cust = await custsRes.json();
+        const staff = await staffRes.json();
+
+        // Veritabani alanlarini frontend alanlarina maple
+        setCategories(cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })));
+        setProducts(prods.map(p => ({ 
+          id: p.id, 
+          name: p.urun_adi, 
+          price: parseFloat(p.fiyat), 
+          unit: p.birim_adi, 
+          categoryIds: p.kategori_ids || [], 
+          image: p.gorsel_yolu, 
+          inStock: p.stok_durumu === 1 || p.stok_durumu === true,
+          updatedAt: p.guncelleme_tarihi,
+          lastPriceChange: p.son_fiyat_degisimi || null
+        })));
+        setUnits(brm.map(b => ({ id: b.id, name: b.birim_adi })));
+        setCustomers(cust.map(c => ({ 
+          id: c.id, 
+          name: c.ad_soyad, 
+          taxId: c.vkn_tc, 
+          phone: c.telefon, 
+          email: c.eposta, 
+          password: c.sifre,
+          discount: parseFloat(c.iskonto_orani), 
+          address: c.adres,
+          createdAt: c.kayit_tarihi
+        })));
+        setUsers(staff.map(s => ({ 
+          id: s.id, 
+          contact: s.ad_soyad, 
+          username: s.kullanici_adi,
+          password: s.sifre,
+          allowedPages: s.yetkiler || []
+        })));
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Veri yukleme hatasi:", error);
+        setApiError('Sunucuya bağlanılamadı. Backend\'in çalıştığından ve .env dosyasının doğru ayarlandığından emin olun.');
+        setLoading(false);
       }
-    }
-  };
+    };
 
-  useEffect(() => { safeSave('manav_categories', categories); }, [categories]);
-  useEffect(() => { safeSave('manav_products', products); }, [products]);
-  useEffect(() => { safeSave('manav_users', users); }, [users]);
-  useEffect(() => { safeSave('manav_customers', customers); }, [customers]);
-  useEffect(() => { safeSave('manav_units', units); }, [units]);
-  useEffect(() => { safeSave('manav_extra_prices', extraPrices); }, [extraPrices]);
+    fetchData();
+  }, []);
 
-  const clearAllData = () => {
-    if (window.confirm('Tüm veriler silinecek! Emin misiniz?')) {
-      localStorage.clear();
-      window.location.reload();
-    }
+  const refetchProducts = async () => {
+    try {
+      const res = await fetch(`${API_URL}/urunler`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const prods = await res.json();
+      setProducts(prods.map(p => ({
+        id: p.id,
+        name: p.urun_adi,
+        price: parseFloat(p.fiyat),
+        unit: p.birim_adi,
+        categoryIds: p.kategori_ids || [],
+        image: p.gorsel_yolu,
+        inStock: p.stok_durumu === 1 || p.stok_durumu === true,
+        updatedAt: p.guncelleme_tarihi,
+        lastPriceChange: p.son_fiyat_degisimi || null
+      })));
+    } catch { /* sessizce hata yut, mevcut veri kalsin */ }
   };
 
   // CATEGORIES
-  const addCategory = (name, parentId = null) => {
-    setCategories(prev => [...prev, { id: uuidv4(), name, parentId }]);
+  const addCategory = async (name, parentId = null) => {
+    try {
+      const res = await fetch(`${API_URL}/kategoriler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kategori_adi: name, ust_kategori_id: parentId })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCategories(prev => [...prev, { id: data.id, name: data.kategori_adi, parentId: data.ust_kategori_id ? parseInt(data.ust_kategori_id) : null }]);
+    } catch { setApiError('Kategori eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateCategory = (id, name) => {
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c));
+  const updateCategory = async (id, name) => {
+    try {
+      const res = await fetch(`${API_URL}/kategoriler/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kategori_adi: name })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c));
+    } catch { setApiError('Kategori güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const deleteCategory = (id) => {
-    const getAllChildren = (parentId) => {
-      const children = categories.filter(c => c.parentId === parentId);
-      return children.reduce((acc, c) => [...acc, c.id, ...getAllChildren(c.id)], []);
-    };
-    const toDelete = [id, ...getAllChildren(id)];
-    setCategories(prev => prev.filter(c => !toDelete.includes(c.id)));
-    setProducts(prev => prev.map(p => ({ ...p, categoryIds: (p.categoryIds || []).filter(cid => !toDelete.includes(cid)) })));
+  const deleteCategory = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/kategoriler/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCategories(prev => prev.filter(c => c.id !== id));
+    } catch { setApiError('Kategori silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
   // USERS (STAFF)
-  const addUser = (user) => {
-    setUsers(prev => [...prev, { id: uuidv4(), ...user }]);
+  const addUser = async (user) => {
+    try {
+      const res = await fetch(`${API_URL}/personeller`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ad_soyad: user.contact,
+          kullanici_adi: user.username,
+          sifre: user.password,
+          yetkiler: user.allowedPages
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setUsers(prev => [...prev, { 
+        id: data.id, 
+        contact: data.ad_soyad, 
+        username: data.kullanici_adi,
+        password: data.sifre,
+        allowedPages: data.yetkiler || []
+      }]);
+    } catch { setApiError('Personel eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateUser = (id, updates) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  const updateUser = async (id, updates) => {
+    const current = users.find(u => u.id === id);
+    const fullData = {
+        ad_soyad: updates.contact !== undefined ? updates.contact : current.contact,
+        kullanici_adi: updates.username !== undefined ? updates.username : current.username,
+        yetkiler: updates.allowedPages !== undefined ? updates.allowedPages : current.allowedPages
+    };
+    // Yeni sifre gonderilmisse ekle (hash backend'de yapilir)
+    if (updates.password) fullData.sifre = updates.password;
+    try {
+      const res = await fetch(`${API_URL}/personeller/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullData)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+    } catch { setApiError('Personel güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const deleteUser = (id) => {
-    if (id === 'admin') return; // Admin silinemez
-    setUsers(prev => prev.filter(u => u.id !== id));
+  const deleteUser = async (id) => {
+    if (id === 1 || id === '1') return;
+    try {
+      const res = await fetch(`${API_URL}/personeller/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch { setApiError('Personel silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
   // UNITS
-  const addUnit = (name) => {
-    if (!units.includes(name)) setUnits(prev => [...prev, name]);
+  const addUnit = async (name) => {
+    try {
+      const res = await fetch(`${API_URL}/birimler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birim_adi: name })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!units.some(u => u.name === data.birim_adi)) {
+        setUnits(prev => [...prev, { id: data.id, name: data.birim_adi }]);
+      }
+    } catch { setApiError('Birim eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateUnit = (oldName, newName) => {
-    if (!newName.trim() || units.includes(newName)) return;
-    setUnits(prev => prev.map(u => u === oldName ? newName : u));
-    setProducts(prev => prev.map(p => p.unit === oldName ? { ...p, unit: newName } : p));
+  const updateUnit = async (id, newName) => {
+    try {
+      const res = await fetch(`${API_URL}/birimler/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birim_adi: newName })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setUnits(prev => prev.map(u => u.id === id ? { ...u, name: newName } : u));
+    } catch { setApiError('Birim güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const deleteUnit = (name) => {
-    setUnits(prev => prev.filter(u => u !== name));
+  const deleteUnit = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/birimler/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setUnits(prev => prev.filter(u => u.id !== id));
+    } catch { setApiError('Birim silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
   // PRODUCTS
-  const addProduct = (product) => {
-    setProducts(prev => [...prev, { id: uuidv4(), ...product, unit: product.unit || 'Kg', createdAt: Date.now(), priceHistory: [{ price: product.price, date: Date.now() }] }]);
+  const addProduct = async (product) => {
+    try {
+      const res = await fetch(`${API_URL}/urunler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urun_adi: product.name,
+          fiyat: product.price,
+          birim_adi: product.unit,
+          gorsel_yolu: product.image,
+          kategori_ids: product.categoryIds,
+          stok_durumu: product.inStock
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setProducts(prev => [...prev, { 
+        id: data.id, 
+        name: data.urun_adi, 
+        price: parseFloat(data.fiyat), 
+        unit: product.unit, 
+        categoryIds: data.kategori_ids || [], 
+        image: data.gorsel_yolu, 
+        inStock: data.stok_durumu === 1 || data.stok_durumu === true || data.stok_durumu === 'true'
+      }]);
+    } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateProduct = (id, updates) => {
-    setProducts(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const priceChanged = updates.price !== undefined && updates.price !== p.price;
-      return {
-        ...p,
-        ...updates,
-        priceHistory: priceChanged
-          ? [...(p.priceHistory || []), { price: updates.price, date: Date.now() }]
-          : p.priceHistory,
-      };
-    }));
+  const updateProduct = async (id, updates) => {
+    const current = products.find(p => p.id === id);
+    const fullData = {
+      urun_adi: updates.name || current.name,
+      fiyat: updates.price !== undefined ? updates.price : current.price,
+      birim_adi: updates.unit || current.unit,
+      gorsel_yolu: updates.image !== undefined ? updates.image : current.image,
+      stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
+      kategori_ids: updates.categoryIds || current.categoryIds
+    };
+    // Yerel durumu aninda guncelle (Sayfa yenilemeden "Son Guncelleme" tarihinin degismesi icin)
+    const now = new Date().toISOString();
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: now } : p));
+    try {
+      const res = await fetch(`${API_URL}/urunler/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullData)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } catch { setApiError('Ürün güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const deleteProduct = (id) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-    setExtraPrices(prev => prev.filter(ep => ep.productId !== id));
+  const deleteProduct = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/urunler/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch { setApiError('Ürün silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-
-
 
   // CUSTOMERS
-  const addCustomer = (customer) => {
-    setCustomers(prev => [...prev, { id: uuidv4(), ...customer, createdAt: Date.now() }]);
+  const addCustomer = async (customer) => {
+    try {
+      const res = await fetch(`${API_URL}/musteriler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ad_soyad: customer.name,
+          vkn_tc: customer.taxId,
+          telefon: customer.phone,
+          eposta: customer.email,
+          sifre: customer.password,
+          iskonto_orani: customer.discount,
+          adres: customer.address
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCustomers(prev => [...prev, { 
+        id: data.id, 
+        name: data.ad_soyad, 
+        taxId: data.vkn_tc, 
+        phone: data.telefon, 
+        email: data.eposta, 
+        password: data.sifre, 
+        discount: parseFloat(data.iskonto_orani), 
+        address: data.adres,
+        createdAt: data.kayit_tarihi
+      }]);
+    } catch { setApiError('Müşteri eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateCustomer = (id, updates) => {
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  const updateCustomer = async (id, updates) => {
+    const current = customers.find(c => c.id === id);
+    const fullData = {
+      ad_soyad: updates.name !== undefined ? updates.name : current.name,
+      vkn_tc: updates.taxId !== undefined ? updates.taxId : current.taxId,
+      telefon: updates.phone !== undefined ? updates.phone : current.phone,
+      eposta: updates.email !== undefined ? updates.email : current.email,
+      iskonto_orani: updates.discount !== undefined ? updates.discount : current.discount,
+      adres: updates.address !== undefined ? updates.address : current.address
+    };
+    // Yeni sifre gonderilmisse ekle (hash backend'de yapilir)
+    if (updates.password) fullData.sifre = updates.password;
+    try {
+      const res = await fetch(`${API_URL}/musteriler/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullData)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    } catch { setApiError('Müşteri güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const deleteCustomer = (id) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
+  const deleteCustomer = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/musteriler/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setCustomers(prev => prev.filter(c => c.id !== id));
+    } catch { setApiError('Müşteri silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
-  // EXTRA PRICES
-  const addExtraPrice = (ep) => setExtraPrices(prev => [...prev, { id: uuidv4(), ...ep }]);
-  const updateExtraPrice = (id, updates) => setExtraPrices(prev => prev.map(ep => ep.id === id ? { ...ep, ...updates } : ep));
-  const deleteExtraPrice = (id) => setExtraPrices(prev => prev.filter(ep => ep.id !== id));
+  // EXTRA PRICES - Kaldirildi (Backend yapisinda musteriler tablosu iskonto kullaniyor)
 
   return (
     <DataContext.Provider value={{
@@ -140,8 +340,7 @@ export function DataProvider({ children }) {
       users, addUser, updateUser, deleteUser,
       customers, addCustomer, updateCustomer, deleteCustomer,
       units, addUnit, updateUnit, deleteUnit,
-      extraPrices, addExtraPrice, updateExtraPrice, deleteExtraPrice,
-      clearAllData
+      loading, apiError, clearApiError: () => setApiError(null), refetchProducts
     }}>
       {children}
     </DataContext.Provider>
