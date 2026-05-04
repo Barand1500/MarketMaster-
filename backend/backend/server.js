@@ -79,26 +79,6 @@ db.getConnection((err, connection) => {
   }
 });
 
-// Startup migration: Yeni kolonlari ekle (MySQL uyumlu, kolon varsa sessizce atla)
-['bilgi_guncelleme_tarihi'].forEach(col => {
-  db.query(`ALTER TABLE urunler ADD COLUMN ${col} TIMESTAMP NULL DEFAULT NULL`, (err) => {
-    if (err && err.code !== 'ER_DUP_FIELDNAME') {
-      console.warn(`Migration uyarisi (${col}):`, err.message);
-    } else if (!err) {
-      console.log(`✅ Migration: ${col} kolonu eklendi`);
-    }
-  });
-});
-
-// Cleanup migration: fiyat_guncelleme_tarihi kolonu artik gerekmiyor, fiyat_gecmisi tablosu kullaniliyor
-db.query(`ALTER TABLE urunler DROP COLUMN fiyat_guncelleme_tarihi`, (err) => {
-  if (err && err.code !== 'ER_CANT_DROP_FIELD_OR_KEY') {
-    // Kolon zaten yoksa veya baska hata — sessizce atla
-  } else if (!err) {
-    console.log('✅ Migration: fiyat_guncelleme_tarihi kolonu kaldirildi');
-  }
-});
-
 // --- BIRIMLER API ---
 app.get('/api/birimler', (req, res) => {
   db.query('SELECT * FROM birimler', (err, results) => {
@@ -183,10 +163,8 @@ app.get('/api/urunler', (req, res) => {
 
 app.post('/api/urunler', (req, res) => {
   const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu } = req.body;
-
-  if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
-  const price = parseFloat(fiyat);
-  if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
+  
+  const price = parseFloat(fiyat) || 0;
   const stok = stok_durumu !== undefined ? stok_durumu : true;
   
   const insertProduct = (bId) => {
@@ -213,61 +191,33 @@ app.post('/api/urunler', (req, res) => {
 
 app.put('/api/urunler/:id', (req, res) => {
   const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, stok_durumu, kategori_ids } = req.body;
-  if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
-  const price = parseFloat(fiyat);
-  if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
+  const price = parseFloat(fiyat) || 0;
 
   const updateProd = (bId) => {
     // Once mevcut fiyati al, degistiyse gecmise kaydet
-    db.query('SELECT fiyat, urun_adi, birim_id, gorsel_yolu, stok_durumu FROM urunler WHERE id = ?', [req.params.id], (err, rows) => {
+    db.query('SELECT fiyat FROM urunler WHERE id = ?', [req.params.id], (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
-      const current = rows[0];
-      const eskiFiyat = current ? parseFloat(current.fiyat) : null;
+      const eskiFiyat = rows.length > 0 ? parseFloat(rows[0].fiyat) : null;
 
-      // Bilgi alanlarinda degisim var mi? (fiyat haric)
-      const fiyatDegisti = eskiFiyat !== null && eskiFiyat !== price;
-      const bilgiDegisti = current && (
-        current.urun_adi !== urun_adi ||
-        current.birim_id !== bId ||
-        String(current.gorsel_yolu || '') !== String(gorsel_yolu || '') ||
-        Number(current.stok_durumu) !== Number(stok_durumu ? 1 : 0)
-      );
-
-      let updateSql = 'UPDATE urunler SET urun_adi = ?, fiyat = ?, birim_id = ?, gorsel_yolu = ?, stok_durumu = ?';
-      const updateParams = [urun_adi, price, bId, gorsel_yolu, stok_durumu];
-
-      if (bilgiDegisti) updateSql += ', bilgi_guncelleme_tarihi = NOW()';
-      updateSql += ' WHERE id = ?';
-      updateParams.push(req.params.id);
-
-      db.query(updateSql, updateParams, (err) => {
+      db.query('UPDATE urunler SET urun_adi = ?, fiyat = ?, birim_id = ?, gorsel_yolu = ?, stok_durumu = ? WHERE id = ?',
+        [urun_adi, price, bId, gorsel_yolu, stok_durumu, req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         
         // Fiyat degistiyse fiyat_gecmisi tablosuna yaz
-        if (fiyatDegisti) {
+        if (eskiFiyat !== null && eskiFiyat !== price) {
           db.query('INSERT INTO fiyat_gecmisi (urun_id, eski_fiyat, yeni_fiyat) VALUES (?, ?, ?)',
             [req.params.id, eskiFiyat, price]);
         }
         
         if (Array.isArray(kategori_ids)) {
-          // Kategori degisimini kontrol et
-          db.query('SELECT kategori_id FROM urun_kategori_iliskisi WHERE urun_id = ? ORDER BY kategori_id', [req.params.id], (err2, catRows) => {
-            const mevcutCatIds = catRows ? catRows.map(r => r.kategori_id).sort((a, b) => a - b) : [];
-            const yeniCatIds = [...kategori_ids].map(Number).sort((a, b) => a - b);
-            if (!bilgiDegisti && JSON.stringify(mevcutCatIds) !== JSON.stringify(yeniCatIds)) {
-              db.query('UPDATE urunler SET bilgi_guncelleme_tarihi = NOW() WHERE id = ?', [req.params.id]);
+          db.query('DELETE FROM urun_kategori_iliskisi WHERE urun_id = ?', [req.params.id], () => {
+            if (kategori_ids.length > 0) {
+              const values = kategori_ids.map(kid => [req.params.id, kid]);
+              db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
             }
-            db.query('DELETE FROM urun_kategori_iliskisi WHERE urun_id = ?', [req.params.id], () => {
-              if (kategori_ids.length > 0) {
-                const values = kategori_ids.map(kid => [req.params.id, kid]);
-                db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
-              }
-            });
-            res.json({ success: true });
           });
-        } else {
-          res.json({ success: true });
         }
+        res.json({ success: true });
       });
     });
   };
@@ -298,39 +248,25 @@ app.get('/api/musteriler', (req, res) => {
 
 app.post('/api/musteriler', (req, res) => {
   const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres } = req.body;
-  if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Müşteri adı zorunludur.' });
-  const iskonto = parseFloat(iskonto_orani) || 0;
-  if (iskonto < 0 || iskonto > 100) return res.status(400).json({ error: 'İskonto oranı 0-100 arasında olmalıdır.' });
   db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto || 0, adres], (err, result) => {
-    if (err) {
-      if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
-      }
-      return res.status(500).json({ error: err.message });
-    }
+    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani || 0, adres], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
     res.json({ id: result.insertId, ...req.body });
   });
 });
 
 app.put('/api/musteriler/:id', (req, res) => {
   const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres } = req.body;
-  const handleDbErr = (err, res) => {
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
-    }
-    return res.status(500).json({ error: err.message });
-  };
   if (sifre) {
     db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, sifre=?, iskonto_orani=?, adres=? WHERE id=?',
       [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, req.params.id], (err) => {
-      if (err) return handleDbErr(err, res);
+      if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true });
     });
   } else {
     db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, iskonto_orani=?, adres=? WHERE id=?',
       [ad_soyad, vkn_tc, telefon, eposta, iskonto_orani, adres, req.params.id], (err) => {
-      if (err) return handleDbErr(err, res);
+      if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true });
     });
   }
@@ -360,9 +296,6 @@ app.get('/api/personeller', (req, res) => {
 });
 app.post('/api/personeller', (req, res) => {
   const { ad_soyad, kullanici_adi, sifre, yetkiler } = req.body;
-  if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Ad Soyad zorunludur.' });
-  if (!kullanici_adi || !kullanici_adi.trim()) return res.status(400).json({ error: 'Kullanıcı adı zorunludur.' });
-  if (!sifre || sifre.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalıdır.' });
   db.query('INSERT INTO personeller (ad_soyad, kullanici_adi, sifre) VALUES (?, ?, ?)',
     [ad_soyad, kullanici_adi, sifre], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -379,9 +312,6 @@ app.post('/api/personeller', (req, res) => {
 
 app.put('/api/personeller/:id', (req, res) => {
   const { ad_soyad, kullanici_adi, sifre, yetkiler } = req.body;
-  if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Ad Soyad zorunludur.' });
-  if (!kullanici_adi || !kullanici_adi.trim()) return res.status(400).json({ error: 'Kullanıcı adı zorunludur.' });
-  if (sifre && sifre.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalıdır.' });
   const sql = sifre
     ? 'UPDATE personeller SET ad_soyad=?, kullanici_adi=?, sifre=? WHERE id=?'
     : 'UPDATE personeller SET ad_soyad=?, kullanici_adi=? WHERE id=?';
@@ -469,10 +399,10 @@ app.post('/api/send-reset-code', (req, res) => {
       });
     }
 
-    // Eger Resend API key yoksa hata don
+    // Eger Resend API key yoksa sadece konsola yaz ve basarili don (Test amacli)
     if (!resend) {
-      console.error('[MAIL] RESEND_API_KEY bulunamadı. Lütfen .env dosyasını kontrol edin ve PM2\'yi yeniden başlatın: pm2 restart manav-backend');
-      return res.status(503).json({ error: 'E-posta servisi şu an kullanılamıyor. Lütfen yöneticinizle iletişime geçin.' });
+      console.log(`[TEST MODE] Reset Code for ${email}: ${code}`);
+      return res.json({ success: true, message: 'Kod gonderildi (Test Modu: Konsola bakin)', test: true, code: code, remaining: limitCheck.remaining });
     }
 
     try {

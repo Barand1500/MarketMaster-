@@ -42,6 +42,7 @@ export function DataProvider({ children }) {
           image: p.gorsel_yolu, 
           inStock: p.stok_durumu === 1 || p.stok_durumu === true,
           updatedAt: p.guncelleme_tarihi,
+          lastInfoChange: p.bilgi_guncelleme_tarihi || null,
           lastPriceChange: p.son_fiyat_degisimi || null
         })));
         setUnits(brm.map(b => ({ id: b.id, name: b.birim_adi })));
@@ -89,7 +90,8 @@ export function DataProvider({ children }) {
         image: p.gorsel_yolu,
         inStock: p.stok_durumu === 1 || p.stok_durumu === true,
         updatedAt: p.guncelleme_tarihi,
-        lastPriceChange: p.son_fiyat_degisimi || null
+        lastInfoChange: p.bilgi_guncelleme_tarihi || null,
+        lastPriceChange: p.son_fiyat_degisimi || p.fiyat_guncelleme_tarihi || null
       })));
     } catch { /* sessizce hata yut, mevcut veri kalsin */ }
   };
@@ -250,9 +252,18 @@ export function DataProvider({ children }) {
       stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
       kategori_ids: updates.categoryIds || current.categoryIds
     };
-    // Yerel durumu aninda guncelle (Sayfa yenilemeden "Son Guncelleme" tarihinin degismesi icin)
+    // Yerel durumu aninda guncelle (Sayfa yenilemeden tarihlerin degismesi icin)
     const now = new Date().toISOString();
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates, updatedAt: now } : p));
+    const infoFields = ['name', 'unit', 'image', 'inStock', 'categoryIds'];
+    const isInfoUpdate = infoFields.some(f => updates[f] !== undefined);
+    const isPriceUpdate = updates.price !== undefined;
+    setProducts(prev => prev.map(p => p.id === id ? { 
+      ...p, 
+      ...updates, 
+      updatedAt: now,
+      lastInfoChange: isInfoUpdate ? now : p.lastInfoChange,
+      lastPriceChange: isPriceUpdate ? now : p.lastPriceChange
+    } : p));
     try {
       const res = await fetch(`${API_URL}/urunler/${id}`, {
         method: 'PUT',
@@ -286,7 +297,12 @@ export function DataProvider({ children }) {
           adres: customer.address
         })
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let errMsg = 'Müşteri eklenemedi.';
+        try { const d = await res.json(); errMsg = d.error || errMsg; } catch {}
+        setApiError(errMsg);
+        return;
+      }
       const data = await res.json();
       setCustomers(prev => [...prev, { 
         id: data.id, 
@@ -299,7 +315,7 @@ export function DataProvider({ children }) {
         address: data.adres,
         createdAt: data.kayit_tarihi
       }]);
-    } catch { setApiError('Müşteri eklenemedi. Sunucu bağlantısını kontrol edin.'); }
+    } catch (e) { setApiError(e.message || 'Müşteri eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const updateCustomer = async (id, updates) => {
     const current = customers.find(c => c.id === id);
@@ -319,9 +335,19 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fullData)
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let errMsg = 'Müşteri güncellenemedi.';
+        try { const d = await res.json(); errMsg = d.error || errMsg; } catch {}
+        setApiError(errMsg);
+        return { ok: false, error: errMsg };
+      }
       setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-    } catch { setApiError('Müşteri güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
+      return { ok: true };
+    } catch (e) {
+      const msg = e.message || 'Müşteri güncellenemedi. Sunucu bağlantısını kontrol edin.';
+      setApiError(msg);
+      return { ok: false, error: msg };
+    }
   };
   const deleteCustomer = async (id) => {
     try {

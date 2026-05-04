@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function PageHeader({ title, sub, helpContent }) {
+export default function PageHeader({ title, sub, helpContent, helpContentMobile }) {
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
@@ -27,22 +27,33 @@ export default function PageHeader({ title, sub, helpContent }) {
       </div>
 
       {showHelp && (
-        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '700' }}>📖 Yardım: {title}</h3>
-              <button 
-                onClick={() => setShowHelp(false)}
-                style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: 'var(--text-muted)' }}
-              >
-                &times;
-              </button>
+        <div className="modal-overlay help-overlay" onClick={() => setShowHelp(false)}>
+          <div className="help-modal" onClick={e => e.stopPropagation()}>
+            {/* Başlık */}
+            <div className="help-modal-head">
+              <div className="help-modal-icon">💡</div>
+              <div>
+                <div className="help-modal-title">Nasıl Kullanılır?</div>
+                <div className="help-modal-sub">{title}</div>
+              </div>
+              <button className="help-modal-close" onClick={() => setShowHelp(false)}>✕</button>
             </div>
-            <div style={{ color: 'var(--text-muted)', lineHeight: '1.7' }}>
-              {helpContent}
+
+            {/* İçerik */}
+            <div className="help-modal-body">
+              {helpContentMobile ? (
+                <>
+                  <div className="help-desktop-only">{helpContent}</div>
+                  <div className="help-mobile-only">{helpContentMobile}</div>
+                </>
+              ) : helpContent}
             </div>
-            <div style={{ marginTop: '24px', textAlign: 'right' }}>
-              <button className="btn-primary" onClick={() => setShowHelp(false)}>Anladım</button>
+
+            {/* Footer */}
+            <div className="help-modal-footer">
+              <div className="help-modal-shortcut help-desktop-only">⌨️ <strong>F1</strong> ile de açabilirsiniz</div>
+              <div className="help-modal-shortcut help-mobile-only" style={{ fontSize: '11px', color: '#a0aec0' }}>📱 Mobil görünüm</div>
+              <button className="help-modal-btn" onClick={() => setShowHelp(false)}>Anladım ✓</button>
             </div>
           </div>
         </div>

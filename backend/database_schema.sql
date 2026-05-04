@@ -1,4 +1,4 @@
--- BostanHub Veritabani Semasi (Database Schema)
+-- BostanHub Veritabani Semasi (Database Schema) (Lütfen Ellemeyiniz)
 -- Tum isimler Turkce karakter icermeden (g, u, s, i, o, c) Turkce olarak adlandirilmistir.
 -- Foreign Key (Yabanci Anahtar) baglantilari mimari olarak eksiksiz kurulmustur.
 
@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS urunler (
     stok_durumu BOOLEAN DEFAULT TRUE,
     olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     guncelleme_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    bilgi_guncelleme_tarihi TIMESTAMP NULL DEFAULT NULL,
+    fiyat_guncelleme_tarihi TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (birim_id) REFERENCES birimler(id) ON DELETE RESTRICT
 );
 

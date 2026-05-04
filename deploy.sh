@@ -1,44 +1,32 @@
 #!/bin/bash
+# Sunucuda çalıştır: bash deploy.sh
+# Yapılan değişiklikleri git'e push ettikten sonra sunucuda bu scripti çalıştır.
 
-# BostanHub Otomatik Deploy Scripti
-# Bu dosya sunucuda calistirildiginda projeyi gunceller ve baslatir.
+set -e
 
-echo "------------------------------------------------"
-echo "🚀 Bostan Market Canliya Alma Islemi Basliyor..."
-echo "------------------------------------------------"
+PROJECT_DIR="/home/guzelteknoloji-bostan/htdocs/bostan.guzelteknoloji.com"
+BACKEND_NAME="manav-backend"
 
-# ADIM 1: Kodlari Guncelle
-echo "📦 ADIM 1: Github'dan en guncel kodlar cekiliyor..."
+echo "===== Bostan Manav Deploy ====="
+
+cd $PROJECT_DIR
+
+echo "[1/4] Git'ten son versiyon çekiliyor..."
 git pull origin main
-if [ $? -eq 0 ]; then
-    echo "✅ Kodlar basariyla güncellendi."
-else
-    echo "❌ HATA: Git pull basarisiz oldu!"
-    exit 1
-fi
 
-# ADIM 2: Frontend Hazirlik
-echo "🎨 ADIM 2: Frontend bagimliliklari yukleniyor ve derleniyor..."
+echo "[2/4] Frontend bağımlılıkları yükleniyor ve build alınıyor..."
 npm install
 npm run build
-echo "✅ Frontend hazir."
+# Build çıktısı otomatik olarak frontend/ klasörüne gider
 
-# ADIM 3: Backend Hazirlik
-echo "⚙️ ADIM 3: Backend yapilandiriliyor..."
+echo "[3/4] Backend bağımlılıkları yükleniyor..."
 cd backend
-npm install
-# Veritabanini guncelle/hazirla
-node init_db.js
-node seed.js
-echo "✅ Backend ve Veritabani hazir."
-
-# ADIM 4: Servisleri Yeniden Baslat
-echo "🔄 ADIM 4: Uygulama servisleri yeniden baslatiliyor (PM2)..."
-# Not: PM2 kurulu olmalidir
-pm2 restart all || pm2 start server.js --name "manav-api"
+npm install --omit=dev
 cd ..
 
-echo "------------------------------------------------"
-echo "🎉 TEBRIKLER! Uygulama Basariyla Deploy Edildi."
-echo "🌐 Su an canlida yayindasiniz."
-echo "------------------------------------------------"
+echo "[4/4] Backend yeniden başlatılıyor..."
+pm2 restart $BACKEND_NAME || pm2 start backend/server.js --name $BACKEND_NAME
+
+echo ""
+echo "===== Deploy tamamlandı! ====="
+pm2 status $BACKEND_NAME

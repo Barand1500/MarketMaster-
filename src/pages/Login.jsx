@@ -44,6 +44,7 @@ export default function Login({ onLogin }) {
         taxId: data.user.vkn_tc,
         phone: data.user.telefon,
         email: data.user.eposta,
+        address: data.user.adres || '',
         discount: parseFloat(data.user.iskonto_orani || 0)
       };
       // Hashlenmiş şifreyi session'da saklama
@@ -93,7 +94,7 @@ export default function Login({ onLogin }) {
         }
       } catch { setForgotError('Bağlantı hatası.'); }
     } else if (forgotStep === 'newpass') {
-      if (resetData.newPass.length < 3) return setForgotError('Şifre en az 3 karakter olmalıdır.');
+      if (resetData.newPass.length < 6) return setForgotError('Şifre en az 6 karakter olmalıdır.');
       if (resetData.newPass !== resetData.confirmNewPass) return setForgotError('Şifreler uyuşmuyor.');
       try {
         const res = await fetch(`${API_URL}/reset-password`, {
@@ -126,7 +127,7 @@ export default function Login({ onLogin }) {
         {!forgot ? (
           <form onSubmit={handleSubmit} className="login-form">
             <div className="field">
-              <label>Kullanıcı Adı</label>
+              <label>Kullanıcı Adı / E-posta / Telefon</label>
               <input
                 type="text"
                 placeholder="Kullanıcı adı, telefon veya e-posta"
@@ -147,8 +148,15 @@ export default function Login({ onLogin }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 12px', marginBottom: '4px' }}>
               <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
               <p style={{ margin: 0, fontSize: '12px', color: '#92400e', fontWeight: '600', lineHeight: '1.5' }}>
-                Kullanıcı adı ve şifre <strong>büyük/küçük harf duyarlıdır.</strong><br/>
-                Örneğin: <em>"Ercan Güzel"</em> ile <em>"ercan güzel"</em> farklıdır.
+                Müşteriler <strong>e-posta, telefon veya VKN/TC</strong> ile giriş yapabilir.<br/>
+                Personeller ise <strong>kullanıcı adı</strong> ile giriş yapar.
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '16px', lineHeight: 1 }}>💡</span>
+              <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', fontWeight: '600', lineHeight: '1.5' }}>
+                Kullanıcı adında <strong>büyük-küçük harf duyarlıdır</strong>.<br/>
+                <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>Ercan</code> ile <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>ercan</code> farklıdır!
               </p>
             </div>
             {error && <p className="login-error">{error}</p>}

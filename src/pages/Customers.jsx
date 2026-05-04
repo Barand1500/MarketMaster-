@@ -15,6 +15,14 @@ export default function Customers() {
   const [showInfoPass, setShowInfoPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // MOBİL state
+  const [mobileEdit, setMobileEdit] = useState(null); // customer being edited
+  const [showMobileAdd, setShowMobileAdd] = useState(false);
+  const [mobileAddData, setMobileAddData] = useState({ name: '', taxId: '', phone: '', password: '', discount: '0', email: '' });
+  const [mobileAddError, setMobileAddError] = useState('');
+  const [mobileEditError, setMobileEditError] = useState('');
+  const [mobileEditPass, setMobileEditPass] = useState(false);
+
   const formatPhoneDynamic = (val) => {
     let digits = val.replace(/\D/g, '');
     const isWithZero = digits.startsWith('0');
@@ -129,19 +137,32 @@ export default function Customers() {
         title="👥 Müşteri Yönetimi" 
         sub="Müşteri portföyünüzü ve özel portal erişimlerini hızla yönetin."
         helpContent={
-          <div className="help-modal-content">
-            <h3 style={{ borderBottom: '2px solid var(--primary)', paddingBottom: '8px', color: '#1e293b' }}>Müşteriler Sisteme Nasıl Giriş Yapar?</h3>
-            <p>Müşterilerinizin kendilerine özel indirimli fiyatları görebilmesi ve sisteme giriş yapabilmesi için sistemimiz oldukça basit çalışır:</p>
-            <ol style={{ paddingLeft: '20px', lineHeight: '1.6', marginTop: '12px' }}>
-              <li><strong>Kullanıcı Adı veya E-posta:</strong> Müşterileriniz giriş yaparken, tabloda yazan <b>Müşteri Adı</b> veya <b>E-posta</b> bilgisini kullanarak giriş yapabilirler.</li>
-              <li><strong>Şifre:</strong> Müşterinize burada atadığınız şifreyi kullanarak sisteme erişirler.</li>
-              <li><strong>Şifre Sıfırlama:</strong> Müşteri şifresini unutursa, giriş ekranından e-posta adresini girerek şifre sıfırlama talebinde bulunabilir. Bu yüzden <b>E-posta alanı zorunludur.</b></li>
-            </ol>
-            <div style={{ marginTop: '16px', background: '#f8fafc', padding: '12px', borderRadius: '8px', borderLeft: '4px solid #3b82f6' }}>
-              <strong style={{ color: '#3b82f6' }}>💡 Şifre İpucu:</strong> Şifre sütunundaki göz (👁️) simgesine tıklayarak müşterinizin güncel şifresini görebilirsiniz. Hücreye çift tıklayarak şifreyi veya başka bir bilgiyi anında güncelleyebilirsiniz.
+          <div>
+            <p>Müşterilerinizin özel indirimli fiyatları görebilmesi ve sisteme giriş yapabilmesi için aşağıdaki bilgileri doldurun:</p>
+            <ul>
+              <li><strong>👤 Kullanıcı Adı / E-posta:</strong> Müşteriler, tablodaki <b>Müşteri Adı</b> veya <b>E-posta</b> bilgisini kullanarak giriş yapar.</li>
+              <li><strong>🔑 Şifre:</strong> Buraya atadığınız şifreyle sisteme erişirler. Göz (👁️) simgesine tıklayarak mevcut şifreyi görebilirsiniz.</li>
+              <li><strong>📧 Şifre Sıfırlama:</strong> Müşteri şifresini unutursa giriş ekranından e-posta ile sıfırlama yapabilir. <b>E-posta alanı zorunludur.</b></li>
+              <li><strong>% İskonto:</strong> Müşteriye özel indirim oranıdır. Örneğin "10" yazarsanız tüm fiyatları %10 indirimli görür.</li>
+            </ul>
+            <div className="help-tip">
+              <strong>💡 İpucu:</strong> Herhangi bir hücreye <strong>çift tıklayarak</strong> o bilgiyi anında güncelleyebilirsiniz.
             </div>
-            <div style={{ marginTop: '12px', background: '#fff0f2', padding: '12px', borderRadius: '8px', borderLeft: '4px solid var(--danger)' }}>
-              <strong style={{ color: 'var(--danger)' }}>% İskonto Nedir?</strong> Müşterinize tanımladığınız özel indirim oranıdır. Örneğin "10" yazarsanız, bu müşteri giriş yaptığında sistemdeki tüm fiyatları otomatik olarak %10 indirimli görür.
+          </div>
+        }
+        helpContentMobile={
+          <div>
+            <p>Mobil ekranda müşterileriniz kart listesi olarak görünür. Yapılabilecekler:</p>
+            <ul>
+              <li><strong>✏️ Düzenleme:</strong> Kartın sağındaki kalem ikonuna (<strong>✏️</strong>) dokunun. Açılan ekranda ad, e-posta, şifre, telefon, iskonto ve TC/VKN bilgilerini güncelleyip <strong>Kaydet</strong>'e basin.</li>
+              <li><strong>👤 Profil Görüntleme:</strong> Kartın sağındaki <strong>👤</strong> ikonuna dokunarak müşterinin detaylı profil bilgilerini görebilirsiniz.</li>
+              <li><strong>🔑 Şifre:</strong> Düzenleme ekranında göz ikonuna (👁️) dokunarak şifreyi görünez yapıp gösterebilirsiniz.</li>
+              <li><strong>% İskonto:</strong> Düzenleme ekranında iskonto oranını girerek müşteriye özel indirim tanımlayabilirsiniz.</li>
+              <li><strong>🗑️ Silme:</strong> Kartın sağındaki 🗑️ ikonuna dokunun, onay istenir.</li>
+              <li><strong>➕ Yeni Müşteri:</strong> Sağ alttaki yeşil <strong>️️+</strong> butonu ile hızlıca yeni müşteri ekleyebilirsiniz.</li>
+            </ul>
+            <div className="help-tip">
+              <strong>💡 İpucu:</strong> Müşteriler sisteme giriş yaparken <b>Müşteri Adı</b> veya <b>E-posta</b> + şife ile giriş yapar.
             </div>
           </div>
         }
@@ -160,7 +181,7 @@ export default function Customers() {
           <table className="excel-table">
             <thead>
               <tr className="th-row">
-                <th style={{ width: '180px' }}>Müşteri Adı <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
+                <th style={{ width: '180px' }}>Müşteri Adı / Ünvan <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '120px' }}>TC / VKN</th>
                 <th style={{ width: '140px' }}>Telefon</th>
                 <th style={{ width: '180px' }}>E-posta <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
@@ -170,7 +191,7 @@ export default function Customers() {
               </tr>
               {/* EXCEL ADD ROW */}
               <tr className="add-row">
-                <td><input className="lite-input" type="text" placeholder="Yeni müşteri..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value})} /></td>
+                <td><input className="lite-input" type="text" placeholder="Yeni müşteri..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value.toUpperCase()})} /></td>
                 <td><input className="lite-input" type="text" placeholder="Max 11 rakam" value={newRow.taxId} onChange={e => {
                   let val = e.target.value.replace(/\D/g, '');
                   if (val.length > 11) val = val.slice(0, 11);
@@ -213,7 +234,7 @@ export default function Customers() {
                   {/* INLINE EDITABLE CELLS */}
                   <td onDoubleClick={() => setEditing({ id: c.id, field: 'name' })}>
                     {editing?.id === c.id && editing?.field === 'name' ? (
-                      <input autoFocus className="lite-input" defaultValue={c.name} onBlur={(e) => handleBlur(c.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                      <input autoFocus className="lite-input" defaultValue={c.name} onChange={e => e.target.value = e.target.value.toUpperCase()} onBlur={(e) => handleBlur(c.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
                       <span className="edit-txt">{c.name}</span>
                     )}
@@ -304,6 +325,153 @@ export default function Customers() {
           </table>
         </div>
       </div>
+
+      {/* ===================== MOBİL MÜŞTERİ LİSTESİ ===================== */}
+      <div className="mobile-product-list">
+        <div className="mobile-search-bar">
+          <span>🔍</span>
+          <input type="text" placeholder="Müşteri ara..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+
+        {customers.filter(c => c.name?.toLowerCase().includes(search.toLowerCase())).map(c => (
+          <div key={c.id} className="mobile-product-card">
+            <div className="mobile-card-img" style={{ background: '#ebf4ff', fontSize: '22px' }}>👤</div>
+            <div className="mobile-card-info">
+              <div className="mobile-card-name">{c.name}</div>
+              <div className="mobile-card-meta">
+                {c.email && <span style={{ fontSize: '11px', color: '#718096' }}>{c.email}</span>}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                {c.phone && <span className="mobile-info-chip">📞 {c.phone}</span>}
+                {c.discount > 0 && (
+                  <span className="mobile-discount-badge">
+                    <span className="mobile-discount-pct">%{c.discount}</span>
+                    <span className="mobile-discount-label">İndirim</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="mobile-card-actions">
+              <button className="mobile-edit-btn" style={{ background: '#ebf8ff' }} onClick={() => setInfoModal(c)}>👤</button>
+              <button className="mobile-edit-btn" onClick={() => {
+                setMobileEdit({ id: c.id, name: c.name, taxId: c.taxId || '', phone: c.phone || '', email: c.email || '', password: c.password || '', discount: String(c.discount || 0) });
+                setMobileEditError('');
+                setMobileEditPass(false);
+              }}>✏️</button>
+              <button className="mobile-del-btn" onClick={() => setConfirm(c.id)}>🗑</button>
+            </div>
+          </div>
+        ))}
+
+        <button className="mobile-fab" onClick={() => { setMobileAddData({ name: '', taxId: '', phone: '', password: '', discount: '0', email: '' }); setMobileAddError(''); setShowMobileAdd(true); }}>＋</button>
+      </div>
+
+      {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
+      {mobileEdit && (
+        <div className="modal-overlay" onClick={() => setMobileEdit(null)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Müşteriyi Düzenle</span>
+              <button onClick={() => setMobileEdit(null)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+              <label className="mobile-label">Müşteri Adı / Ünvan *</label>
+              <input className="mobile-input" value={mobileEdit.name} onChange={e => setMobileEdit(p => ({ ...p, name: e.target.value.toUpperCase() }))} placeholder="Müşteri adı..." />
+
+              <label className="mobile-label">E-posta *</label>
+              <input className="mobile-input" type="email" value={mobileEdit.email} onChange={e => setMobileEdit(p => ({ ...p, email: e.target.value }))} placeholder="ornek@email.com" />
+
+              <label className="mobile-label">Şifre *</label>
+              <div style={{ position: 'relative' }}>
+                <input className="mobile-input" type={mobileEditPass ? 'text' : 'password'} value={mobileEdit.password} onChange={e => setMobileEdit(p => ({ ...p, password: e.target.value }))} placeholder="Şifre..." style={{ paddingRight: '40px' }} />
+                <button onClick={() => setMobileEditPass(p => !p)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>{mobileEditPass ? '🙈' : '👁️'}</button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Telefon</label>
+                  <input className="mobile-input" value={mobileEdit.phone} onChange={e => setMobileEdit(p => ({ ...p, phone: formatPhoneDynamic(e.target.value) }))} placeholder="05xx xxx xx xx" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">İskonto %</label>
+                  <input className="mobile-input" type="number" min="0" max="100" value={mobileEdit.discount} onChange={e => setMobileEdit(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
+                </div>
+              </div>
+
+              <label className="mobile-label">TC / VKN</label>
+              <input className="mobile-input" value={mobileEdit.taxId} onChange={e => setMobileEdit(p => ({ ...p, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) }))} placeholder="TC veya Vergi No..." />
+
+              {mobileEditError && <div style={{ marginTop: '8px', padding: '10px 12px', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', color: '#742a2a', fontSize: '13px' }}>⚠️ {mobileEditError}</div>}
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setMobileEdit(null)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                if (!mobileEdit.name.trim() || !mobileEdit.email.trim() || !mobileEdit.password.trim()) {
+                  setMobileEditError('Ad, e-posta ve şifre zorunludur!'); return;
+                }
+                const others = customers.filter(c => c.id !== mobileEdit.id);
+                if (others.find(c => c.email.toLowerCase() === mobileEdit.email.toLowerCase())) {
+                  setMobileEditError('Bu e-posta zaten kayıtlı!'); return;
+                }
+                updateCustomer(mobileEdit.id, { name: mobileEdit.name, email: mobileEdit.email, password: mobileEdit.password, phone: formatPhone(mobileEdit.phone), taxId: formatTaxId(mobileEdit.taxId), discount: parseFloat(mobileEdit.discount) || 0 });
+                setMobileEdit(null);
+              }}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MOBİL YENİ MÜŞTERİ MODALI ===================== */}
+      {showMobileAdd && (
+        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Yeni Müşteri Ekle</span>
+              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+              <label className="mobile-label">Müşteri Adı / Ünvan *</label>
+              <input className="mobile-input" value={mobileAddData.name} onChange={e => setMobileAddData(p => ({ ...p, name: e.target.value.toUpperCase() }))} placeholder="Müşteri adı..." />
+
+              <label className="mobile-label">E-posta *</label>
+              <input className="mobile-input" type="email" value={mobileAddData.email} onChange={e => setMobileAddData(p => ({ ...p, email: e.target.value }))} placeholder="ornek@email.com" />
+
+              <label className="mobile-label">Şifre *</label>
+              <input className="mobile-input" type="text" value={mobileAddData.password} onChange={e => setMobileAddData(p => ({ ...p, password: e.target.value }))} placeholder="Şifre..." />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Telefon</label>
+                  <input className="mobile-input" value={mobileAddData.phone} onChange={e => setMobileAddData(p => ({ ...p, phone: formatPhoneDynamic(e.target.value) }))} placeholder="05xx xxx xx xx" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">İskonto %</label>
+                  <input className="mobile-input" type="number" min="0" max="100" value={mobileAddData.discount} onChange={e => setMobileAddData(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
+                </div>
+              </div>
+
+              <label className="mobile-label">TC / VKN</label>
+              <input className="mobile-input" value={mobileAddData.taxId} onChange={e => setMobileAddData(p => ({ ...p, taxId: e.target.value.replace(/\D/g, '').slice(0, 11) }))} placeholder="TC veya Vergi No..." />
+
+              {mobileAddError && <div style={{ marginTop: '8px', padding: '10px 12px', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', color: '#742a2a', fontSize: '13px' }}>⚠️ {mobileAddError}</div>}
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setShowMobileAdd(false)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                setMobileAddError('');
+                if (!mobileAddData.name.trim() || !mobileAddData.email.trim() || !mobileAddData.password.trim()) {
+                  setMobileAddError('Ad, e-posta ve şifre zorunludur!'); return;
+                }
+                if (customers.find(c => c.email.toLowerCase() === mobileAddData.email.toLowerCase())) {
+                  setMobileAddError('Bu e-posta zaten kayıtlı!'); return;
+                }
+                addCustomer({ name: mobileAddData.name, email: mobileAddData.email, password: mobileAddData.password, phone: formatPhone(mobileAddData.phone), taxId: formatTaxId(mobileAddData.taxId), discount: parseFloat(mobileAddData.discount) || 0 });
+                setShowMobileAdd(false);
+              }}>Ekle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirm && (
         <div className="modal-overlay" onClick={() => setConfirm(null)}>

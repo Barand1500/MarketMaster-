@@ -6,27 +6,30 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 async function initializeDatabase() {
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    multipleStatements: true // SQL dosyasindaki tum komutlari tek seferde calistirmak icin
-  });
+  let connection;
 
   try {
-    console.log('⏳ Veritabani tablolari olusturuluyor...');
-    
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      multipleStatements: true
+    });
+
+    console.log('✅ Veritabanina baglanildi:', process.env.DB_NAME);
+    console.log('⏳ Tablolar olusturuluyor...');
+
     const sqlPath = path.join(__dirname, 'database_schema.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
-
     await connection.query(sql);
-    
-    console.log('✅ Basarili: Tum tablolar ve iliskiler "manav_db" icinde olusturuldu!');
+
+    console.log('✅ Tum tablolar basariyla olusturuldu!');
   } catch (error) {
-    console.error('❌ Hata: Tablolar olusturulurken bir sorun yasandi:', error.message);
+    console.error('❌ Hata:', error.message);
+    process.exit(1);
   } finally {
-    await connection.end();
+    if (connection) await connection.end();
   }
 }
 

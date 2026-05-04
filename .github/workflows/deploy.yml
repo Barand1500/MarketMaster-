@@ -1,0 +1,32 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH ile sunucuya bağlan ve deploy et
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/guzelteknoloji-bostan/public_html
+            echo "--- Git pull ---"
+            git pull origin main
+            echo "--- Frontend bağımlılıkları yükleniyor ---"
+            npm install
+            echo "--- Frontend build alınıyor ---"
+            npm run build
+            echo "--- Backend bağımlılıkları yükleniyor ---"
+            cd backend
+            npm install --omit=dev
+            echo "--- Backend yeniden başlatılıyor ---"
+            pm2 restart manav-backend || pm2 start server.js --name manav-backend
+            echo "--- Deploy tamamlandı ✅ ---"

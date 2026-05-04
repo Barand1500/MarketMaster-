@@ -10,7 +10,7 @@ export default function Navbar({ active, onNav, onLogout, session }) {
     <nav className="navbar">
       <div className="nav-container">
         <div className="nav-left">
-          <div className="nav-logo">🍉 Bostan Manav</div>
+          <div className="nav-logo">🍉 <span className="nav-logo-text">Bostan Manav</span></div>
           <div className="nav-links">
             {(isSysAdmin || allowed.includes('products')) && (
               <button className={`nav-link ${active === 'products' ? 'active' : ''}`} onClick={() => onNav('products')}>Ürünler</button>

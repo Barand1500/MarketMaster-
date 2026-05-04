@@ -113,3 +113,18 @@
 .nav-logout:hover {
   transform: scale(1.1);
 }
+
+@media (max-width: 768px) {
+  .navbar { height: 52px; }
+  .nav-container { padding: 0 10px; }
+  .nav-left { gap: 6px; }
+  .nav-logo { font-size: 20px; }
+  .nav-logo-text { display: none; }
+  .nav-links { gap: 2px; }
+  .nav-link { padding: 5px 8px; font-size: 12px; }
+  .profile-info { display: none; }
+  .profile-avatar { width: 28px; height: 28px; font-size: 15px; }
+  .nav-profile { padding-right: 8px; gap: 4px; border-right-width: 1px; }
+  .nav-right { gap: 6px; }
+  .nav-logout { font-size: 18px; }
+}

@@ -19,6 +19,15 @@ export default function Users() {
   const [showPasswords, setShowPasswords] = useState({});
   const [errorMsg, setErrorMsg] = useState('');
 
+  // MOBİL state
+  const [mobileEdit, setMobileEdit] = useState(null);
+  const [showMobileAdd, setShowMobileAdd] = useState(false);
+  const [mobileAddData, setMobileAddData] = useState({ contact: '', username: '', password: '', allowedPages: ['products'] });
+  const [mobileAddError, setMobileAddError] = useState('');
+  const [mobileEditError, setMobileEditError] = useState('');
+  const [mobileEditPass, setMobileEditPass] = useState(false);
+  const [mobileAddPass, setMobileAddPass] = useState(false);
+
   const togglePassword = (id, e) => {
     e.stopPropagation();
     setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
@@ -79,17 +88,30 @@ export default function Users() {
         title="🛡️ Personel Yönetimi" 
         sub="Sisteme girebilecek personelleri ve erişebilecekleri sayfaları belirleyin."
         helpContent={
-          <div className="help-modal-content">
-            <h3 style={{ borderBottom: '2px solid var(--primary)', paddingBottom: '8px', color: '#1e293b' }}>Personel (Kullanıcı) Ekleme ve Yetkiler</h3>
-            <p>Buradan sisteme giriş yapabilecek çalışanlarınızı veya ortaklarınızı ekleyebilirsiniz.</p>
-            <ol style={{ paddingLeft: '20px', lineHeight: '1.6', marginTop: '12px' }}>
-              <li><strong>Ad Soyad:</strong> Personelin gerçek adı (bilgi amaçlıdır).</li>
-              <li><strong>Kullanıcı Adı:</strong> Sisteme giriş yaparken kullanacağı benzersiz addır. (Örn: ali123)</li>
-              <li><strong>Şifre:</strong> Sisteme giriş yaparken kullanacağı şifredir.</li>
-              <li><strong>Erişim İzinleri:</strong> Hangi sayfalara girebileceğini kutucukları işaretleyerek seçersiniz. Örneğin sadece "Ürün ve Stok" seçilirse Müşteriler sayfasını göremez.</li>
-            </ol>
-            <div style={{ marginTop: '12px', background: '#fff0f2', padding: '12px', borderRadius: '8px', borderLeft: '4px solid var(--danger)' }}>
-              <strong style={{ color: 'var(--danger)' }}>⚠️ Önemli Not:</strong> "admin" (Yönetici) hesabı silinemez ve yetkileri kısıtlanamaz. Yönetici her zaman tüm sayfalara erişir.
+          <div>
+            <p>Sisteme giriş yapabilecek çalışanlarınızı veya ortaklarınızı buradan ekleyebilirsiniz.</p>
+            <ul>
+              <li><strong>👤 Ad Soyad:</strong> Personelin gerçek adı (bilgi amaçlı).</li>
+              <li><strong>🔤 Kullanıcı Adı:</strong> Sisteme girişte kullanacağı benzersiz ad. (Örn: ali123)</li>
+              <li><strong>🔑 Şifre:</strong> Sisteme girişte kullanacağı şifre.</li>
+              <li><strong>🔒 Erişim İzinleri:</strong> Hangi sayfalara girebileceğini kutucuklarla seçersiniz. Örn. sadece "Ürün ve Stok" seçilirse Müşteriler sayfasını göremez.</li>
+            </ul>
+            <div className="help-tip" style={{ borderLeftColor: '#e53e3e', background: '#fff5f5', color: '#742a2a' }}>
+              <strong>⚠️ Önemli:</strong> "admin" hesabı silinemez ve kısıtlanamaz — yönetici her zaman tüm sayfalara erişir.
+            </div>
+          </div>
+        }
+        helpContentMobile={
+          <div>
+            <p style={{ marginBottom: '10px' }}>Sisteme giriş yapacak personelleri buradan yönetirsiniz.</p>
+            <ul style={{ paddingLeft: '18px', lineHeight: '1.8' }}>
+              <li><strong>🧑‍💼 Kart:</strong> Her personel bir kart olarak görünür. Ad, kullanıcı adı ve yetkili sayfalar kartın üzerinde yazar.</li>
+              <li><strong>✏️ Düzenle:</strong> Kart üzerindeki kalem ikonuna basarak personelin bilgilerini ve sayfa erişimlerini güncelleyin.</li>
+              <li><strong>🗑 Sil:</strong> Çöp kutusu ikonuna basarak personeli kaldırın.</li>
+              <li><strong>＋ Ekle:</strong> Sağ alttaki yeşil yuvarlak butona basarak yeni personel ekleyin.</li>
+            </ul>
+            <div className="help-tip" style={{ borderLeftColor: '#e53e3e', background: '#fff5f5', color: '#742a2a', marginTop: '10px' }}>
+              <strong>⚠️ Not:</strong> 👑 Admin hesabı düzenlenemez ve silinemez.
             </div>
           </div>
         }
@@ -235,6 +257,172 @@ export default function Users() {
           </table>
         </div>
       </div>
+
+      {/* ===================== MOBİL PERSONEL LİSTESİ ===================== */}
+      <div className="mobile-product-list">
+        <div className="mobile-search-bar">
+          <span>🔍</span>
+          <input type="text" placeholder="Personel ara..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+
+        {users.filter(u => u.contact?.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase())).map(u => {
+          const isSysAdmin = u.id === 1 || u.id === '1' || u.id === 'admin' || u.username === 'baran';
+          const userPages = u.allowedPages || [];
+          return (
+            <div key={u.id} className="mobile-product-card" style={{ background: isSysAdmin ? '#f0f7ff' : '#fff' }}>
+              <div className="mobile-card-img" style={{ background: isSysAdmin ? '#dbeafe' : '#f0fdf4', fontSize: '20px' }}>
+                {isSysAdmin ? '👑' : '🧑‍💼'}
+              </div>
+              <div className="mobile-card-info">
+                <div className="mobile-card-name">{u.contact || u.username}</div>
+                <div className="mobile-card-meta">
+                  <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600' }}>@{u.username}</span>
+                </div>
+                <div className="mobile-user-pages">
+                  {isSysAdmin
+                    ? <span className="mobile-page-badge admin">🛡️ Sistem Admini</span>
+                    : AVAILABLE_PAGES.filter(p => userPages.includes(p.id)).map(p => (
+                        <span key={p.id} className="mobile-page-badge">{p.label}</span>
+                      ))
+                  }
+                </div>
+              </div>
+              <div className="mobile-card-actions">
+                {!isSysAdmin && (
+                  <>
+                    <button className="mobile-edit-btn" onClick={() => {
+                      setMobileEdit({ id: u.id, contact: u.contact || '', username: u.username, password: u.password || '', allowedPages: [...(u.allowedPages || [])] });
+                      setMobileEditError('');
+                      setMobileEditPass(false);
+                    }}>✏️</button>
+                    <button className="mobile-del-btn" onClick={() => setConfirm(u.id)}>🗑</button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="mobile-fab" onClick={() => { setMobileAddData({ contact: '', username: '', password: '', allowedPages: ['products'] }); setMobileAddError(''); setMobileAddPass(false); setShowMobileAdd(true); }}>＋</button>
+      </div>
+
+      {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
+      {mobileEdit && (
+        <div className="modal-overlay" onClick={() => setMobileEdit(null)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Personeli Düzenle</span>
+              <button onClick={() => setMobileEdit(null)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+              <label className="mobile-label">Ad Soyad</label>
+              <input className="mobile-input" value={mobileEdit.contact} onChange={e => setMobileEdit(p => ({ ...p, contact: e.target.value }))} placeholder="Ali Yılmaz" />
+
+              <label className="mobile-label">Kullanıcı Adı</label>
+              <input className="mobile-input" value={mobileEdit.username} onChange={e => setMobileEdit(p => ({ ...p, username: e.target.value }))} placeholder="aliyilmaz" />
+
+              <label className="mobile-label">Şifre</label>
+              <div style={{ position: 'relative' }}>
+                <input className="mobile-input" type={mobileEditPass ? 'text' : 'password'} value={mobileEdit.password} onChange={e => setMobileEdit(p => ({ ...p, password: e.target.value }))} placeholder="••••••" style={{ paddingRight: '44px' }} />
+                <button onClick={() => setMobileEditPass(p => !p)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>{mobileEditPass ? '🙈' : '👁️'}</button>
+              </div>
+
+              <label className="mobile-label">Sayfa Erişim Yetkileri</label>
+              <div className="mobile-perm-list">
+                {AVAILABLE_PAGES.map(page => {
+                  const checked = mobileEdit.allowedPages.includes(page.id);
+                  return (
+                    <label key={page.id} className={`mobile-perm-row ${checked ? 'active' : ''}`}>
+                      <input type="checkbox" checked={checked} onChange={() => setMobileEdit(p => ({
+                        ...p,
+                        allowedPages: p.allowedPages.includes(page.id)
+                          ? p.allowedPages.filter(x => x !== page.id)
+                          : [...p.allowedPages, page.id]
+                      }))} />
+                      <span>{page.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {mobileEditError && <div style={{ marginTop: '8px', padding: '10px 12px', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', color: '#742a2a', fontSize: '13px' }}>⚠️ {mobileEditError}</div>}
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setMobileEdit(null)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                if (!mobileEdit.contact.trim() || !mobileEdit.username.trim() || !mobileEdit.password.trim()) {
+                  setMobileEditError('Tüm alanlar zorunludur!'); return;
+                }
+                const others = users.filter(u => u.id !== mobileEdit.id);
+                if (others.some(u => u.username.toLowerCase() === mobileEdit.username.toLowerCase())) {
+                  setMobileEditError('Bu kullanıcı adı zaten kullanılıyor!'); return;
+                }
+                updateUser(mobileEdit.id, { contact: mobileEdit.contact, username: mobileEdit.username, password: mobileEdit.password, allowedPages: mobileEdit.allowedPages });
+                setMobileEdit(null);
+              }}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MOBİL YENİ PERSONEL MODALI ===================== */}
+      {showMobileAdd && (
+        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Yeni Personel Ekle</span>
+              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+              <label className="mobile-label">Ad Soyad *</label>
+              <input className="mobile-input" value={mobileAddData.contact} onChange={e => setMobileAddData(p => ({ ...p, contact: e.target.value }))} placeholder="Ali Yılmaz" />
+
+              <label className="mobile-label">Kullanıcı Adı *</label>
+              <input className="mobile-input" value={mobileAddData.username} onChange={e => setMobileAddData(p => ({ ...p, username: e.target.value }))} placeholder="aliyilmaz" />
+
+              <label className="mobile-label">Şifre *</label>
+              <div style={{ position: 'relative' }}>
+                <input className="mobile-input" type={mobileAddPass ? 'text' : 'password'} value={mobileAddData.password} onChange={e => setMobileAddData(p => ({ ...p, password: e.target.value }))} placeholder="••••••" style={{ paddingRight: '44px' }} />
+                <button onClick={() => setMobileAddPass(p => !p)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>{mobileAddPass ? '🙈' : '👁️'}</button>
+              </div>
+
+              <label className="mobile-label">Sayfa Erişim Yetkileri</label>
+              <div className="mobile-perm-list">
+                {AVAILABLE_PAGES.map(page => {
+                  const checked = mobileAddData.allowedPages.includes(page.id);
+                  return (
+                    <label key={page.id} className={`mobile-perm-row ${checked ? 'active' : ''}`}>
+                      <input type="checkbox" checked={checked} onChange={() => setMobileAddData(p => ({
+                        ...p,
+                        allowedPages: p.allowedPages.includes(page.id)
+                          ? p.allowedPages.filter(x => x !== page.id)
+                          : [...p.allowedPages, page.id]
+                      }))} />
+                      <span>{page.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {mobileAddError && <div style={{ marginTop: '8px', padding: '10px 12px', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', color: '#742a2a', fontSize: '13px' }}>⚠️ {mobileAddError}</div>}
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setShowMobileAdd(false)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                setMobileAddError('');
+                if (!mobileAddData.contact.trim() || !mobileAddData.username.trim() || !mobileAddData.password.trim()) {
+                  setMobileAddError('Tüm alanlar zorunludur!'); return;
+                }
+                if (users.some(u => u.username.toLowerCase() === mobileAddData.username.toLowerCase())) {
+                  setMobileAddError('Bu kullanıcı adı zaten kullanılıyor!'); return;
+                }
+                addUser(mobileAddData);
+                setShowMobileAdd(false);
+              }}>Ekle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirm && (
         <div className="modal-overlay" onClick={() => setConfirm(null)}>

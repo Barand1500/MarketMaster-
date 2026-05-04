@@ -5,6 +5,35 @@ import '../styles/ExcelTable.css';
 
 const API_URL = "/api"; // Production: Aynı domain üzerinden
 
+const formatPhoneDynamic = (val) => {
+  let digits = val.replace(/\D/g, '');
+  const isWithZero = digits.startsWith('0');
+  if (isWithZero) {
+    if (digits.length > 11) digits = digits.slice(0, 11);
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9, 11)}`;
+  } else {
+    if (digits.length > 10) digits = digits.slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+    if (digits.length <= 8) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+  }
+};
+
+const formatPhone = (val) => {
+  if (!val) return '';
+  let cleaned = ('' + val).replace(/\D/g, '');
+  if (cleaned.length === 10 && cleaned.startsWith('5')) cleaned = '0' + cleaned;
+  if (cleaned.length >= 11) {
+    cleaned = cleaned.slice(0, 11);
+    return cleaned.replace(/(\d{4})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+  }
+  return formatPhoneDynamic(val);
+};
+
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
   const { categories, products, updateCustomer, refetchProducts } = useData();
   const [search, setSearch] = useState('');
@@ -18,11 +47,25 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     taxId: customer.taxId || '',
     email: customer.email || '',
     phone: customer.phone || '',
-    address: customer.address || '',
+    address: customer.address || customer.adres || '',
     currentPass: '',
     newPass: '',
     confirmNewPass: ''
   });
+
+  // Modal her açıldığında customer prop'undan profileData'yı yenile
+  useEffect(() => {
+    if (showProfile) {
+      setProfileData(prev => ({
+        ...prev,
+        title: customer.name || '',
+        taxId: customer.taxId || '',
+        email: customer.email || '',
+        phone: customer.phone || '',
+        address: customer.address || customer.adres || '',
+      }));
+    }
+  }, [showProfile]);
   const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false, reset: false, resetConfirm: false });
   const [resetStep, setResetStep] = useState('none'); // 'none', 'sending', 'verify', 'newpass'
   const [resetData, setResetData] = useState({ code: '', newPass: '', confirmNewPass: '' });
@@ -48,7 +91,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const discount = customer.discount || 0;
 
   const filteredProducts = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = p.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
     const matchCat = selectedCategories.length > 0
       ? selectedCategories.some(cid => p.categoryIds.includes(cid))
       : true;
@@ -247,7 +290,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
         @media (max-width: 768px) {
           .customer-header {
-            padding: 10px 15px;
+            padding: 8px 10px;
             gap: 8px;
           }
           .header-center {
@@ -288,6 +331,25 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
           gap: 16px;
         }
+        .card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; }
+        .card-name { font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
+        .card-unit-badge { display: inline-block; background: #f1f5f9; color: #64748b; font-weight: 600; font-size: 11px; padding: 2px 7px; border-radius: 6px; margin-top: 4px; }
+        .card-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; }
+        .card-footer-row { display: flex; flex-direction: column; gap: 1px; }
+        .card-footer-label { font-size: 9px; font-weight: 700; color: #64748b; }
+        .card-footer-label.bilgi { color: #64748b; }
+        .card-footer-label.fiyat { color: #16a34a; }
+        .card-footer-date { font-size: 10px; color: #0f172a; font-weight: 700; }
+        @media (max-width: 640px) {
+          .product-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+          .product-card { border-radius: 10px; }
+          .card-body { padding: 8px !important; }
+          .card-name { font-size: 12px !important; }
+          .card-unit-badge { font-size: 10px !important; padding: 2px 6px !important; margin-top: 3px; }
+          .card-footer { margin-top: 8px; padding-top: 6px; gap: 4px; }
+          .card-footer-label { font-size: 9px !important; }
+          .card-footer-date { font-size: 10px !important; }
+        }
         .product-card {
           background: #fff;
           border-radius: 16px;
@@ -305,12 +367,16 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .product-image-container {
           position: relative;
           width: 100%;
-          aspect-ratio: 1 / 1;
+          aspect-ratio: 4 / 3;
           background-color: #f8fafc;
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
+        }
+        @media (max-width: 640px) {
+          .product-image-container { aspect-ratio: 4 / 3 !important; }
+          .product-image { object-fit: cover !important; }
         }
         .product-image {
           width: 100%;
@@ -338,9 +404,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <div className="product-grid">
               {catProducts.map(p => {
                 const discountedPrice = p.price * (1 - discount / 100);
-                const lastUpdate = p.lastPriceChange
+                const lastInfoUpdate = p.lastInfoChange
+                  ? new Date(p.lastInfoChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : null;
+                const lastPriceUpdate = p.lastPriceChange
                   ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : 'İlk Fiyat';
+                  : null;
 
                 return (
                   <div key={p.id} className="product-card" style={{ opacity: p.inStock === false ? 0.6 : 1, filter: p.inStock === false ? 'grayscale(0.3)' : 'none' }}>
@@ -362,10 +431,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       )}
                     </div>
 
-                    <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <strong style={{ fontSize: '14px', color: '#0f172a', lineHeight: '1.2' }}>{p.name}</strong>
-                        <span className="badge-unit" style={{ background: '#f1f5f9', color: '#64748b', fontWeight: '600', fontSize: '11px', padding: '2px 6px' }}>{p.unit || 'Kg'}</span>
+                    <div className="card-body">
+                      <div style={{ marginBottom: '4px' }}>
+                        <strong className="card-name">{p.name}</strong>
+                        <div><span className="card-unit-badge">{p.unit || 'Kg'}</span></div>
                       </div>
 
                       <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'center' }}>
@@ -419,8 +488,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                           </div>
                         )}
                       </div>
-                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', fontSize: '10px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}>
-                        <span style={{ opacity: 0.7 }}>🕒</span> Son Güncelleme: {lastUpdate}
+                      <div className="card-footer">
+                        <div className="card-footer-row">
+                          <span className="card-footer-label bilgi">📋 Son Bilgi Güncellemesi :</span>
+                          <span className="card-footer-date">{lastInfoUpdate || 'Henüz yok'}</span>
+                        </div>
+                        <div className="card-footer-row">
+                          <span className="card-footer-label fiyat">💰 Son Fiyat Güncellemesi :</span>
+                          <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -433,40 +509,40 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       {/* PROFILE MODAL */}
       {/* PREMIUM PROFILE MODAL */}
       {showProfile && (
-        <div className="modal-overlay" onClick={() => setShowProfile(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+        <div className="modal-overlay" onClick={() => setShowProfile(false)} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12px', overflowY: 'auto' }}>
           <div className="premium-confirm" onClick={e => e.stopPropagation()} style={{
-            maxWidth: '550px', width: '100%', padding: '0', borderRadius: '24px',
-            overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: 'none'
+            maxWidth: '550px', width: '100%', padding: '0', borderRadius: '20px',
+            overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: 'none',
+            marginTop: '12px', marginBottom: '12px'
           }}>
-            {/* MODAL HEADER */}
             <div style={{
-              padding: '32px 32px 24px',
+              padding: '20px 20px 16px',
               background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
               borderBottom: '1px solid #e2e8f0',
               position: 'relative'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '56px', height: '56px',
+                  width: '44px', height: '44px',
                   background: 'linear-gradient(135deg, var(--primary) 0%, #00d2ab 100%)',
-                  borderRadius: '16px', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', color: '#fff', fontSize: '24px',
-                  boxShadow: '0 8px 16px rgba(0, 184, 148, 0.2)'
+                  borderRadius: '12px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', color: '#fff', fontSize: '20px',
+                  boxShadow: '0 8px 16px rgba(0, 184, 148, 0.2)', flexShrink: 0
                 }}>👤</div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '800', color: '#1e293b' }}>Profil & Fatura</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b', fontWeight: '500' }}>Kişisel bilgilerinizi ve fatura detaylarını yönetin</p>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>Profil & Fatura</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b', fontWeight: '500' }}>Kişisel bilgilerinizi yönetin</p>
                 </div>
               </div>
               <button onClick={() => setShowProfile(false)} style={{
-                position: 'absolute', top: '24px', right: '24px',
+                position: 'absolute', top: '16px', right: '16px',
                 background: '#fff', border: '1px solid #e2e8f0', width: '32px', height: '32px',
                 borderRadius: '50%', fontSize: '14px', cursor: 'pointer', color: '#64748b',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s'
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>✕</button>
             </div>
 
-            <div className="confirm-body" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="confirm-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="field-group">
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ opacity: 0.7 }}>🏢</span> Ticari Ünvan / Ad Soyad
@@ -485,7 +561,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ opacity: 0.7 }}>📞</span> Telefon No
                   </label>
-                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.phone} onChange={e => setProfileData({ ...profileData, phone: e.target.value })} />
+                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.phone} onChange={e => setProfileData({ ...profileData, phone: formatPhoneDynamic(e.target.value) })} onBlur={e => setProfileData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))} placeholder="0530 000 00 00" />
                 </div>
               </div>
 
@@ -593,8 +669,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <button
                       type="button"
                       onClick={async () => {
-                        if (profileData.newPass.length < 3) {
-                          alert('Yeni şifre en az 3 karakter olmalıdır!');
+                        if (profileData.newPass.length < 6) {
+                          alert('Yeni şifre en az 6 karakter olmalıdır!');
                           return;
                         }
                         if (profileData.newPass !== profileData.confirmNewPass) {
@@ -673,22 +749,51 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </div>
 
             <div className="confirm-footer" style={{
-              padding: '24px 32px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
+              padding: '16px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
               display: 'flex', justifyContent: 'flex-end', gap: '12px'
             }}>
               <button onClick={() => { setShowProfile(false); setShowPasswordSection(false); setProfileData(prev => ({ ...prev, currentPass: '', newPass: '', confirmNewPass: '' })); }} style={{
                 background: 'transparent', color: '#64748b', border: 'none',
                 padding: '12px 20px', fontWeight: '700', fontSize: '14px', cursor: 'pointer'
               }}>Vazgeç</button>
-              <button onClick={() => {
+              <button onClick={async () => {
+                // Validasyon
+                if (!profileData.title || profileData.title.trim().length < 2) {
+                  alert('Ad Soyad / Ticari Ünvan en az 2 karakter olmalıdır!');
+                  return;
+                }
+                if (profileData.taxId) {
+                  const tcVkn = profileData.taxId.replace(/\s/g, '');
+                  if (!/^\d{10,11}$/.test(tcVkn)) {
+                    alert('TC Kimlik No 11 haneli, VKN ise 10 haneli sayısal olmalıdır!');
+                    return;
+                  }
+                }
+                if (profileData.phone) {
+                  const phoneClean = profileData.phone.replace(/\s/g, '');
+                  if (phoneClean.length < 10) {
+                    alert('Geçerli bir Türkiye telefon numarası giriniz! (Örn: 0532 123 45 67)');
+                    return;
+                  }
+                }
+                if (profileData.email) {
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileData.email)) {
+                    alert('Geçerli bir e-posta adresi giriniz!');
+                    return;
+                  }
+                }
                 const updates = {
                   name: profileData.title,
                   taxId: profileData.taxId,
                   email: profileData.email,
-                  phone: profileData.phone,
+                  phone: formatPhone(profileData.phone),
                   address: profileData.address
                 };
-                updateCustomer(customer.id, updates);
+                const result = await updateCustomer(customer.id, updates);
+                if (!result || result.ok === false) {
+                  alert(result?.error || 'Güncelleme başarısız. Lütfen tekrar deneyin.');
+                  return;
+                }
                 // Header'daki musteri adini guncelle
                 if (onSessionUpdate) {
                   onSessionUpdate(prev => ({ ...prev, name: profileData.title, taxId: profileData.taxId, email: profileData.email, phone: profileData.phone, address: profileData.address }));

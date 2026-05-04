@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
@@ -11,10 +11,53 @@ import Navbar from './components/Navbar';
 import './components/Navbar.css';
 import { useData } from './context/DataContext';
 
+// Session storage key
+const SESSION_KEY = 'bostan_session';
+
+// localStorage'dan session oku
+const getStoredSession = () => {
+  try {
+    const stored = localStorage.getItem(SESSION_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+// localStorage'a session kaydet
+const setStoredSession = (session) => {
+  try {
+    if (session) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  } catch {
+    // localStorage full olabilir, görmezden gel
+  }
+};
+
 export default function App() {
   const { loading, apiError, clearApiError } = useData();
-  const [session, setSession] = useState(null);
+  const [session, setSessionState] = useState(getStoredSession);
   const [page, setPage] = useState('products');
+
+  // Session değiştiğinde localStorage'a kaydet
+  const setSession = (newSession) => {
+    setSessionState(prev => {
+      const resolved = typeof newSession === 'function' ? newSession(prev) : newSession;
+      setStoredSession(resolved);
+      return resolved;
+    });
+  };
+
+  // Sayfa yüklendiğinde localStorage'dan session kontrol et
+  useEffect(() => {
+    const stored = getStoredSession();
+    if (stored && !session) {
+      setSessionState(stored);
+    }
+  }, []);
 
   if (loading) {
     return (

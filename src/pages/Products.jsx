@@ -3,6 +3,64 @@ import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
 
+function PaginationBar({ currentPage, totalPages, pageSize, totalCount, onPageChange, onPageSizeChange, mobile }) {
+  const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalCount);
+
+  // Sayfa numaralarını hesapla: max 5 buton göster
+  const pages = [];
+  const delta = 2;
+  for (let i = Math.max(1, currentPage - delta); i <= Math.min(totalPages, currentPage + delta); i++) {
+    pages.push(i);
+  }
+
+  const containerStyle = mobile
+    ? { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 4px 80px', alignItems: 'center' }
+    : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '10px' };
+
+  return (
+    <div style={containerStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#64748b' }}>
+        <span>Sayfa başına:</span>
+        {[5, 10, 20].map(n => (
+          <button key={n} onClick={() => onPageSizeChange(n)} style={{
+            padding: '4px 10px', borderRadius: '8px', border: '1px solid',
+            borderColor: pageSize === n ? 'var(--primary)' : '#e2e8f0',
+            background: pageSize === n ? 'rgba(0,184,148,0.08)' : '#fff',
+            color: pageSize === n ? 'var(--primary)' : '#64748b',
+            fontWeight: pageSize === n ? '800' : '600', cursor: 'pointer', fontSize: '12px'
+          }}>{n}</button>
+        ))}
+        <span style={{ marginLeft: '8px', color: '#94a3b8' }}>
+          {totalCount > 0 ? `${start}–${end} / ${totalCount} ürün` : '0 ürün'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={() => onPageChange(1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>«</button>
+        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>‹</button>
+        {pages[0] > 1 && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        {pages.map(p => (
+          <button key={p} onClick={() => onPageChange(p)} style={pBtn(false, p === currentPage)}>{p}</button>
+        ))}
+        {pages[pages.length - 1] < totalPages && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>›</button>
+        <button onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>»</button>
+      </div>
+    </div>
+  );
+}
+
+function pBtn(disabled, active = false) {
+  return {
+    minWidth: '32px', height: '32px', borderRadius: '8px', border: '1px solid',
+    borderColor: active ? 'var(--primary)' : '#e2e8f0',
+    background: active ? 'var(--primary)' : disabled ? '#f8fafc' : '#fff',
+    color: active ? '#fff' : disabled ? '#cbd5e1' : '#475569',
+    fontWeight: '700', cursor: disabled ? 'default' : 'pointer', fontSize: '13px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px'
+  };
+}
+
 export default function Products() {
   const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit } = useData();
 
@@ -10,6 +68,8 @@ export default function Products() {
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(null);
   
   const [catDrop, setCatDrop] = useState(false);
@@ -28,6 +88,14 @@ export default function Products() {
 
   const fileInputRef = useRef(null);
   const editFileRef = useRef(null);
+  const mobileFileRef = useRef(null);
+  const mobileAddFileRef = useRef(null);
+
+  // MOBİL: edit modal state
+  const [mobileEdit, setMobileEdit] = useState(null); // { ...product fields }
+  const [mobileEditCatSearch, setMobileEditCatSearch] = useState('');
+  const [showMobileAdd, setShowMobileAdd] = useState(false);
+  const [mobileAddCatSearch, setMobileAddCatSearch] = useState('');
   const dropRef = useRef(null);
   const editDropRef = useRef(null);
 
@@ -90,6 +158,15 @@ export default function Products() {
   };
 
   const fmtPrice = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+
+  // Sayfalama hesaplama
+  const filteredProducts = products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedProducts = filteredProducts.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  // Arama değişince 1. sayfaya dön
+  useEffect(() => { setCurrentPage(1); }, [search, pageSize]);
 
   const handleAddModal = () => {
     if (!modalInput.trim()) return;
@@ -209,17 +286,33 @@ export default function Products() {
         title="🍉 Bostan Manav" 
         sub="Ürün Veritabanı ve Stok Yönetimi" 
         helpContent={
-          <div className="help-modal-content">
-            <p>Bostan Manav stok yönetim paneline hoş geldiniz. Bu ekranı kullanarak mağazanızdaki ürünleri hızlı ve kolay bir şekilde yönetebilirsiniz.</p>
-            <ul style={{ paddingLeft: '20px', marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <li><strong>📷 Görsel Ekleme:</strong> Yeni ekleme satırında kamera ikonuna tıklayarak veya mevcut ürün görseline çift tıklayarak resim ekleyip değiştirebilirsiniz.</li>
-              <li><strong>✏️ Hızlı Düzenleme (Excel Tipi):</strong> Ürün adı, fiyatı veya biriminin üzerine <strong>çift tıklayarak</strong> anında düzenleme yapabilirsiniz. Kaydetmek için Enter'a basmanız veya dışarı tıklamanız yeterlidir.</li>
-              <li><strong>🏷️ Kategoriler:</strong> Ürünlerin hangi reyonlarda görüneceğini seçebilirsiniz. Yeni kategori eklemek için tablo başlığındaki <strong>+</strong> butonuna tıklayın.</li>
-              <li><strong>⚖️ Birimler:</strong> Kg, Adet, Demet gibi birimleri belirleyebilirsiniz. Yeni birim eklemek için tablo başlığındaki <strong>+</strong> butonuna tıklayın.</li>
-              <li><strong>🔍 Hızlı Arama:</strong> Sağ üstteki arama çubuğu ile ürünleriniz arasında anında arama yapıp istediğiniz ürünü bulabilirsiniz.</li>
+          <div>
+            <p>Bu ekrandan ürünlerinizi hızlı ve kolay şekilde yönetebilirsiniz.</p>
+            <ul>
+              <li><strong>📷 Görsel Ekleme:</strong> Kamera ikonuna tıklayarak resim ekleyip değiştirebilirsiniz.</li>
+              <li><strong>✏️ Hızlı Düzenleme:</strong> Ürün adı, fiyatı veya birimi üzerine <strong>çift tıklayarak</strong> anında düzenleme yapabilirsiniz.</li>
+              <li><strong>🏷️ Kategoriler:</strong> Ürünlerin hangi reyonlarda görüneceğini seçebilirsiniz. Tablo başlığındaki <strong>+</strong> ile yeni kategori ekleyin.</li>
+              <li><strong>⚖️ Birimler:</strong> Kg, Adet, Demet gibi birimleri belirleyebilirsiniz. Tablo başlığındaki <strong>+</strong> ile yeni birim ekleyin.</li>
+              <li><strong>🔍 Arama:</strong> Üstteki arama çubuğu ile ürünler arasında anında filtreleme yapabilirsiniz.</li>
             </ul>
-            <div style={{ marginTop: '20px', padding: '10px', background: 'rgba(0, 184, 148, 0.1)', borderRadius: '8px', borderLeft: '4px solid var(--primary)' }}>
-              <strong>💡 İpucu:</strong> Yeni ürün eklemek için tablonun en üstündeki <strong>boş satırı</strong> doldurup "EKLE" butonuna basmanız veya Enter tuşunu kullanmanız yeterlidir!
+            <div className="help-tip">
+              <strong>💡 İpucu:</strong> Yeni ürün eklemek için tablonun en üstündeki <strong>boş satırı</strong> doldurup "EKLE" butonuna basın veya Enter tuşunu kullanın!
+            </div>
+          </div>
+        }
+        helpContentMobile={
+          <div>
+            <p>Mobil ekranda ürünleriniz kart listesi olarak görünür. Yapılabilecekler:</p>
+            <ul>
+              <li><strong>✏️ Düzenleme:</strong> Herhangi bir ürün kartındaki kalem ikonuna (<strong>✏️</strong>) dokunun. Açılan ekranda ad, fiyat, birim, kategoriler ve görseli düzenleyip <strong>Kaydet</strong>'e basin.</li>
+              <li><strong>VAR / YOK:</strong> Kartın sağındaki butona dokunarak stok durumunu anında değiştirebilirsiniz.</li>
+              <li><strong>🗑️ Silme:</strong> Kalem ikonunun altındaki 🗑️ butonuna dokunun, onay istenir.</li>
+              <li><strong>➕ Yeni Ürün:</strong> Sağ alttaki yeşil <strong>️️+</strong> butonu ile yeni ürün ekleyebilirsiniz.</li>
+              <li><strong>📁 Kategori / ⚖️ Birim:</strong> Listenin üstündeki <strong>Kategori Yönetimi</strong> ve <strong>Birim Yönetimi</strong> butonları ile yönetim ekranını açabilirsiniz.</li>
+              <li><strong>🔍 Arama:</strong> Listenin üstündeki arama kutusuna yazarak anında filtreleyebilirsiniz.</li>
+            </ul>
+            <div className="help-tip">
+              <strong>💡 İpucu:</strong> Kategoriler ve birimler ekranında çift parmakla kaydırarak tüm listeyi görebilirsiniz.
             </div>
           </div>
         }
@@ -248,7 +341,7 @@ export default function Products() {
                 <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => openModal('units')}>+</button></th>
                 <th style={{ width: '230px' }}>Kategoriler <button className="mini-add-btn" onClick={() => openModal('categories')}>+</button></th>
                 <th style={{ width: '90px', textAlign: 'center' }}>Stok</th>
-                <th style={{ width: '130px' }}>Son Güncelleme</th>
+                <th style={{ width: '160px' }}>Son Güncelleme</th>
                 <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
               </tr>
               <tr className="add-row">
@@ -263,7 +356,7 @@ export default function Products() {
                     <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={e => handleFile(e, setNewRow)} />
                   </div>
                 </td>
-                <td><input type="text" className="lite-input" placeholder="Adı..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value})} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
+                <td><input type="text" className="lite-input" placeholder="Adı..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value.toUpperCase()})} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
                 <td><input type="text" className="lite-input" placeholder="0.00" value={newRow.price} onChange={e => {
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
@@ -308,7 +401,7 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase())).map(p => {
+              {pagedProducts.map(p => {
                 const isEditingCats = editing?.id == p.id && editing?.field === 'categoryIds';
                 return (
                   <tr key={p.id} className={isEditingCats ? 'editing-row' : ''}>
@@ -325,14 +418,14 @@ export default function Products() {
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'name' })}>
                       {editing?.id === p.id && editing?.field === 'name' ? (
-                        <input autoFocus className="inline-edit" defaultValue={p.name} onBlur={(e) => handleBlur(p.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                        <input autoFocus className="inline-edit" defaultValue={p.name} onFocus={e => e.target.select()} onChange={e => e.target.value = e.target.value.toUpperCase()} onBlur={(e) => handleBlur(p.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                       ) : (
                         <span className="edit-txt">{p.name}</span>
                       )}
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'price' })}>
                       {editing?.id === p.id && editing?.field === 'price' ? (
-                        <input autoFocus type="text" className="inline-edit" defaultValue={p.price} onInput={e => {
+                        <input autoFocus type="text" className="inline-edit" defaultValue={p.price} onFocus={e => e.target.select()} onInput={e => {
                           let val = e.target.value.replace(/[^0-9.]/g, '');
                           if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
                           e.target.value = val;
@@ -388,9 +481,21 @@ export default function Products() {
                       </button>
                     </td>
                     <td>
-                      <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', flexDirection: 'column' }}>
-                        <span>{p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('tr-TR') : '-'}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>{p.updatedAt ? new Date(p.updatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      <div style={{ fontSize: '10px', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingBottom: '4px' }}>
+                          <span style={{ color: '#94a3b8', fontSize: '9px', fontWeight: '700', letterSpacing: '0.3px', minWidth: '28px' }}>BİLGİ</span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span>{p.lastInfoChange ? new Date(p.lastInfoChange).toLocaleDateString('tr-TR') : 'Değişmedi'}</span>
+                            <span style={{ fontSize: '9px', opacity: 0.8 }}>{p.lastInfoChange ? new Date(p.lastInfoChange).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                          </div>
+                        </div>
+                        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ color: '#94a3b8', fontSize: '9px', fontWeight: '700', letterSpacing: '0.3px', minWidth: '28px' }}>FİYAT</span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ color: p.lastPriceChange ? '#0f172a' : '#94a3b8' }}>{p.lastPriceChange ? new Date(p.lastPriceChange).toLocaleDateString('tr-TR') : 'Değişmedi'}</span>
+                            <span style={{ fontSize: '9px', opacity: 0.8 }}>{p.lastPriceChange ? new Date(p.lastPriceChange).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -402,7 +507,257 @@ export default function Products() {
             </tbody>
           </table>
         </div>
+        {/* DESKTOP SAYFALAMA */}
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredProducts.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+        />
       </div>
+
+      {/* ===================== MOBİL KART LİSTESİ ===================== */}
+      <div className="mobile-product-list">
+        {/* Yönetim butonları */}
+        <div className="mobile-manage-row">
+          <button className="mobile-manage-btn" onClick={() => openModal('categories')}>
+            <span>📁</span> Kategori Yönetimi
+          </button>
+          <button className="mobile-manage-btn" onClick={() => openModal('units')}>
+            <span>⚖️</span> Birim Yönetimi
+          </button>
+        </div>
+
+        <div className="mobile-search-bar">
+          <span>🔍</span>
+          <input type="text" placeholder="Ürün ara..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+
+        {pagedProducts.map(p => (
+          <div key={p.id} className="mobile-product-card">
+            <div className="mobile-card-img">
+              {p.image ? <img src={p.image} alt={p.name} /> : <span>🍎</span>}
+            </div>
+            <div className="mobile-card-info">
+              <div className="mobile-card-name">{p.name}</div>
+              <div className="mobile-card-meta">
+                <span className="mobile-card-price">{fmtPrice(p.price)}</span>
+                <span className="mobile-card-unit">{p.unit}</span>
+              </div>
+              {p.categoryIds.length > 0 && (
+                <div className="mobile-card-cats">
+                  {p.categoryIds.slice(0,2).map(cid => {
+                    const cat = categories.find(c => c.id === cid);
+                    return cat ? <span key={cid} className="mobile-cat-badge">{cat.name}</span> : null;
+                  })}
+                  {p.categoryIds.length > 2 && <span className="mobile-cat-badge">+{p.categoryIds.length - 2}</span>}
+                </div>
+              )}
+            </div>
+            <div className="mobile-card-actions">
+              <button
+                className={`mobile-stock-btn ${p.inStock ? 'in' : 'out'}`}
+                onClick={() => updateProduct(p.id, { inStock: !p.inStock })}
+              >{p.inStock ? 'VAR' : 'YOK'}</button>
+              <button className="mobile-edit-btn" onClick={() => {
+                setMobileEdit({ id: p.id, name: p.name, price: String(p.price), unit: p.unit || 'Kg', categoryIds: [...p.categoryIds], image: p.image || '', inStock: p.inStock });
+                setMobileEditCatSearch('');
+              }}>✏️</button>
+              <button className="mobile-del-btn" onClick={() => setConfirm(p.id)}>🗑</button>
+            </div>
+          </div>
+        ))}
+
+        {/* MOBİL SAYFALAMA */}
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredProducts.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          mobile
+        />
+
+        {/* FAB - Yeni Ürün Ekle */}
+        <button className="mobile-fab" onClick={() => { setShowMobileAdd(true); setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true }); setMobileAddCatSearch(''); }}>＋</button>
+      </div>
+
+      {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
+      {mobileEdit && (
+        <div className="modal-overlay" onClick={() => setMobileEdit(null)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Ürünü Düzenle</span>
+              <button onClick={() => setMobileEdit(null)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+
+              {/* Görsel */}
+              <div className="mobile-field-row">
+                <div className="mobile-img-box" onClick={() => mobileFileRef.current.click()}>
+                  {mobileEdit.image ? <img src={mobileEdit.image} alt="" /> : <span>📷</span>}
+                </div>
+                <input type="file" ref={mobileFileRef} hidden accept="image/*" onChange={e => {
+                  const file = e.target.files[0]; if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => setMobileEdit(prev => ({ ...prev, image: ev.target.result }));
+                  reader.readAsDataURL(file);
+                }} />
+                {mobileEdit.image && <button className="mobile-img-clear" onClick={() => setMobileEdit(prev => ({ ...prev, image: '' }))}>Görseli Kaldır</button>}
+              </div>
+
+              {/* Ad */}
+              <label className="mobile-label">Ürün Adı</label>
+              <input className="mobile-input" value={mobileEdit.name} onChange={e => setMobileEdit(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} placeholder="Ürün adı..." />
+
+              {/* Fiyat + Birim */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Fiyat (₺)</label>
+                  <input className="mobile-input" value={mobileEdit.price} onChange={e => {
+                    let val = e.target.value.replace(/[^0-9.]/g, '');
+                    if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
+                    setMobileEdit(prev => ({ ...prev, price: val }));
+                  }} placeholder="0.00" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Birim</label>
+                  <select className="mobile-input" value={mobileEdit.unit} onChange={e => setMobileEdit(prev => ({ ...prev, unit: e.target.value }))}>
+                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Stok */}
+              <label className="mobile-label">Stok Durumu</label>
+              <button className={`mobile-stock-toggle ${mobileEdit.inStock ? 'in' : 'out'}`} onClick={() => setMobileEdit(prev => ({ ...prev, inStock: !prev.inStock }))}>
+                {mobileEdit.inStock ? '✓ Stokta Var' : '✗ Stokta Yok'}
+              </button>
+
+              {/* Kategoriler */}
+              <label className="mobile-label">Kategoriler</label>
+              <input className="mobile-input" placeholder="Kategori ara..." value={mobileEditCatSearch} onChange={e => setMobileEditCatSearch(e.target.value)} />
+              <div className="mobile-cat-list">
+                {categories.filter(c => c.name.toLowerCase().includes(mobileEditCatSearch.toLowerCase())).map(c => (
+                  <label key={c.id} className="mobile-cat-row">
+                    <input type="checkbox" checked={mobileEdit.categoryIds.includes(c.id)} onChange={() => {
+                      setMobileEdit(prev => ({
+                        ...prev,
+                        categoryIds: prev.categoryIds.includes(c.id)
+                          ? prev.categoryIds.filter(id => id !== c.id)
+                          : [...prev.categoryIds, c.id]
+                      }));
+                    }} />
+                    <span>{getCategoryPath(c)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setMobileEdit(null)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                if (!mobileEdit.name.trim() || !mobileEdit.price) return;
+                updateProduct(mobileEdit.id, {
+                  name: mobileEdit.name.trim(),
+                  price: parseFloat(mobileEdit.price),
+                  unit: mobileEdit.unit,
+                  categoryIds: mobileEdit.categoryIds,
+                  image: mobileEdit.image,
+                  inStock: mobileEdit.inStock
+                });
+                setMobileEdit(null);
+              }}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MOBİL YENİ ÜRÜN MODALI ===================== */}
+      {showMobileAdd && (
+        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+          <div className="mobile-modal" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <span>Yeni Ürün Ekle</span>
+              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+            </div>
+            <div className="mobile-modal-body">
+
+              {/* Görsel */}
+              <div className="mobile-field-row">
+                <div className="mobile-img-box" onClick={() => mobileAddFileRef.current.click()}>
+                  {newRow.image ? <img src={newRow.image} alt="" /> : <span>📷</span>}
+                </div>
+                <input type="file" ref={mobileAddFileRef} hidden accept="image/*" onChange={e => {
+                  const file = e.target.files[0]; if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => setNewRow(prev => ({ ...prev, image: ev.target.result }));
+                  reader.readAsDataURL(file);
+                }} />
+                {newRow.image && <button className="mobile-img-clear" onClick={() => setNewRow(prev => ({ ...prev, image: '' }))}>Görseli Kaldır</button>}
+              </div>
+
+              {/* Ad */}
+              <label className="mobile-label">Ürün Adı</label>
+              <input className="mobile-input" value={newRow.name} onChange={e => setNewRow(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} placeholder="Ürün adı..." />
+
+              {/* Fiyat + Birim */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Fiyat (₺)</label>
+                  <input className="mobile-input" value={newRow.price} onChange={e => {
+                    let val = e.target.value.replace(/[^0-9.]/g, '');
+                    if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
+                    setNewRow(prev => ({ ...prev, price: val }));
+                  }} placeholder="0.00" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="mobile-label">Birim</label>
+                  <select className="mobile-input" value={newRow.unit} onChange={e => setNewRow(prev => ({ ...prev, unit: e.target.value }))}>
+                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Stok */}
+              <label className="mobile-label">Stok Durumu</label>
+              <button className={`mobile-stock-toggle ${newRow.inStock ? 'in' : 'out'}`} onClick={() => setNewRow(prev => ({ ...prev, inStock: !prev.inStock }))}>
+                {newRow.inStock ? '✓ Stokta Var' : '✗ Stokta Yok'}
+              </button>
+
+              {/* Kategoriler */}
+              <label className="mobile-label">Kategoriler</label>
+              <input className="mobile-input" placeholder="Kategori ara..." value={mobileAddCatSearch} onChange={e => setMobileAddCatSearch(e.target.value)} />
+              <div className="mobile-cat-list">
+                {categories.filter(c => c.name.toLowerCase().includes(mobileAddCatSearch.toLowerCase())).map(c => (
+                  <label key={c.id} className="mobile-cat-row">
+                    <input type="checkbox" checked={newRow.categoryIds.includes(c.id)} onChange={() => {
+                      setNewRow(prev => ({
+                        ...prev,
+                        categoryIds: prev.categoryIds.includes(c.id)
+                          ? prev.categoryIds.filter(id => id !== c.id)
+                          : [...prev.categoryIds, c.id]
+                      }));
+                    }} />
+                    <span>{getCategoryPath(c)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mobile-modal-footer">
+              <button className="mobile-btn-cancel" onClick={() => setShowMobileAdd(false)}>Vazgeç</button>
+              <button className="mobile-btn-save" onClick={() => {
+                if (!newRow.name.trim() || !newRow.price) return;
+                addProduct({ ...newRow, price: parseFloat(newRow.price) });
+                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true });
+                setShowMobileAdd(false);
+              }}>Ekle</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SINGLE COLUMN PREMIUM MANAGE MODAL */}
       {showModal && (
