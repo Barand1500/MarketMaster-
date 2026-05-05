@@ -1,61 +1,7 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
-
-const ALL_SHEETS = [
-  { key: 'urunler',                label: 'Ürünler',            desc: 'Ürün adları, fiyatlar ve stok bilgisi',     icon: '🥦' },
-  { key: 'kategoriler',            label: 'Kategoriler',        desc: 'Ürün kategori ağacı',                        icon: '📂' },
-  { key: 'birimler',               label: 'Birimler',           desc: 'Kg, adet, litre vb.',                        icon: '⚖️' },
-  { key: 'musteriler',             label: 'Müşteriler',         desc: 'Müşteri bilgileri ve iskonto oranları',       icon: '👥' },
-  { key: 'personeller',            label: 'Personeller',        desc: 'Personel bilgileri ve şifreler',              icon: '👤' },
-  { key: 'personel_yetkileri',     label: 'Personel Yetkileri', desc: 'Sayfa erişim yetkileri',                     icon: '🔐' },
-  { key: 'urun_kategori_iliskisi', label: 'Ürün-Kategori',      desc: 'Hangi ürün hangi kategoride',                icon: '🔗' },
-];
-
-// Bir tabloyu seçince beraber seçilmesi ZORUNLU olan tablolar
-const DEPS = {
-  urunler:                ['birimler'],
-  personel_yetkileri:     ['personeller'],
-  urun_kategori_iliskisi: ['urunler', 'kategoriler', 'birimler'],
-};
-
-// Bir tabloyu kaldırınca bağımlı olduğu için kaldırılması gereken tablolar
-const REQUIRED_BY = {};
-Object.entries(DEPS).forEach(([tbl, deps]) => {
-  deps.forEach(dep => {
-    if (!REQUIRED_BY[dep]) REQUIRED_BY[dep] = [];
-    REQUIRED_BY[dep].push(tbl);
-  });
-});
-
-// Bir tablo seçildiğinde tüm bağımlılıklarını (transitif) döndürür
-const collectDeps = (key) => {
-  const all = new Set();
-  const visit = (k) => (DEPS[k] || []).forEach(d => { if (!all.has(d)) { all.add(d); visit(d); } });
-  visit(key);
-  return [...all];
-};
-
-// Bir tablo kaldırıldığında onu gerektiren tüm tabloları (transitif) döndürür
-const collectRequiredBy = (key) => {
-  const all = new Set();
-  const visit = (k) => (REQUIRED_BY[k] || []).forEach(d => { if (!all.has(d)) { all.add(d); visit(d); } });
-  visit(key);
-  return [...all];
-};
-
-// Her tablo için DB alan adları (export ve import için canonical sıra)
-const TABLE_FIELDS = {
-  urunler:                ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'],
-  kategoriler:            ['id','kategori_adi','ust_kategori_id'],
-  birimler:               ['id','birim_adi'],
-  musteriler:             ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'],
-  personeller:            ['id','ad_soyad','kullanici_adi','sifre'],
-  personel_yetkileri:     ['personel_id','sayfa_adi'],
-  urun_kategori_iliskisi: ['urun_id','kategori_id'],
-};
 
 export default function Settings() {
   const { siteSettings, updateSiteSettings } = useData();
@@ -69,13 +15,8 @@ export default function Settings() {
   // YEDEKLEME
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [restoreConfirm, setRestoreConfirm] = useState(null); // { type:'excel'|'sql', payload:... }
+  const [restoreConfirm, setRestoreConfirm] = useState(null); // { type:'sql', payload:... }
   const [restoreResult, setRestoreResult] = useState(null);
-  const [showExcelModal, setShowExcelModal] = useState(false);
-  const [excelSelections, setExcelSelections] = useState(
-    Object.fromEntries(ALL_SHEETS.map(s => [s.key, true]))
-  );
-  const restoreExcelFileRef = useRef(null);
   const restoreSqlFileRef = useRef(null);
 
   const logoRef = useRef(null);
@@ -145,38 +86,6 @@ export default function Settings() {
 
   // ── Yedekleme işleyicileri ──────────────────────────────
 
-  // Excel İndir — modal onayından sonra çalışır
-  const handleExcelDownload = async () => {
-    const selected = ALL_SHEETS.filter(s => excelSelections[s.key]);
-    if (selected.length === 0) return;
-    setShowExcelModal(false);
-    setBackupLoading(true);
-    setRestoreResult(null);
-    try {
-      const r = await fetch('/api/backup');
-      if (!r.ok) throw new Error(`Sunucu hatası: ${r.status}`);
-      const backupData = await r.json();
-      const wb = XLSX.utils.book_new();
-      selected.forEach(({ key, label }) => {
-        // gorsel_yolu base64 resim içerdiğinden Excel 32767 char limitini aşıyor — SQL yedeği kullanın
-        const fields = (TABLE_FIELDS[key] || []).filter(f => f !== 'gorsel_yolu');
-        const rows = (backupData.data[key] || []).map(row => {
-          const mapped = {};
-          fields.forEach(f => { mapped[f] = row[f] !== undefined ? row[f] : null; });
-          return mapped;
-        });
-        // json_to_sheet ile satırları yazarken sütun sırasını koru
-        const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}], { header: fields });
-        ws['!cols'] = fields.map(f => ({ wch: Math.max(f.length + 2, 14) }));
-        XLSX.utils.book_append_sheet(wb, ws, label);
-      });
-      XLSX.writeFile(wb, `bostan_yedek_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (e) {
-      setRestoreResult({ ok: false, msg: 'Excel oluşturulamadı: ' + (e.message || 'bilinmeyen hata') });
-    }
-    setBackupLoading(false);
-  };
-
   // SQL İndir
   const handleBackupSql = async () => {
     setBackupLoading(true);
@@ -195,33 +104,6 @@ export default function Settings() {
       setRestoreResult({ ok: false, msg: 'SQL indirilemedi: ' + (e.message || '') });
     }
     setBackupLoading(false);
-  };
-
-  // Excel Geri Yükle
-  const handleRestoreExcelFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: false, raw: true });
-        const data = {};
-        ALL_SHEETS.forEach(({ key, label }) => {
-          const ws = wb.Sheets[label];
-          if (!ws) return;
-          // defval: null — boş hücreler null gelsin, raw: true — değer dönüşümü yapma
-          const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });
-          // Sütun adları DB alan adları olduğundan doğrudan kullan
-          data[key] = rows;
-        });
-        if (!ALL_SHEETS.some(s => data[s.key] && data[s.key].length > 0)) throw new Error('Boş dosya');
-        setRestoreConfirm({ type: 'excel', payload: { version: 2, createdAt: new Date().toISOString(), data } });
-      } catch (err) {
-        setRestoreResult({ ok: false, msg: 'Geçersiz Excel yedek dosyası. Bostan Manav Excel yedeği seçiniz.' + (err.message ? ' (' + err.message + ')' : '') });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = '';
   };
 
   // SQL Geri Yükle
@@ -247,20 +129,11 @@ export default function Settings() {
     setRestoreConfirm(null);
     setRestoreLoading(true);
     try {
-      let r;
-      if (confirm.type === 'excel') {
-        r = await fetch('/api/restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(confirm.payload),
-        });
-      } else {
-        r = await fetch('/api/restore-sql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: confirm.payload,
-        });
-      }
+      const r = await fetch('/api/restore-sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: confirm.payload,
+      });
       const json = await r.json();
       if (json.success) {
         setRestoreResult({ ok: true, msg: 'Veriler başarıyla geri yüklendi. Sayfa yenilenecek...' });
@@ -481,30 +354,19 @@ export default function Settings() {
           {/* Açıklama */}
           <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#475569' }}>
-              <span>�</span><span><strong>Excel</strong> — Seçtiğiniz tabloları ayrı sekmelerde indirir. Türkçe başlıklıdır.</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#475569' }}>
-              <span>🗄️</span><span><strong>SQL</strong> — Tam veritabanı yedeği. Geri yükleme için önerilir.</span>
+              <span>🗄️</span><span><strong>SQL</strong> — Tam veritabanı yedeği (tablolar, resimler, tüm veriler). Geri yükleme için önerilir.</span>
             </div>
           </div>
 
           {/* İNDİR */}
           <div>
             <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '8px' }}>Yedeği İndir</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                onClick={() => { setRestoreResult(null); setShowExcelModal(true); }}
-                disabled={backupLoading}
-                style={{ padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', fontWeight: '700', fontSize: '13px', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                {backupLoading ? '⏳' : '📊'} Excel İndir
-              </button>
-              <button
-                onClick={handleBackupSql}
-                disabled={backupLoading}
-                style={{ padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontWeight: '700', fontSize: '13px', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                {backupLoading ? '⏳' : '🗄️'} SQL İndir
-              </button>
-            </div>
+            <button
+              onClick={handleBackupSql}
+              disabled={backupLoading}
+              style={{ width: '100%', padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontWeight: '700', fontSize: '13px', cursor: backupLoading ? 'not-allowed' : 'pointer', opacity: backupLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+              {backupLoading ? '⏳' : '🗄️'} SQL İndir
+            </button>
           </div>
 
           <div style={{ borderTop: '1px solid #f1f5f9' }} />
@@ -512,22 +374,13 @@ export default function Settings() {
           {/* GERİ YÜKLE */}
           <div>
             <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '8px' }}>Yedekten Geri Yükle</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <input ref={restoreExcelFileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleRestoreExcelFile} />
-              <button
-                onClick={() => { setRestoreResult(null); restoreExcelFileRef.current?.click(); }}
-                disabled={restoreLoading}
-                style={{ padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #bbf7d0', background: '#fff', color: '#15803d', fontWeight: '700', fontSize: '13px', cursor: restoreLoading ? 'not-allowed' : 'pointer', opacity: restoreLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                {restoreLoading ? '⏳' : '📊'} Excel Yükle
-              </button>
-              <input ref={restoreSqlFileRef} type="file" accept=".sql" style={{ display: 'none' }} onChange={handleRestoreSqlFile} />
-              <button
-                onClick={() => { setRestoreResult(null); restoreSqlFileRef.current?.click(); }}
-                disabled={restoreLoading}
-                style={{ padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #c7d2fe', background: '#fff', color: '#4338ca', fontWeight: '700', fontSize: '13px', cursor: restoreLoading ? 'not-allowed' : 'pointer', opacity: restoreLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                {restoreLoading ? '⏳' : '🗄️'} SQL Yükle
-              </button>
-            </div>
+            <input ref={restoreSqlFileRef} type="file" accept=".sql" style={{ display: 'none' }} onChange={handleRestoreSqlFile} />
+            <button
+              onClick={() => { setRestoreResult(null); restoreSqlFileRef.current?.click(); }}
+              disabled={restoreLoading}
+              style={{ width: '100%', padding: '11px 8px', borderRadius: '10px', border: '1.5px solid #c7d2fe', background: '#fff', color: '#4338ca', fontWeight: '700', fontSize: '13px', cursor: restoreLoading ? 'not-allowed' : 'pointer', opacity: restoreLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+              {restoreLoading ? '⏳' : '🗄️'} SQL Yükle
+            </button>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '8px', padding: '9px 12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a' }}>
               <span style={{ fontSize: '13px', flexShrink: 0 }}>⚠️</span>
               <span style={{ fontSize: '12px', color: '#92400e', lineHeight: '1.5' }}>Geri yükleme <strong>mevcut tüm verilerin üzerine yazar</strong> ve geri alınamaz. Admin hesabı korunur.</span>
@@ -545,96 +398,6 @@ export default function Settings() {
       </div>
 
       </div>{/* /flex row */}
-
-      {/* EXCEL TABLO SEÇİM MODALI */}
-      {showExcelModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowExcelModal(false)}>
-          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', maxWidth: '480px', width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-
-            {/* Başlık */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '40px', height: '40px', background: '#f0fdf4', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📊</div>
-                <div>
-                  <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>Excel Yedeği İndir</div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '1px' }}>Hangi tabloları dahil etmek istiyorsunuz?</div>
-                </div>
-              </div>
-              <button onClick={() => setShowExcelModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
-            </div>
-
-            {/* Tümünü seç/kaldır */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px', marginTop: '6px' }}>
-              {Object.values(excelSelections).every(Boolean)
-                ? <button onClick={() => setExcelSelections(Object.fromEntries(ALL_SHEETS.map(s => [s.key, false])))} style={{ fontSize: '12px', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Tümünü Kaldır</button>
-                : <button onClick={() => setExcelSelections(Object.fromEntries(ALL_SHEETS.map(s => [s.key, true])))} style={{ fontSize: '12px', color: '#0369a1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Tümünü Seç</button>
-              }
-            </div>
-
-            {/* Tablo listesi */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              {ALL_SHEETS.map(({ key, label, desc, icon }) => {
-                const myDeps = collectDeps(key);          // bu seçilince zorunlu olan tablolar
-                const neededBy = collectRequiredBy(key);  // bu kaldırılınca silinecek tablolar
-                const isForced = ALL_SHEETS.some(s => excelSelections[s.key] && (DEPS[s.key] || []).includes(key)); // başka bir seçili tablo beni zorunlu kılıyor
-                return (
-                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: '12px', border: `2px solid ${excelSelections[key] ? (isForced ? '#fbbf24' : '#86efac') : '#e2e8f0'}`, background: excelSelections[key] ? (isForced ? '#fffbeb' : '#f0fdf4') : '#f8fafc', cursor: 'pointer', transition: 'all .15s' }}>
-                    <input
-                      type="checkbox"
-                      checked={excelSelections[key]}
-                      onChange={ev => {
-                        setExcelSelections(prev => {
-                          const next = { ...prev, [key]: ev.target.checked };
-                          if (ev.target.checked) {
-                            // seçince bağımlılıkları da aç
-                            collectDeps(key).forEach(d => { next[d] = true; });
-                          } else {
-                            // kaldırınca beni gerektirenleri de kapat
-                            collectRequiredBy(key).forEach(d => { next[d] = false; });
-                          }
-                          return next;
-                        });
-                      }}
-                      style={{ width: '16px', height: '16px', accentColor: '#22c55e', flexShrink: 0 }}
-                    />
-                    <span style={{ fontSize: '18px', flexShrink: 0 }}>{icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        {label}
-                        {isForced && <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', borderRadius: '5px', padding: '1px 6px', fontWeight: '600' }}>zorunlu</span>}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '1px' }}>{desc}</div>
-                      {myDeps.length > 0 && (
-                        <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '3px' }}>
-                          Gerektirir: {myDeps.map(d => ALL_SHEETS.find(s => s.key === d)?.label).join(', ')}
-                        </div>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-
-            {/* Resim uyarısı */}
-            <div style={{ background: '#fef9ec', border: '1px solid #fde68a', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#92400e', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ flexShrink: 0 }}>🖼️</span>
-              <span><strong>Ürün görselleri Excel'e dahil edilmez</strong> (Excel'in 32.767 karakter limiti aşılıyor). Görselleri de yedeklemek için <strong>SQL İndir</strong> seçeneğini kullanın.</span>
-            </div>
-
-            {/* Butonlar */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={handleExcelDownload}
-                disabled={!Object.values(excelSelections).some(Boolean)}
-                style={{ flex: 1, padding: '13px', borderRadius: '10px', border: 'none', background: Object.values(excelSelections).some(Boolean) ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#e2e8f0', color: Object.values(excelSelections).some(Boolean) ? '#fff' : '#94a3b8', fontWeight: '800', fontSize: '14px', cursor: Object.values(excelSelections).some(Boolean) ? 'pointer' : 'not-allowed' }}
-              >
-                📥 Excel İndir ({Object.values(excelSelections).filter(Boolean).length} tablo)
-              </button>
-              <button onClick={() => setShowExcelModal(false)} style={{ padding: '13px 20px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Onay Dialogu */}
       {restoreConfirm && (

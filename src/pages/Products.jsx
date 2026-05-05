@@ -65,6 +65,9 @@ function pBtn(disabled, active = false) {
 export default function Products() {
   const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, siteSettings } = useData();
 
+  // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
+  const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
+
   const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
@@ -391,7 +394,7 @@ export default function Products() {
               <tr className="add-row">
                 <td>
                   <div className="add-img-box">
-                    {newRow.image ? (
+                    {validImg(newRow.image) ? (
                       <div className="thumb-container">
                         <img src={newRow.image} />
                         <button className="img-clear" onClick={() => removeImage('new')}>×</button>
@@ -451,7 +454,7 @@ export default function Products() {
                   <tr key={p.id} className={isEditingCats ? 'editing-row' : ''}>
                     <td>
                       <div className="thumb-box">
-                        {p.image ? (
+                        {validImg(p.image) ? (
                           <div className="thumb-container">
                             <img src={p.image} onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }} />
                             <button className="img-clear" onClick={() => removeImage(p.id)}>×</button>
@@ -582,7 +585,7 @@ export default function Products() {
         {pagedProducts.map(p => (
           <div key={p.id} className="mobile-product-card">
             <div className="mobile-card-img">
-              {p.image ? <img src={p.image} alt={p.name} /> : <span>🍎</span>}
+              {validImg(p.image) ? <img src={p.image} alt={p.name} /> : <span>🍎</span>}
             </div>
             <div className="mobile-card-info">
               <div className="mobile-card-name">{p.name}</div>
@@ -642,7 +645,7 @@ export default function Products() {
               {/* Görsel */}
               <div className="mobile-field-row">
                 <div className="mobile-img-box" onClick={() => mobileFileRef.current.click()}>
-                  {mobileEdit.image ? <img src={mobileEdit.image} alt="" /> : <span>📷</span>}
+                  {validImg(mobileEdit.image) ? <img src={mobileEdit.image} alt="" /> : <span>📷</span>}
                 </div>
                 <input type="file" ref={mobileFileRef} hidden accept="image/*" onChange={e => {
                   const file = e.target.files[0]; if (!file) return;
@@ -732,7 +735,7 @@ export default function Products() {
               {/* Görsel */}
               <div className="mobile-field-row">
                 <div className="mobile-img-box" onClick={() => mobileAddFileRef.current.click()}>
-                  {newRow.image ? <img src={newRow.image} alt="" /> : <span>📷</span>}
+                  {validImg(newRow.image) ? <img src={newRow.image} alt="" /> : <span>📷</span>}
                 </div>
                 <input type="file" ref={mobileAddFileRef} hidden accept="image/*" onChange={e => {
                   const file = e.target.files[0]; if (!file) return;
@@ -929,7 +932,12 @@ export default function Products() {
                         const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                         if (data.length < 2) { setExcelError('Dosyada hiç veri bulunamadı.'); return; }
                         // İlk satır başlık, diğerleri veri
-                        const rows = data.slice(1).map(r => ({ name: String(r[0] || '').trim(), price: String(r[1] || '').replace(',', '.').trim() })).filter(r => r.name);
+                        const rows = data.slice(1).map(r => {
+                          const name = String(r[0] || '').trim().toLocaleUpperCase('tr-TR');
+                          const price = String(r[1] || '').replace(',', '.').trim();
+                          const existing = products.find(p => p.name.toLocaleUpperCase('tr-TR') === name) || null;
+                          return { name, price, existing };
+                        }).filter(r => r.name);
                         if (rows.length === 0) { setExcelError('Geçerli ürün satırı bulunamadı. A sütunu ürün adı, B sütunu fiyat olmalıdır.'); return; }
                         setExcelRows(rows);
                         setExcelStep('preview');
@@ -950,7 +958,9 @@ export default function Products() {
               {excelStep === 'preview' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ fontSize: '13px', color: '#475569', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px' }}>
-                    ✅ <strong>{excelRows.length} ürün</strong> bulundu. Aşağıda göründüğü gibi sisteme eklenecek.
+                    ✅ <strong>{excelRows.length} satır</strong> bulundu. —&nbsp;
+                    <span style={{ color: '#15803d' }}>🟢 {excelRows.filter(r => !r.existing).length} yeni</span>&nbsp;&nbsp;
+                    <span style={{ color: '#b45309' }}>🟡 {excelRows.filter(r => r.existing).length} güncelleme</span>
                   </div>
                   <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -959,14 +969,21 @@ export default function Products() {
                           <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>#</th>
                           <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>Ürün Adı</th>
                           <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>Fiyat</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>Durum</th>
                         </tr>
                       </thead>
                       <tbody>
                         {excelRows.map((r, i) => (
-                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: r.existing ? '#fffbeb' : '#fff' }}>
                             <td style={{ padding: '7px 12px', color: '#94a3b8' }}>{i + 1}</td>
                             <td style={{ padding: '7px 12px', color: '#0f172a', fontWeight: '600' }}>{r.name}</td>
                             <td style={{ padding: '7px 12px', color: '#16a34a', fontWeight: '700' }}>{r.price ? `${Number(r.price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                            <td style={{ padding: '7px 12px' }}>
+                              {r.existing
+                                ? <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟡 Güncelle</span>
+                                : <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟢 Yeni</span>
+                              }
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -976,13 +993,21 @@ export default function Products() {
                     <button onClick={() => { setExcelStep('guide'); setExcelRows([]); }} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>↩ Geri</button>
                     <button disabled={excelLoading} onClick={async () => {
                       setExcelLoading(true);
+                      let added = 0, updated = 0;
                       for (const r of excelRows) {
-                        await addProduct({ name: r.name, price: parseFloat(r.price) || 0, unit: 'Kg', categoryIds: [], image: '', inStock: true });
+                        if (r.existing) {
+                          await updateProduct(r.existing.id, { price: parseFloat(r.price) || 0 });
+                          updated++;
+                        } else {
+                          await addProduct({ name: r.name, price: parseFloat(r.price) || 0, unit: 'Kg', categoryIds: [], image: '', inStock: true });
+                          added++;
+                        }
                       }
                       setExcelLoading(false);
+                      setExcelRows(prev => prev.map((r, i, arr) => ({ ...r, _added: added, _updated: updated })));
                       setExcelStep('done');
                     }} style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: excelLoading ? '#86efac' : 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: '800', fontSize: '13px', cursor: excelLoading ? 'default' : 'pointer' }}>
-                      {excelLoading ? '⏳ Ekleniyor...' : `✅ ${excelRows.length} Ürünü Sisteme Ekle`}
+                      {excelLoading ? '⏳ İşleniyor...' : `✅ ${excelRows.length} Satırı Uygula`}
                     </button>
                   </div>
                 </div>
@@ -991,8 +1016,13 @@ export default function Products() {
               {excelStep === 'done' && (
                 <div style={{ textAlign: 'center', padding: '20px 0' }}>
                   <div style={{ fontSize: '56px', marginBottom: '12px' }}>🎉</div>
-                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#14532d', marginBottom: '8px' }}>Başarıyla Eklendi!</div>
-                  <div style={{ fontSize: '13px', color: '#16a34a', marginBottom: '24px' }}>{excelRows.length} ürün sisteme eklendi.</div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#14532d', marginBottom: '8px' }}>İşlem Tamamlandı!</div>
+                  <div style={{ fontSize: '13px', color: '#16a34a', marginBottom: '4px' }}>
+                    🟢 {excelRows.filter(r => !r.existing).length} ürün eklendi
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#b45309', marginBottom: '24px' }}>
+                    🟡 {excelRows.filter(r => r.existing).length} ürün güncellendi
+                  </div>
                   <button onClick={() => setShowExcelModal(false)} style={{ padding: '12px 32px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Tamam</button>
                 </div>
               )}
