@@ -15,7 +15,9 @@ export function DataProvider({ children }) {
   const [siteSettings, setSiteSettings] = useState(() => {
     try {
       const saved = localStorage.getItem('siteSettings');
-      return saved ? JSON.parse(saved) : { site_adi: 'Bostan Manav', logo: '', favicon: '' };
+      if (!saved) return { site_adi: 'Bostan Manav', logo: '', favicon: '' };
+      const parsed = JSON.parse(saved);
+      return (parsed && typeof parsed === 'object') ? parsed : { site_adi: 'Bostan Manav', logo: '', favicon: '' };
     } catch { return { site_adi: 'Bostan Manav', logo: '', favicon: '' }; }
   });
 
@@ -66,7 +68,7 @@ export function DataProvider({ children }) {
           phone: c.telefon, 
           email: c.eposta, 
           password: c.sifre,
-          discount: parseFloat(c.iskonto_orani), 
+          discount: c.iskonto_orani || '0', 
           address: c.adres,
           createdAt: c.kayit_tarihi
         })) : []);
@@ -337,7 +339,7 @@ export function DataProvider({ children }) {
         phone: data.telefon, 
         email: data.eposta, 
         password: data.sifre, 
-        discount: parseFloat(data.iskonto_orani), 
+        discount: data.iskonto_orani || '0', 
         address: data.adres,
         createdAt: data.kayit_tarihi
       }]);

@@ -27,6 +27,11 @@ async function fixDatabase() {
     }
     console.log('✅ Birimler kontrol edildi ve eksikler tamamlandi.');
 
+    // 3. iskonto_orani kolonunu VARCHAR(20) yap (zincirleme "20+20" formatini desteklemek icin)
+    console.log('💰 iskonto_orani kolonu VARCHAR(20) yapiliyor...');
+    await connection.execute("ALTER TABLE musteriler MODIFY COLUMN iskonto_orani VARCHAR(20) DEFAULT '0'");
+    console.log('✅ iskonto_orani kolonu VARCHAR(20) yapildi.');
+
     console.log('\n✨ Tum duzeltmeler basariyla uygulandi! Artik buyuk resimli urunleri ekleyebilirsiniz.');
 
   } catch (error) {

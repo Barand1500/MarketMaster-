@@ -25,6 +25,9 @@
 }
 
 .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 20px;
   font-weight: 800;
   color: var(--primary);
@@ -117,14 +120,15 @@
 @media (max-width: 768px) {
   .navbar { height: 52px; }
   .nav-container { padding: 0 10px; }
-  .nav-left { gap: 6px; }
-  .nav-logo { font-size: 20px; }
+  .nav-left { gap: 6px; flex: 1; min-width: 0; overflow: hidden; }
+  .nav-logo { font-size: 20px; flex-shrink: 0; }
   .nav-logo-text { display: none; }
-  .nav-links { gap: 2px; }
-  .nav-link { padding: 5px 8px; font-size: 12px; }
+  .nav-links { gap: 2px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-link { padding: 5px 8px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
   .profile-info { display: none; }
   .profile-avatar { width: 28px; height: 28px; font-size: 15px; }
-  .nav-profile { padding-right: 8px; gap: 4px; border-right-width: 1px; }
-  .nav-right { gap: 6px; }
+  .nav-profile { padding-right: 8px; gap: 4px; border-right-width: 1px; flex-shrink: 0; }
+  .nav-right { gap: 6px; flex-shrink: 0; }
   .nav-logout { font-size: 18px; }
 }

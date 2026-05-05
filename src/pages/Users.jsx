@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -6,9 +6,43 @@ import '../styles/ExcelTable.css';
 const AVAILABLE_PAGES = [
   { id: 'products', label: '🍎 Ürün ve Stok' },
   { id: 'customers', label: '👥 Müşteriler' },
-  { id: 'users', label: '🛡️ Personel Yönetimi' },
+  { id: 'users', label: '🛡️ Kullanıcı Yönetimi' },
   { id: 'settings', label: '⚙️ Site Ayarları' }
 ];
+
+function PaginationBar({ currentPage, totalPages, pageSize, totalCount, onPageChange, onPageSizeChange, label = 'kayıt', mobile }) {
+  const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalCount);
+  const pages = [];
+  const delta = 2;
+  for (let i = Math.max(1, currentPage - delta); i <= Math.min(totalPages, currentPage + delta); i++) pages.push(i);
+  const containerStyle = mobile
+    ? { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 4px 80px', alignItems: 'center' }
+    : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '10px' };
+  return (
+    <div style={containerStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#64748b' }}>
+        <span>Sayfa başına:</span>
+        {[5, 10, 20].map(n => (
+          <button key={n} onClick={() => onPageSizeChange(n)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid', borderColor: pageSize === n ? 'var(--primary)' : '#e2e8f0', background: pageSize === n ? 'rgba(0,184,148,0.08)' : '#fff', color: pageSize === n ? 'var(--primary)' : '#64748b', fontWeight: pageSize === n ? '800' : '600', cursor: 'pointer', fontSize: '12px' }}>{n}</button>
+        ))}
+        <span style={{ marginLeft: '8px', color: '#94a3b8' }}>{totalCount > 0 ? `${start}–${end} / ${totalCount} ${label}` : `0 ${label}`}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={() => onPageChange(1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>«</button>
+        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>‹</button>
+        {pages[0] > 1 && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        {pages.map(p => <button key={p} onClick={() => onPageChange(p)} style={pBtn(false, p === currentPage)}>{p}</button>)}
+        {pages[pages.length - 1] < totalPages && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>›</button>
+        <button onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>»</button>
+      </div>
+    </div>
+  );
+}
+function pBtn(disabled, active = false) {
+  return { minWidth: '32px', height: '32px', borderRadius: '8px', border: '1px solid', borderColor: active ? 'var(--primary)' : '#e2e8f0', background: active ? 'var(--primary)' : disabled ? '#f8fafc' : '#fff', color: active ? '#fff' : disabled ? '#cbd5e1' : '#475569', fontWeight: '700', cursor: disabled ? 'default' : 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' };
+}
 
 export default function Users() {
   const { users, addUser, updateUser, deleteUser } = useData();
@@ -29,7 +63,26 @@ export default function Users() {
   const [mobileEditPass, setMobileEditPass] = useState(false);
   const [mobileAddPass, setMobileAddPass] = useState(false);
 
-  // YEDEK & GERİ YÜKLEME
+  // SAYFALAMA
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const filteredUsers = users.filter(u => u.contact?.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedUsers = filteredUsers.slice((safePage - 1) * pageSize, safePage * pageSize);
+  useEffect(() => { setCurrentPage(1); }, [search, pageSize]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (confirm) { setConfirm(null); return; }
+      if (showMobileAdd) { setShowMobileAdd(false); return; }
+      if (mobileEdit) { setMobileEdit(null); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [confirm, showMobileAdd, mobileEdit]);
+
   const togglePassword = (id, e) => {
     e.stopPropagation();
     setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
@@ -47,7 +100,7 @@ export default function Users() {
     }
     const result = await addUser(newRow);
     if (result?.ok === false) {
-      setErrorMsg(result.error || 'Personel eklenemedi.');
+      setErrorMsg(result.error || 'Kullanıcı eklenemedi.');
       return;
     }
     setNewRow({ contact: '', username: '', password: '', allowedPages: ['products'] });
@@ -58,7 +111,7 @@ export default function Users() {
     if (field === 'username' && value) {
       const otherUsers = users.filter(u => u.id !== id);
       if (otherUsers.some(u => u.username.toLowerCase() === value.toLowerCase())) {
-        alert(`HATA: '${value}' kullanıcı adı zaten başka bir personelde kayıtlı! Değişiklik geri alındı.`);
+        alert(`HATA: '${value}' kullanıcı adı zaten başka bir kullanıcıda kayıtlı! Değişiklik geri alındı.`);
         setEditing(null);
         return;
       }
@@ -91,21 +144,21 @@ export default function Users() {
   return (
     <div className="page-container wide">
       <PageHeader 
-        title="🛡️ Personel Yönetimi" 
-        sub="Sisteme girebilecek personelleri ve erişebilecekleri sayfaları belirleyin."
+        title="🛡️ Kullanıcı Yönetimi" 
+        sub="Sisteme girebilecek kullanıcıları ve erişebilecekleri sayfaları belirleyin."
         helpContent={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
-              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Personel Nasıl Eklenir?</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırındaki boş alanlara personelin <strong>Ad Soyad</strong>, <strong>Kullanıcı Adı</strong> ve <strong>Şifre</strong> bilgilerini girin. Ardından hangi sayfalara girebileceğini kutucuklardan seçip <strong>EKLE</strong> butonuna basın.</div>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Kullanıcı Nasıl Eklenir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırındaki boş alanlara kullanıcının <strong>Ad Soyad</strong>, <strong>Kullanıcı Adı</strong> ve <strong>Şifre</strong> bilgilerini girin. Ardından hangi sayfalara girebileceğini kutucuklardan seçip <strong>EKLE</strong> butonuna basın.</div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
               <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔤 Kullanıcı Adı Nedir?</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personelin sisteme giriş yaparken kullanacağı özel isimdir. Her personelin kullanıcı adı <strong>birbirinden farklı</strong> olmak zorundadır. Örnek: <em>ali123</em>, <em>mehmet_depo</em></div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>kullanıcının sisteme giriş yaparken kullanacağı özel isimdir. Her kullanıcının kullanıcı adı <strong>birbirinden farklı</strong> olmak zorundadır. Örnek: <em>ali123</em>, <em>mehmet_depo</em></div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
               <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔒 Sayfa Erişim Yetkileri Nedir?</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Her personel yalnızca izin verilen sayfalara girebilir. Örneğin; <strong>Ürün ve Stok</strong> seçilip <strong>Müşteriler</strong> seçilmezse o personel müşteri listesini hiç göremez. Yetkileri istediğiniz zaman güncelleyebilirsiniz.</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Her kullanıcı yalnızca izin verilen sayfalara girebilir. Örneğin; <strong>Ürün ve Stok</strong> seçilip <strong>Müşteriler</strong> seçilmezse o kullanıcı müşteri listesini hiç göremez. Yetkileri istediğiniz zaman güncelleyebilirsiniz.</div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
               <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Bilgileri Güncellemek</div>
@@ -120,20 +173,20 @@ export default function Users() {
         helpContentMobile={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid var(--primary)' }}>
-              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Personel Eklemek</div>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Kullanıcı Eklemek</div>
               <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ekranın sağ alt köşesindeki yeşil <strong>+</strong> butonuna dokunun. Açılan formda Ad Soyad, Kullanıcı Adı ve Şifre girin, yetkileri seçin, <strong>Ekle</strong>'ye basın.</div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #3b82f6' }}>
-              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Personel Bilgilerini Değiştirmek</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel kartındaki kalem <strong>✏️</strong> ikonuna dokunun. Açılan ekranda bilgileri ve sayfa erişimlerini düzenleyip <strong>Kaydet</strong>'e basın.</div>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Kullanıcı Bilgilerini Değiştirmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kullanıcı kartındaki kalem <strong>✏️</strong> ikonuna dokunun. Açılan ekranda bilgileri ve sayfa erişimlerini düzenleyip <strong>Kaydet</strong>'e basın.</div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #ef4444' }}>
-              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗑️ Personel Silmek</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel kartındaki çöp kutusu <strong>🗑️</strong> ikonuna dokunun. Silmek istediğinizden emin olup olmadığınız sorulacak, onayladıktan sonra silinir.</div>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗑️ Kullanıcı Silmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kullanıcı kartındaki çöp kutusu <strong>🗑️</strong> ikonuna dokunun. Silmek istediğinizden emin olup olmadığınız sorulacak, onayladıktan sonra silinir.</div>
             </div>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #8b5cf6' }}>
               <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔒 Sayfa Yetkileri Nedir?</div>
-              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel yalnızca yetkili olduğu sayfalara girebilir. Düzenleme ekranındaki kutucuklarla hangi sayfalara erişebileceğini ayarlayabilirsiniz.</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kullanıcı yalnızca yetkili olduğu sayfalara girebilir. Düzenleme ekranındaki kutucuklarla hangi sayfalara erişebileceğini ayarlayabilirsiniz.</div>
             </div>
             <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #ef4444' }}>
               <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Admin Hesabı</div>
@@ -148,7 +201,7 @@ export default function Users() {
           <h2 className="toolbar-title">Sistem Kullanıcıları <span className="count-badge">{users.length} Kişi</span></h2>
           <div className="premium-search">
             <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Personel ara..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input type="text" placeholder="Kullanıcı ara..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
@@ -205,7 +258,7 @@ export default function Users() {
               </tr>
             </thead>
             <tbody>
-              {users.filter(u => u.contact?.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase())).map(u => {
+              {pagedUsers.map(u => {
                 const isSysAdmin = u.id === 1 || u.id === '1' || u.id === 'admin' || u.username === 'baran';
                 const userPages = u.allowedPages || [];
                 
@@ -282,16 +335,25 @@ export default function Users() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredUsers.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          label="kullanıcı"
+        />
       </div>
 
-      {/* ===================== MOBİL PERSONEL LİSTESİ ===================== */}
+      {/* ===================== MOBİL KULLANICI LİSTESİ ===================== */}
       <div className="mobile-product-list">
         <div className="mobile-search-bar">
           <span>🔍</span>
-          <input type="text" placeholder="Personel ara..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="text" placeholder="Kullanıcı ara..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {users.filter(u => u.contact?.toLowerCase().includes(search.toLowerCase()) || u.username.toLowerCase().includes(search.toLowerCase())).map(u => {
+        {filteredUsers.slice((safePage - 1) * pageSize, safePage * pageSize).map(u => {
           const isSysAdmin = u.id === 1 || u.id === '1' || u.id === 'admin' || u.username === 'baran';
           const userPages = u.allowedPages || [];
           return (
@@ -329,16 +391,28 @@ export default function Users() {
           );
         })}
 
+        {/* MOBİL SAYFALAMA */}
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredUsers.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          label="kullanıcı"
+          mobile
+        />
+
         <button className="mobile-fab" onClick={() => { setMobileAddData({ contact: '', username: '', password: '', allowedPages: ['products'] }); setMobileAddError(''); setMobileAddPass(false); setShowMobileAdd(true); }}>＋</button>
       </div>
 
       {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
       {mobileEdit && (
-        <div className="modal-overlay" onClick={() => setMobileEdit(null)}>
+        <div className="modal-overlay">
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
-              <span>Personeli Düzenle</span>
-              <button onClick={() => setMobileEdit(null)}>✕</button>
+              <span>Kullanıcıyı Düzenle</span>
+              <button onClick={() => setMobileEdit(null)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Ad Soyad</label>
@@ -391,13 +465,13 @@ export default function Users() {
         </div>
       )}
 
-      {/* ===================== MOBİL YENİ PERSONEL MODALI ===================== */}
+      {/* ===================== MOBİL YENİ KULLANICI MODALİ ===================== */}
       {showMobileAdd && (
-        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+        <div className="modal-overlay">
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
-              <span>Yeni Personel Ekle</span>
-              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+              <span>Yeni Kullanıcı Ekle</span>
+              <button onClick={() => setShowMobileAdd(false)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Ad Soyad *</label>
@@ -451,14 +525,14 @@ export default function Users() {
       )}
 
       {confirm && (
-        <div className="modal-overlay" onClick={() => setConfirm(null)}>
+        <div className="modal-overlay">
           <div className="premium-confirm" onClick={e => e.stopPropagation()}>
             <div className="confirm-header">
               <span className="warn-icon">⚠️</span>
-              <h3>Personeli Sil?</h3>
+              <h3>Kullanıcıyı Sil?</h3>
             </div>
             <div className="confirm-body">
-              <p>Personel kaydını kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+              <p>Kullanıcı kaydını kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
             </div>
             <div className="confirm-footer">
               <button className="btn-cancel" onClick={() => setConfirm(null)}>Vazgeç</button>

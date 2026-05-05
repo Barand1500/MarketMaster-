@@ -123,6 +123,17 @@ export default function Products() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [editing]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (showModal) { setShowModal(null); return; }
+      if (showExcelModal) { setShowExcelModal(false); return; }
+      if (showMobileAdd) { setShowMobileAdd(false); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showModal, showExcelModal, showMobileAdd]);
+
   const handleFile = (e, setter, isEdit = false) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -295,10 +306,7 @@ export default function Products() {
   return (
     <div className="page-container wide">
       <PageHeader 
-        title={siteSettings?.logo
-          ? <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><img src={siteSettings.logo} alt="logo" style={{ height: '32px', width: '32px', objectFit: 'contain', borderRadius: '6px' }} />{siteSettings.site_adi || 'Bostan Manav'}</span>
-          : `🍉 ${siteSettings?.site_adi || 'Bostan Manav'}`
-        }
+        title="Ürün ve Stok Yönetimi"
         sub="Ürün Veritabanı ve Stok Yönetimi"
         actions={
           <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
@@ -724,11 +732,11 @@ export default function Products() {
 
       {/* ===================== MOBİL YENİ ÜRÜN MODALI ===================== */}
       {showMobileAdd && (
-        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+        <div className="modal-overlay">
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <span>Yeni Ürün Ekle</span>
-              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+              <button className="mobile-btn-cancel" onClick={() => setShowMobileAdd(false)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="mobile-modal-body">
 
@@ -808,11 +816,11 @@ export default function Products() {
 
       {/* SINGLE COLUMN PREMIUM MANAGE MODAL */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(null)}>
+        <div className="modal-overlay">
           <div className="pm-modal" onClick={e => e.stopPropagation()}>
             <div className="pm-header">
               <h3>{showModal === 'categories' ? 'Kategori Yönetimi' : 'Birim Yönetimi'}</h3>
-              <button className="pm-close" onClick={() => setShowModal(null)}>✕</button>
+              <button className="pm-close" onClick={() => setShowModal(null)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="pm-body">
               
@@ -850,17 +858,15 @@ export default function Products() {
 
       {/* EXCEL IMPORT MODAL */}
       {showExcelModal && (
-        <div className="modal-overlay" onClick={() => setShowExcelModal(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '520px', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="excel-import-modal" onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '520px', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', padding: '20px 24px 16px', borderBottom: '1px solid #bbf7d0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontSize: '20px', fontWeight: '800', color: '#14532d' }}>📥 Excel'den Ürün Yükle</div>
-                  <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '2px' }}>Toplu ürün ekleme — hızlı ve kolay</div>
-                </div>
-                <button onClick={() => setShowExcelModal(false)} style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', padding: '20px 24px 16px', borderBottom: '1px solid #bbf7d0', position: 'relative' }}>
+              <div>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: '#14532d' }}>📥 Excel'den Ürün Yükle</div>
+                <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '2px' }}>Toplu ürün ekleme — hızlı ve kolay</div>
               </div>
+              <button onClick={() => setShowExcelModal(false)} style={{ position: 'absolute', top: '14px', right: '16px', background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '20px', padding: '4px 10px', cursor: 'pointer', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>× <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
 
             <div style={{ padding: '20px 24px' }}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 import { useData } from '../context/DataContext';
 
@@ -18,6 +18,16 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
   const [passLoading, setPassLoading] = useState(false);
   const [passMsg, setPassMsg] = useState(null);
   const [showPass, setShowPass] = useState({ current: false, new1: false, new2: false });
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (showProfile) { setShowProfile(false); return; }
+      if (showLogoutConfirm) { setShowLogoutConfirm(false); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showProfile, showLogoutConfirm]);
   // E-posta ile sıfırlama
   const [resetStep, setResetStep] = useState(0); // 0=kapalı/form, 1=kod, 2=yeni şifre
   const [resetEmail, setResetEmail] = useState('');
@@ -151,7 +161,7 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
               <button className={`nav-link ${active === 'users' ? 'active' : ''}`} onClick={() => onNav('users')}>Kullanıcılar</button>
             )}
             {(isSysAdmin || allowed.includes('settings')) && (
-              <button className={`nav-link ${active === 'settings' ? 'active' : ''}`} onClick={() => onNav('settings')}>⚙️ Ayarlar</button>
+              <button className={`nav-link ${active === 'settings' ? 'active' : ''}`} onClick={() => onNav('settings')}>Ayarlar</button>
             )}
           </div>
         </div>
@@ -171,7 +181,7 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
 
     {/* PROFİL MODAL */}
     {showProfile && (
-      <div style={overlayStyle} onClick={() => setShowProfile(false)}>
+      <div style={overlayStyle}>
         <div style={cardStyle} onClick={e => e.stopPropagation()}>
           {/* Header */}
           <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -182,7 +192,7 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
                 <div style={{ fontSize: '12px', color: '#94a3b8' }}>@{session?.username}</div>
               </div>
             </div>
-            <button onClick={() => setShowProfile(false)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>×</button>
+            <button onClick={() => setShowProfile(false)} style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '20px', padding: '4px 10px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>× <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
           </div>
 
           {/* Tab Bar */}
@@ -319,7 +329,7 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
 
     {/* ÇIKIŞ ONAY MODALI */}
     {showLogoutConfirm && (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setShowLogoutConfirm(false)}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
         <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 28px', maxWidth: '360px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚪</div>
           <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px' }}>Çıkış Yap</h3>

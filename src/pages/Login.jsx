@@ -45,7 +45,7 @@ export default function Login({ onLogin }) {
         phone: data.user.telefon,
         email: data.user.eposta,
         address: data.user.adres || '',
-        discount: parseFloat(data.user.iskonto_orani || 0)
+        discount: data.user.iskonto_orani || '0'
       };
       // Hashlenmiş şifreyi session'da saklama
       delete mappedUser.sifre;

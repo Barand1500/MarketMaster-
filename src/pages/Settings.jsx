@@ -210,7 +210,7 @@ export default function Settings() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '12px',
-        padding: '14px 18px', maxWidth: '600px', marginBottom: '18px'
+        padding: '14px 18px', marginBottom: '18px'
       }}>
         <span style={{ fontSize: '22px', flexShrink: 0 }}>🚨</span>
         <div>
@@ -221,9 +221,9 @@ export default function Settings() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', flexWrap: 'wrap' }}>
 
-      <div className="card excel-card" style={{ flex: '1 1 380px', minWidth: '320px' }}>
+      <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
           <h2 className="toolbar-title">🎨 Görünüm Ayarları</h2>
         </div>
@@ -244,8 +244,11 @@ export default function Settings() {
             <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '5px' }}>Yükleme ekranında ve tarayıcı başlığında görünür.</div>
           </div>
 
+          {/* Logo + Favicon yan yana */}
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
           {/* Logo */}
-          <div>
+          <div style={{ flex: '1 1 180px' }}>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '7px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
               Logo <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(PNG / JPG / SVG — maks. 500 KB)</span>
             </label>
@@ -278,7 +281,7 @@ export default function Settings() {
           </div>
 
           {/* Favicon */}
-          <div>
+          <div style={{ flex: '1 1 180px' }}>
             <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '7px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
               Favicon <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(PNG / ICO — maks. 200 KB, ideal 32×32 px)</span>
             </label>
@@ -309,6 +312,8 @@ export default function Settings() {
             </div>
             <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '5px' }}>Tarayıcı sekmesinde görünen küçük ikon.</div>
           </div>
+
+          </div>{/* /Logo + Favicon yan yana */}
 
           {/* Mesaj */}
           {msg && (
@@ -344,7 +349,7 @@ export default function Settings() {
       </div>
 
       {/* VERİ YEDEKLEMESİ KARTI */}
-      <div className="card excel-card" style={{ flex: '1 1 320px', minWidth: '280px' }}>
+      <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
           <h2 className="toolbar-title">💾 Veri Yedekleme</h2>
         </div>

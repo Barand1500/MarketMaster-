@@ -3,6 +3,20 @@
   .page-container.wide { padding: 10px 8px; }
 }
 
+/* Excel Import Modal — Mobile */
+@media (max-width: 640px) {
+  .excel-import-modal {
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 20px 20px 0 0 !important;
+  }
+  .modal-overlay:has(.excel-import-modal) {
+    touch-action: pan-y !important;
+    align-items: flex-end !important;
+  }
+}
+
 .excel-card { background: #fff; border-radius: 16px; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.04); overflow: visible; }
 
 .table-header-toolbar { 

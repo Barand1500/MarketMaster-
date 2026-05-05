@@ -6,13 +6,16 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F1') {
-        e.preventDefault(); // Browser yardımını engelle
+        e.preventDefault();
         setShowHelp(prev => !prev);
+      }
+      if (e.key === 'Escape' && showHelp) {
+        setShowHelp(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [showHelp]);
 
   return (
     <div className="page-header">
@@ -28,7 +31,7 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
       </div>
 
       {showHelp && (
-        <div className="modal-overlay help-overlay" onClick={() => setShowHelp(false)}>
+        <div className="modal-overlay help-overlay">
           <div className="help-modal" onClick={e => e.stopPropagation()}>
             {/* Başlık */}
             <div className="help-modal-head">
@@ -37,7 +40,7 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
                 <div className="help-modal-title">Nasıl Kullanılır?</div>
                 <div className="help-modal-sub">{title}</div>
               </div>
-              <button className="help-modal-close" onClick={() => setShowHelp(false)}>✕</button>
+              <button className="help-modal-close" onClick={() => setShowHelp(false)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
 
             {/* İçerik */}

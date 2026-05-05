@@ -34,12 +34,31 @@ const formatPhone = (val) => {
   return formatPhoneDynamic(val);
 };
 
+// Zincirleme iskonto: "20+20" → 36, "10" → 10
+const parseDiscount = (text) => {
+  const str = String(text || '0').trim();
+  if (str.includes('+')) {
+    const parts = str.split('+').map(p => parseFloat(p.trim())).filter(n => !isNaN(n) && n >= 0 && n <= 100);
+    if (parts.length >= 2) {
+      let remaining = 100;
+      for (const p of parts) remaining = remaining * (1 - p / 100);
+      return Math.round((100 - remaining) * 100) / 100;
+    }
+  }
+  const n = parseFloat(str);
+  return (!isNaN(n) && n >= 0) ? Math.min(n, 100) : 0;
+};
+
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
   const { categories, products, updateCustomer, refetchProducts, siteSettings } = useData();
   const [search, setSearch] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [showCatDrop, setShowCatDrop] = useState(false);
+  const [categoryOrder, setCategoryOrder] = useState(null); // null = doğal sıra
+  const [pendingOrder, setPendingOrder] = useState(null);   // dropdown'da düzenlenen geçici sıra
+  const [sortBy, setSortBy] = useState('default');
+  const [showSortDrop, setShowSortDrop] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [showProfile, setShowProfile] = useState(false);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -89,9 +108,20 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     return () => clearInterval(interval);
   }, [resetTimer]);
 
-  const discount = customer.discount || 0;
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (showProfile) { setShowProfile(false); return; }
+      if (showLogoutConfirm) { setShowLogoutConfirm(false); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showProfile, showLogoutConfirm]);
+
+  const discount = parseDiscount(String(customer.discount || '0'));
 
   const filteredProducts = products.filter(p => {
+    if (p.inStock === false) return false;
     const matchSearch = p.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
     const matchCat = selectedCategories.length > 0
       ? selectedCategories.some(cid => p.categoryIds.includes(cid))
@@ -99,13 +129,42 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     return matchSearch && matchCat;
   });
 
+  const sortOptions = [
+    { value: 'default', label: 'Varsayılan' },
+    { value: 'a-z', label: '🔤 A → Z' },
+    { value: 'z-a', label: '🔤 Z → A' },
+    { value: 'price-asc', label: '💰 En Düşük Fiyat' },
+    { value: 'price-desc', label: '💰 En Yüksek Fiyat' },
+    { value: 'newest', label: '🆕 En Yeni Eklenen' },
+    { value: 'updated', label: '🕐 En Son Güncellenen' },
+  ];
+
+  const applySorting = (arr) => {
+    if (sortBy === 'default') return arr;
+    const sorted = [...arr];
+    if (sortBy === 'a-z') sorted.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+    else if (sortBy === 'z-a') sorted.sort((a, b) => b.name.localeCompare(a.name, 'tr'));
+    else if (sortBy === 'price-asc') sorted.sort((a, b) => a.price - b.price);
+    else if (sortBy === 'price-desc') sorted.sort((a, b) => b.price - a.price);
+    else if (sortBy === 'newest') sorted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    else if (sortBy === 'updated') sorted.sort((a, b) => new Date(b.lastPriceChange || b.updatedAt || 0) - new Date(a.lastPriceChange || a.updatedAt || 0));
+    return sorted;
+  };
+
   const fmtPrice = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
+
+  // Sıra uygulanmış kategoriler
+  const orderedRoots = (() => {
+    const order = categoryOrder || roots.map(c => c.id);
+    return [...roots].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  })();
+
   const displayCategories = selectedCategories.length > 0
-    ? categories.filter(c => selectedCategories.includes(c.id))
-    : roots;
+    ? orderedRoots.filter(c => selectedCategories.includes(c.id))
+    : orderedRoots;
 
   // Kategori ilişkisi olmayan ürünleri kontrol et
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
@@ -139,23 +198,159 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           </div>
 
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowCatDrop(!showCatDrop)} className="header-filter-btn">
+            <button onClick={() => {
+              setShowCatDrop(!showCatDrop);
+              // Dropdown açılırken pending'i mevcut sırayla başlat
+              if (!showCatDrop) setPendingOrder(categoryOrder || roots.map(c => c.id));
+            }} className="header-filter-btn">
               📂 {selectedCategories.length > 0 ? `${selectedCategories.length}` : 'Kategoriler'}
             </button>
             {showCatDrop && (
               <>
                 <div className="dropdown-overlay" onClick={() => setShowCatDrop(false)} />
-                <div className="header-dropdown">
-                  <div className="dropdown-scroll">
-                    {categories.map(c => (
-                      <label key={c.id} className="dropdown-item">
-                        <input type="checkbox" checked={selectedCategories.includes(c.id)} onChange={() => setSelectedCategories(prev => prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id])} />
-                        {c.name}
-                      </label>
-                    ))}
+                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '230px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
+
+                  {/* FİLTRE BÖLÜMÜ */}
+                  <div style={{ padding: '8px 8px 4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Filtrele</div>
+                    {(pendingOrder || roots.map(c => c.id)).map(id => {
+                      const c = categories.find(cat => cat.id === id);
+                      if (!c) return null;
+                      const checked = selectedCategories.includes(c.id);
+                      return (
+                        <button key={c.id} onClick={() => setSelectedCategories(prev => prev.includes(c.id) ? prev.filter(i => i !== c.id) : [...prev, c.id])}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '7px 10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: checked ? 'rgba(34,197,94,0.07)' : 'transparent', color: checked ? 'var(--primary)' : '#374151', fontWeight: checked ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
+                          onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${checked ? 'var(--primary)' : '#cbd5e1'}`, background: checked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                            {checked && <span style={{ color: '#fff', fontSize: '10px', fontWeight: '900', lineHeight: 1 }}>✓</span>}
+                          </span>
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                    {selectedCategories.length > 0 && (
+                      <button onClick={() => setSelectedCategories([])} style={{ width: '100%', marginTop: '4px', padding: '6px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>✕ Filtreyi Temizle</button>
+                    )}
                   </div>
-                  {selectedCategories.length > 0 && (
-                    <button onClick={() => { setSelectedCategories([]); setShowCatDrop(false); }} className="dropdown-clear-btn">Temizle</button>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
+
+                  {/* SIRALAMA BÖLÜMÜ */}
+                  <div style={{ padding: '4px 8px 8px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '6px 6px 6px' }}>Kategori Sırası</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {(pendingOrder || roots.map(c => c.id)).map((id, idx, arr) => {
+                        const c = categories.find(cat => cat.id === id);
+                        if (!c) return null;
+                        return (
+                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 6px', borderRadius: '8px' }}>
+                            <span style={{ width: '18px', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textAlign: 'center', flexShrink: 0 }}>{idx + 1}</span>
+                            <span style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#334155' }}>{c.name}</span>
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                              <button
+                                disabled={idx === 0}
+                                onClick={() => {
+                                  const next = [...arr];
+                                  [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                  setPendingOrder(next);
+                                }}
+                                style={{ width: '22px', height: '22px', border: 'none', borderRadius: '6px', background: 'transparent', color: idx === 0 ? '#d1d5db' : '#94a3b8', cursor: idx === 0 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >▲</button>
+                              <button
+                                disabled={idx === arr.length - 1}
+                                onClick={() => {
+                                  const next = [...arr];
+                                  [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                                  setPendingOrder(next);
+                                }}
+                                style={{ width: '22px', height: '22px', border: 'none', borderRadius: '6px', background: 'transparent', color: idx === arr.length - 1 ? '#d1d5db' : '#94a3b8', cursor: idx === arr.length - 1 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >▼</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => { setCategoryOrder(pendingOrder); setShowCatDrop(false); }}
+                      style={{ width: '100%', marginTop: '8px', padding: '9px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      ✓ Onayla
+                    </button>
+                    {categoryOrder && (
+                      <button
+                        onClick={() => { setCategoryOrder(null); setPendingOrder(roots.map(c => c.id)); }}
+                        style={{ width: '100%', marginTop: '4px', padding: '7px', borderRadius: '10px', border: 'none', background: '#f1f5f9', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        ↺ Varsayılan Sıra
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowSortDrop(!showSortDrop)}
+              className="header-filter-btn"
+              style={sortBy !== 'default' ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
+            >
+              <span style={{ fontSize: '13px' }}>↕</span>
+              <span>{sortBy === 'default' ? 'Sırala' : 'Sıralı'}</span>
+            </button>
+            {showSortDrop && (
+              <>
+                <div className="dropdown-overlay" onClick={() => setShowSortDrop(false)} />
+                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '210px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 8px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 6px 4px' }}>Sıralama</div>
+                  </div>
+                  <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {sortOptions.map(opt => {
+                      const active = sortBy === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setSortBy(opt.value); setShowSortDrop(false); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            padding: '8px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%',
+                            background: active ? 'rgba(var(--primary-rgb, 34,197,94), 0.08)' : 'transparent',
+                            color: active ? 'var(--primary)' : '#374151',
+                            fontWeight: active ? '700' : '500', fontSize: '13px',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span style={{
+                            width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                            border: `2px solid ${active ? 'var(--primary)' : '#cbd5e1'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: active ? 'var(--primary)' : 'transparent',
+                            transition: 'all 0.15s',
+                          }}>
+                            {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', display: 'block' }} />}
+                          </span>
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {sortBy !== 'default' && (
+                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
+                      <button
+                        onClick={() => { setSortBy('default'); setShowSortDrop(false); }}
+                        style={{ width: '100%', padding: '7px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        ✕ Sıralamayı Sıfırla
+                      </button>
+                    </div>
                   )}
                 </div>
               </>
@@ -164,8 +359,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
 
         <div className="header-right">
-          <button onClick={() => setShowProfile(true)} className="profile-btn-header">👤 Profil</button>
-          <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header">🚪 Çıkış</button>
+          <button onClick={() => setShowProfile(true)} className="profile-btn-header">👤 <span className="btn-label">Profil</span></button>
+          <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header">🚪 <span className="btn-label">Çıkış</span></button>
         </div>
       </div>
 
@@ -249,28 +444,43 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           outline: none;
         }
         .header-filter-btn {
-          padding: 8px 14px;
-          border-radius: 10px;
-          border: 1px solid #e2e8f0;
-          background: #fff;
-          color: #475569;
+          padding: 6px 13px;
+          border-radius: 20px;
+          border: 1.5px solid #e2e8f0;
+          background: #f8fafc;
+          color: #64748b;
           cursor: pointer;
           font-weight: 600;
           font-size: 12px;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 5px;
           white-space: nowrap;
+          transition: border-color 0.15s, background 0.15s;
         }
-        .header-right { display: flex; align-items: center; gap: 8px; }
-        .profile-btn-header { background: #f1f5f9; color: #475569; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; }
-        .logout-btn-header { background: #fee2e2; color: #ef4444; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; }
+        .header-filter-btn:hover {
+          border-color: #cbd5e1;
+          background: #f1f5f9;
+        }
+        /* Profil modalı mobilde bottom sheet */
+        @media (max-width: 640px) {
+          .profile-modal-panel {
+            border-radius: 20px 20px 0 0 !important;
+            margin: 0 !important;
+            max-height: 92dvh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+        }
+        .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .profile-btn-header { background: #f1f5f9; color: #475569; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+        .logout-btn-header { background: #fee2e2; color: #ef4444; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
         
         .header-dropdown { position: absolute; top: calc(100% + 8px); right: 0; background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 50; width: 220px; padding: 12px; border: 1px solid #e2e8f0; }
         .dropdown-scroll { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
         .dropdown-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #475569; padding: 4px 0; }
         .dropdown-clear-btn { width: 100%; margin-top: 10px; padding: 6px; border: none; background: #fee2e2; color: #ef4444; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
-        .dropdown-overlay { position: fixed; inset: 0; z-index: 40; }
+        .dropdown-overlay { position: fixed; inset: 0; z-index: 8999; }
 
         .info-strip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 4px; flex-wrap: wrap; gap: 12px; }
         .info-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -298,57 +508,89 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
         }
         .refresh-btn-link { background: transparent; border: none; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
-        .customer-category-section { padding-bottom: 28px; margin-bottom: 0; }
-        .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 32px 0; border-radius: 2px; }
+        .customer-category-section { padding-bottom: 0; margin-bottom: 0; }
+        .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 36px 0; border-radius: 2px; }
 
         @media (max-width: 768px) {
           .customer-header {
-            padding: 8px 10px;
+            padding: 8px 12px;
             gap: 8px;
+            flex-wrap: wrap;
           }
-          .header-center {
-            order: 3;
-            max-width: none;
-            width: 100%;
-          }
-          .header-left {
-            flex: 1;
-          }
+          /* Satır 1: logo+isim (sol) | profil+çıkış (sağ) */
+          .header-left { order: 1; flex: 1; min-width: 0; }
+          .header-right { order: 2; flex-shrink: 0; gap: 6px; }
+          /* Satır 2: arama + filtreler (tam genişlik) */
+          .header-center { order: 3; width: 100%; max-width: none; flex-wrap: nowrap; }
+
+          .header-divider { display: none; }
+          .nav-logo { font-size: 15px !important; }
           .customer-name-display {
             font-size: 12px;
-            max-width: 100px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            max-width: 130px;
           }
-          .header-divider { display: none; }
-          .nav-logo { font-size: 16px !important; }
 
-          .info-strip {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-          }
-          .info-left, .info-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-          .discount-badge-premium {
-            padding: 4px 10px;
-          }
+          .info-strip { flex-direction: column; align-items: flex-start; gap: 10px; }
+          .info-left, .info-right { width: 100%; justify-content: space-between; }
+          .discount-badge-premium { padding: 4px 10px; }
           .badge-text { font-size: 11px; }
+        }
+
+        @media (max-width: 640px) {
+          /* Header buton: sadece ikon */
+          .btn-label { display: none; }
+          .profile-btn-header { padding: 8px 10px; font-size: 15px; }
+          .logout-btn-header  { padding: 8px 10px; font-size: 15px; }
+          .customer-name-display { max-width: 110px; }
+
+          /* Dropdownlar ekranın altında sabit panel olarak açılsın */
+          .portal-dropdown-panel {
+            position: fixed !important;
+            left: 12px !important;
+            right: 12px !important;
+            bottom: 16px !important;
+            top: auto !important;
+            min-width: unset !important;
+            max-height: 80dvh;
+            overflow-y: auto;
+            border-radius: 20px !important;
+            z-index: 9000 !important;
+          }
+
+          /* Profil modal bottom sheet */
+          .profile-modal-panel {
+            border-radius: 20px 20px 0 0 !important;
+            margin: 0 !important;
+            max-height: 88dvh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+          }
+          /* Profil form: tek kolon, kompakt padding */
+          .profile-modal-panel .confirm-body {
+            padding: 14px !important;
+            gap: 12px !important;
+          }
+          .profile-modal-panel .confirm-footer {
+            padding: 12px 14px !important;
+          }
         }
 
         .product-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
           gap: 16px;
         }
-        .card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; }
-        .card-name { font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
-        .card-unit-badge { display: inline-block; background: #f1f5f9; color: #64748b; font-weight: 600; font-size: 11px; padding: 2px 7px; border-radius: 6px; margin-top: 4px; }
-        .card-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; }
-        .card-footer-row { display: flex; flex-direction: column; gap: 1px; }
+        .card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; align-items: center; }
+        .card-name { font-size: 14px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; text-align: center; display: block; width: 100%; }
+        .card-unit-corner { position: absolute; top: 8px; right: 8px; z-index: 2; background: rgba(255,255,255,0.92); color: #475569; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .card-indirim-badge { display: inline-flex; align-items: center; border-radius: 20px; overflow: hidden; height: 24px; box-shadow: 0 2px 6px rgba(220,38,38,0.25); }
+        .card-indirim-pct { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; font-size: 11px; font-weight: 900; padding: 0 8px; height: 100%; display: flex; align-items: center; letter-spacing: 0.2px; }
+        .card-indirim-label { background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; padding: 0 8px; height: 100%; display: flex; align-items: center; }
+        .card-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+        .card-footer-row { display: flex; flex-direction: column; gap: 1px; align-items: center; text-align: center; }
         .card-footer-label { font-size: 9px; font-weight: 700; color: #64748b; }
         .card-footer-label.bilgi { color: #64748b; }
         .card-footer-label.fiyat { color: #16a34a; }
@@ -358,7 +600,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           .product-card { border-radius: 10px; }
           .card-body { padding: 8px !important; }
           .card-name { font-size: 12px !important; }
-          .card-unit-badge { font-size: 10px !important; padding: 2px 6px !important; margin-top: 3px; }
+          .card-unit-corner { font-size: 10px !important; padding: 2px 7px !important; }
+          .card-indirim-badge { height: 19px !important; }
+          .card-indirim-pct { font-size: 10px !important; padding: 0 6px !important; }
+          .card-indirim-label { font-size: 9px !important; padding: 0 5px !important; }
           .card-footer { margin-top: 8px; padding-top: 6px; gap: 4px; }
           .card-footer-label { font-size: 9px !important; }
           .card-footer-date { font-size: 10px !important; }
@@ -381,7 +626,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           position: relative;
           width: 100%;
           aspect-ratio: 4 / 3;
-          background-color: #f8fafc;
+          background-color: #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -427,27 +672,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           <div className="product-grid">
-            {filteredProducts.map(p => {
+            {applySorting(filteredProducts).map(p => {
               const discountedPrice = p.price * (1 - discount / 100);
-              const lastInfoUpdate = p.lastInfoChange
-                ? new Date(p.lastInfoChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                : null;
               const lastPriceUpdate = p.lastPriceChange
-                ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : null;
               return (
-                <div key={p.id} className="product-card" style={{ opacity: p.inStock === false ? 0.6 : 1, filter: p.inStock === false ? 'grayscale(0.3)' : 'none' }}>
+                <div key={p.id} className="product-card">
                   <div className="product-image-container">
-                    {discount > 0 && p.inStock !== false && (
-                      <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'var(--danger)', color: '#fff', padding: '4px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', zIndex: 2, boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)' }}>
-                        %{discount}
-                      </div>
-                    )}
-                    {p.inStock === false && (
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                        <span style={{ background: 'var(--danger)', color: '#fff', padding: '6px 16px', borderRadius: '8px', fontWeight: '900', fontSize: '13px', letterSpacing: '0.5px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>STOKTA YOK</span>
-                      </div>
-                    )}
+                    <div className="card-unit-corner">{p.unit || 'Kg'}</div>
                     {p.image ? (
                       <img src={p.image} alt={p.name} className="product-image" />
                     ) : (
@@ -455,44 +688,38 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     )}
                   </div>
                   <div className="card-body">
-                    <div style={{ marginBottom: '4px' }}>
-                      <strong className="card-name">{p.name}</strong>
-                      <div><span className="card-unit-badge">{p.unit || 'Kg'}</span></div>
-                    </div>
-                    <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'center' }}>
+                    <strong className="card-name">{p.name}</strong>
+                    <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
                       {discount > 0 ? (
                         <>
-                          <div style={{ marginBottom: '12px' }}>
-                            <span style={{ color: '#64748b', fontSize: '14px', fontWeight: '700', borderBottom: '1.5px solid rgba(100, 116, 139, 0.3)', paddingBottom: '2px', display: 'inline-block' }}>
+                          <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                            <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', textDecoration: 'line-through' }}>
                               {fmtPrice(p.price)}
                             </span>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '8.5px', color: '#fff', fontWeight: '900', background: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)', padding: '3px 7px', borderRadius: '7px', boxShadow: '0 3px 6px rgba(214, 48, 49, 0.25)', whiteSpace: 'nowrap', transform: 'rotate(-3deg)', display: 'inline-block', letterSpacing: '0.3px', marginBottom: '2px' }}>
-                              SANA ÖZEL
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                            <span className="card-indirim-badge">
+                              <span className="card-indirim-pct">Sana Özel</span>
+                              <span className="card-indirim-label">%{discount} İndirim</span>
                             </span>
-                            <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
-                              {(() => {
-                                const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                                const parts = str.split(',');
-                                return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
-                              })()}
-                            </div>
+                          </div>
+                          <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
+                            {(() => {
+                              const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                              const parts = str.split(',');
+                              return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
+                            })()}
                           </div>
                         </>
                       ) : (
-                        <div style={{ fontSize: '18px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
+                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
                           {fmtPrice(p.price)}
                         </div>
                       )}
                     </div>
                     <div className="card-footer">
                       <div className="card-footer-row">
-                        <span className="card-footer-label bilgi">📋 Son Bilgi Güncellemesi :</span>
-                        <span className="card-footer-date">{lastInfoUpdate || 'Henüz yok'}</span>
-                      </div>
-                      <div className="card-footer-row">
-                        <span className="card-footer-label fiyat">💰 Son Fiyat Güncellemesi :</span>
+                        <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
                         <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
                       </div>
                     </div>
@@ -518,99 +745,55 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </h2>
 
             <div className="product-grid">
-              {catProducts.map(p => {
+              {applySorting(catProducts).map(p => {
                 const discountedPrice = p.price * (1 - discount / 100);
-                const lastInfoUpdate = p.lastInfoChange
-                  ? new Date(p.lastInfoChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : null;
                 const lastPriceUpdate = p.lastPriceChange
-                  ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                   : null;
 
                 return (
-                  <div key={p.id} className="product-card" style={{ opacity: p.inStock === false ? 0.6 : 1, filter: p.inStock === false ? 'grayscale(0.3)' : 'none' }}>
+                  <div key={p.id} className="product-card">
                     <div className="product-image-container">
-                      {discount > 0 && p.inStock !== false && (
-                        <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'var(--danger)', color: '#fff', padding: '4px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', zIndex: 2, boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)' }}>
-                          %{discount}
-                        </div>
-                      )}
-                      {p.inStock === false && (
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
-                          <span style={{ background: 'var(--danger)', color: '#fff', padding: '6px 16px', borderRadius: '8px', fontWeight: '900', fontSize: '13px', letterSpacing: '0.5px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>STOKTA YOK</span>
-                        </div>
-                      )}
+                      <div className="card-unit-corner">{p.unit || 'Kg'}</div>
                       {p.image ? (
                         <img src={p.image} alt={p.name} className="product-image" />
                       ) : (
                         <span style={{ fontSize: '60px' }}>🍎</span>
                       )}
                     </div>
-
                     <div className="card-body">
-                      <div style={{ marginBottom: '4px' }}>
-                        <strong className="card-name">{p.name}</strong>
-                        <div><span className="card-unit-badge">{p.unit || 'Kg'}</span></div>
-                      </div>
-
-                      <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'center' }}>
+                      <strong className="card-name">{p.name}</strong>
+                      <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
                         {discount > 0 ? (
                           <>
-                            <div style={{ marginBottom: '12px' }}>
-                              <span style={{
-                                color: '#64748b',
-                                fontSize: '14px',
-                                fontWeight: '700',
-                                borderBottom: '1.5px solid rgba(100, 116, 139, 0.3)',
-                                paddingBottom: '2px',
-                                display: 'inline-block'
-                              }}>
+                            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                              <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', textDecoration: 'line-through' }}>
                                 {fmtPrice(p.price)}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                              <span style={{
-                                fontSize: '8.5px',
-                                color: '#fff',
-                                fontWeight: '900',
-                                background: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)',
-                                padding: '3px 7px',
-                                borderRadius: '7px',
-                                boxShadow: '0 3px 6px rgba(214, 48, 49, 0.25)',
-                                whiteSpace: 'nowrap',
-                                transform: 'rotate(-3deg)',
-                                display: 'inline-block',
-                                letterSpacing: '0.3px',
-                                marginBottom: '2px'
-                              }}>
-                                SANA ÖZEL
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                              <span className="card-indirim-badge">
+                                <span className="card-indirim-pct">Sana Özel</span>
+                                <span className="card-indirim-label">%{discount} İndirim</span>
                               </span>
-                              <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
-                                {(() => {
-                                  const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                                  const parts = str.split(',');
-                                  return (
-                                    <>
-                                      {parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span>
-                                    </>
-                                  );
-                                })()}
-                              </div>
                             </div>
+                          <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
+                          {(() => {
+                            const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                            const parts = str.split(',');
+                            return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
+                          })()}
+                          </div>
                           </>
                         ) : (
-                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
+                          <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
                             {fmtPrice(p.price)}
                           </div>
                         )}
                       </div>
                       <div className="card-footer">
                         <div className="card-footer-row">
-                          <span className="card-footer-label bilgi">📋 Son Bilgi Güncellemesi :</span>
-                          <span className="card-footer-date">{lastInfoUpdate || 'Henüz yok'}</span>
-                        </div>
-                        <div className="card-footer-row">
-                          <span className="card-footer-label fiyat">💰 Son Fiyat Güncellemesi :</span>
+                          <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
                           <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
                         </div>
                       </div>
@@ -625,7 +808,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       })}
       {/* LOGOUT CONFIRM MODAL */}
       {showLogoutConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setShowLogoutConfirm(false)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 28px', maxWidth: '360px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚪</div>
             <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px' }}>Çıkış Yap</h3>
@@ -641,8 +824,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       {/* PROFILE MODAL */}
       {/* PREMIUM PROFILE MODAL */}
       {showProfile && (
-        <div className="modal-overlay" onClick={() => setShowProfile(false)} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12px', overflowY: 'auto' }}>
-          <div className="premium-confirm" onClick={e => e.stopPropagation()} style={{
+        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', overflowY: 'auto' }}>
+          <div className="premium-confirm profile-modal-panel" onClick={e => e.stopPropagation()} style={{
             maxWidth: '550px', width: '100%', padding: '0', borderRadius: '20px',
             overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: 'none',
             marginTop: '12px', marginBottom: '12px'
@@ -668,10 +851,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               </div>
               <button onClick={() => setShowProfile(false)} style={{
                 position: 'absolute', top: '16px', right: '16px',
-                background: '#fff', border: '1px solid #e2e8f0', width: '32px', height: '32px',
-                borderRadius: '50%', fontSize: '14px', cursor: 'pointer', color: '#64748b',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>✕</button>
+                background: '#fff', border: '1px solid #e2e8f0',
+                borderRadius: '20px', fontSize: '11px', cursor: 'pointer', color: '#64748b',
+                display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', fontWeight: '700'
+              }}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
 
             <div className="confirm-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>

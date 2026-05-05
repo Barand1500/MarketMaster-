@@ -367,10 +367,9 @@ app.get('/api/musteriler', (req, res) => {
 app.post('/api/musteriler', (req, res) => {
   const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres } = req.body;
   if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Müşteri adı zorunludur.' });
-  const iskonto = parseFloat(iskonto_orani) || 0;
-  if (iskonto < 0 || iskonto > 100) return res.status(400).json({ error: 'İskonto oranı 0-100 arasında olmalıdır.' });
+  const iskonto = iskonto_orani || '0';
   db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto || 0, adres], (err, result) => {
+    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto, adres], (err, result) => {
     if (err) {
       if (err.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });

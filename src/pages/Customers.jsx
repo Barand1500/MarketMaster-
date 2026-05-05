@@ -1,12 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
 
+function PaginationBar({ currentPage, totalPages, pageSize, totalCount, onPageChange, onPageSizeChange, label = 'kayıt', mobile }) {
+  const start = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalCount);
+  const pages = [];
+  const delta = 2;
+  for (let i = Math.max(1, currentPage - delta); i <= Math.min(totalPages, currentPage + delta); i++) pages.push(i);
+  const containerStyle = mobile
+    ? { display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 4px 80px', alignItems: 'center' }
+    : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '10px' };
+  return (
+    <div style={containerStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#64748b' }}>
+        <span>Sayfa başına:</span>
+        {[5, 10, 20].map(n => (
+          <button key={n} onClick={() => onPageSizeChange(n)} style={{ padding: '4px 10px', borderRadius: '8px', border: '1px solid', borderColor: pageSize === n ? 'var(--primary)' : '#e2e8f0', background: pageSize === n ? 'rgba(0,184,148,0.08)' : '#fff', color: pageSize === n ? 'var(--primary)' : '#64748b', fontWeight: pageSize === n ? '800' : '600', cursor: 'pointer', fontSize: '12px' }}>{n}</button>
+        ))}
+        <span style={{ marginLeft: '8px', color: '#94a3b8' }}>{totalCount > 0 ? `${start}–${end} / ${totalCount} ${label}` : `0 ${label}`}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={() => onPageChange(1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>«</button>
+        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} style={pBtn(currentPage === 1)}>‹</button>
+        {pages[0] > 1 && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        {pages.map(p => <button key={p} onClick={() => onPageChange(p)} style={pBtn(false, p === currentPage)}>{p}</button>)}
+        {pages[pages.length - 1] < totalPages && <span style={{ padding: '0 4px', color: '#94a3b8' }}>…</span>}
+        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>›</button>
+        <button onClick={() => onPageChange(totalPages)} disabled={currentPage === totalPages} style={pBtn(currentPage === totalPages)}>»</button>
+      </div>
+    </div>
+  );
+}
+function pBtn(disabled, active = false) {
+  return { minWidth: '32px', height: '32px', borderRadius: '8px', border: '1px solid', borderColor: active ? 'var(--primary)' : '#e2e8f0', background: active ? 'var(--primary)' : disabled ? '#f8fafc' : '#fff', color: active ? '#fff' : disabled ? '#cbd5e1' : '#475569', fontWeight: '700', cursor: disabled ? 'default' : 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' };
+}
+
 export default function Customers() {
   const { customers, addCustomer, updateCustomer, deleteCustomer } = useData();
 
-  const [newRow, setNewRow] = useState({ name: '', taxId: '', phone: '', password: '', discount: 0, email: '' });
+  const [newRow, setNewRow] = useState({ name: '', taxId: '', phone: '', password: '', discount: '', email: '' });
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -22,6 +56,27 @@ export default function Customers() {
   const [mobileAddError, setMobileAddError] = useState('');
   const [mobileEditError, setMobileEditError] = useState('');
   const [mobileEditPass, setMobileEditPass] = useState(false);
+
+  // SAYFALAMA
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const filteredCustomers = customers.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedCustomers = filteredCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
+  useEffect(() => { setCurrentPage(1); }, [search, pageSize]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (infoModal) { setInfoModal(null); return; }
+      if (confirm) { setConfirm(null); return; }
+      if (showMobileAdd) { setShowMobileAdd(false); return; }
+      if (mobileEdit) { setMobileEdit(null); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [infoModal, confirm, showMobileAdd, mobileEdit]);
 
   const formatPhoneDynamic = (val) => {
     let digits = val.replace(/\D/g, '');
@@ -57,6 +112,29 @@ export default function Customers() {
   const formatTaxId = (val) => {
     if (!val) return '';
     return ('' + val).replace(/\D/g, '');
+  };
+
+  // Zincirleme iskonto hesaplayıcı: "20+20" → 36, "10" → 10
+  const parseDiscount = (text) => {
+    const str = String(text || '0').trim();
+    if (str.includes('+')) {
+      const parts = str.split('+').map(p => parseFloat(p.trim())).filter(n => !isNaN(n) && n >= 0 && n <= 100);
+      if (parts.length >= 2) {
+        let remaining = 100;
+        for (const p of parts) remaining = remaining * (1 - p / 100);
+        return Math.round((100 - remaining) * 100) / 100;
+      }
+    }
+    const n = parseFloat(str);
+    return (!isNaN(n) && n >= 0) ? Math.min(n, 100) : 0;
+  };
+
+  // Admin tabloda gösterim: "20+20" → "20+20 (%36)", "10" → "%10"
+  const displayDiscount = (val) => {
+    const raw = String(val || '0').trim();
+    const rate = parseDiscount(raw);
+    if (raw.includes('+')) return `${raw} (%${rate})`;
+    return `%${rate}`;
   };
 
   const togglePassword = (id, e) => {
@@ -100,14 +178,15 @@ export default function Customers() {
     addCustomer({ 
       ...newRow, 
       phone: cleanedPhone,
-      taxId: cleanedTaxId
+      taxId: cleanedTaxId,
+      discount: newRow.discount || '0'
     });
-    setNewRow({ name: '', taxId: '', phone: '', password: '', discount: 0, email: '' });
+    setNewRow({ name: '', taxId: '', phone: '', password: '', discount: '', email: '' });
   };
 
   const handleBlur = (id, field, value) => {
     let finalValue = value;
-    if (field === 'discount') finalValue = parseFloat(value) || 0;
+    if (field === 'discount') finalValue = value || '0';
     if (field === 'phone') finalValue = formatPhone(value);
     if (field === 'taxId') finalValue = formatTaxId(value);
 
@@ -206,7 +285,7 @@ export default function Customers() {
                 <th style={{ width: '140px' }}>Telefon</th>
                 <th style={{ width: '180px' }}>E-posta <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '120px' }}>Şifre <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
-                <th style={{ width: '100px' }}>İskonto %</th>
+                <th style={{ width: '130px' }}>İskonto %</th>
                 <th style={{ width: '100px', textAlign: 'center' }}>İşlem</th>
               </tr>
               {/* EXCEL ADD ROW */}
@@ -220,7 +299,7 @@ export default function Customers() {
                 <td><input className="lite-input" type="text" placeholder="Örn: 0530..." value={newRow.phone} onChange={e => setNewRow({...newRow, phone: formatPhoneDynamic(e.target.value)})} /></td>
                 <td><input className="lite-input" type="email" placeholder="Zorunlu..." value={newRow.email} onChange={e => setNewRow({...newRow, email: e.target.value})} /></td>
                 <td><input className="lite-input" type="password" placeholder="••••••" value={newRow.password} onChange={e => setNewRow({...newRow, password: e.target.value})} /></td>
-                <td><input className="lite-input" type="number" placeholder="0" value={newRow.discount} onChange={e => setNewRow({...newRow, discount: e.target.value})} /></td>
+                <td><input className="lite-input" type="text" placeholder="0 veya 20+20" value={newRow.discount} onChange={e => setNewRow({...newRow, discount: e.target.value})} /></td>
                 <td style={{ textAlign: 'center', position: 'relative' }}>
                   <button className="lite-add-btn" onClick={handleAdd}>EKLE</button>
                   {errorMsg && <div style={{ 
@@ -249,7 +328,7 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody>
-              {customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => (
+              {pagedCustomers.map(c => (
                 <tr key={c.id} className={editing?.id === c.id ? 'editing-row' : ''}>
                   {/* INLINE EDITABLE CELLS */}
                   <td onDoubleClick={() => setEditing({ id: c.id, field: 'name' })}>
@@ -316,9 +395,9 @@ export default function Customers() {
 
                   <td onDoubleClick={() => setEditing({ id: c.id, field: 'discount' })}>
                     {editing?.id === c.id && editing?.field === 'discount' ? (
-                      <input autoFocus type="number" className="lite-input" defaultValue={c.discount} onBlur={(e) => handleBlur(c.id, 'discount', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                      <input autoFocus type="text" className="lite-input" defaultValue={c.discount} placeholder="0 veya 20+20" onBlur={(e) => handleBlur(c.id, 'discount', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
-                      <span className="edit-txt">%{c.discount || 0}</span>
+                      <span className="edit-txt">{displayDiscount(c.discount)}</span>
                     )}
                   </td>
 
@@ -344,6 +423,15 @@ export default function Customers() {
             </tbody>
           </table>
         </div>
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredCustomers.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          label="müşteri"
+        />
       </div>
 
       {/* ===================== MOBİL MÜŞTERİ LİSTESİ ===================== */}
@@ -353,7 +441,7 @@ export default function Customers() {
           <input type="text" placeholder="Müşteri ara..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {customers.filter(c => c.name?.toLowerCase().includes(search.toLowerCase())).map(c => (
+        {filteredCustomers.slice((safePage - 1) * pageSize, safePage * pageSize).map(c => (
           <div key={c.id} className="mobile-product-card">
             <div className="mobile-card-img" style={{ background: '#ebf4ff', fontSize: '22px' }}>👤</div>
             <div className="mobile-card-info">
@@ -363,9 +451,9 @@ export default function Customers() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
                 {c.phone && <span className="mobile-info-chip">📞 {c.phone}</span>}
-                {c.discount > 0 && (
+                {parseDiscount(String(c.discount || '0')) > 0 && (
                   <span className="mobile-discount-badge">
-                    <span className="mobile-discount-pct">%{c.discount}</span>
+                    <span className="mobile-discount-pct">%{parseDiscount(String(c.discount || '0'))}</span>
                     <span className="mobile-discount-label">İndirim</span>
                   </span>
                 )}
@@ -383,16 +471,28 @@ export default function Customers() {
           </div>
         ))}
 
+        {/* MOBİL SAYFALAMA */}
+        <PaginationBar
+          currentPage={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalCount={filteredCustomers.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          label="müşteri"
+          mobile
+        />
+
         <button className="mobile-fab" onClick={() => { setMobileAddData({ name: '', taxId: '', phone: '', password: '', discount: '0', email: '' }); setMobileAddError(''); setShowMobileAdd(true); }}>＋</button>
       </div>
 
       {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
       {mobileEdit && (
-        <div className="modal-overlay" onClick={() => setMobileEdit(null)}>
+        <div className="modal-overlay">
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <span>Müşteriyi Düzenle</span>
-              <button onClick={() => setMobileEdit(null)}>✕</button>
+              <button onClick={() => setMobileEdit(null)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Müşteri Adı / Ünvan *</label>
@@ -414,7 +514,7 @@ export default function Customers() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="mobile-label">İskonto %</label>
-                  <input className="mobile-input" type="number" min="0" max="100" value={mobileEdit.discount} onChange={e => setMobileEdit(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
+                  <input className="mobile-input" type="text" value={mobileEdit.discount} onChange={e => setMobileEdit(p => ({ ...p, discount: e.target.value }))} placeholder="0 veya 20+20" />
                 </div>
               </div>
 
@@ -433,7 +533,7 @@ export default function Customers() {
                 if (others.find(c => c.email.toLowerCase() === mobileEdit.email.toLowerCase())) {
                   setMobileEditError('Bu e-posta zaten kayıtlı!'); return;
                 }
-                updateCustomer(mobileEdit.id, { name: mobileEdit.name, email: mobileEdit.email, password: mobileEdit.password, phone: formatPhone(mobileEdit.phone), taxId: formatTaxId(mobileEdit.taxId), discount: parseFloat(mobileEdit.discount) || 0 });
+                updateCustomer(mobileEdit.id, { name: mobileEdit.name, email: mobileEdit.email, password: mobileEdit.password, phone: formatPhone(mobileEdit.phone), taxId: formatTaxId(mobileEdit.taxId), discount: mobileEdit.discount || '0' });
                 setMobileEdit(null);
               }}>Kaydet</button>
             </div>
@@ -443,11 +543,11 @@ export default function Customers() {
 
       {/* ===================== MOBİL YENİ MÜŞTERİ MODALI ===================== */}
       {showMobileAdd && (
-        <div className="modal-overlay" onClick={() => setShowMobileAdd(false)}>
+        <div className="modal-overlay">
           <div className="mobile-modal" onClick={e => e.stopPropagation()}>
             <div className="mobile-modal-header">
               <span>Yeni Müşteri Ekle</span>
-              <button onClick={() => setShowMobileAdd(false)}>✕</button>
+              <button onClick={() => setShowMobileAdd(false)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Müşteri Adı / Ünvan *</label>
@@ -466,7 +566,7 @@ export default function Customers() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="mobile-label">İskonto %</label>
-                  <input className="mobile-input" type="number" min="0" max="100" value={mobileAddData.discount} onChange={e => setMobileAddData(p => ({ ...p, discount: e.target.value }))} placeholder="0" />
+                  <input className="mobile-input" type="text" value={mobileAddData.discount} onChange={e => setMobileAddData(p => ({ ...p, discount: e.target.value }))} placeholder="0 veya 20+20" />
                 </div>
               </div>
 
@@ -485,7 +585,7 @@ export default function Customers() {
                 if (customers.find(c => c.email.toLowerCase() === mobileAddData.email.toLowerCase())) {
                   setMobileAddError('Bu e-posta zaten kayıtlı!'); return;
                 }
-                addCustomer({ name: mobileAddData.name, email: mobileAddData.email, password: mobileAddData.password, phone: formatPhone(mobileAddData.phone), taxId: formatTaxId(mobileAddData.taxId), discount: parseFloat(mobileAddData.discount) || 0 });
+                addCustomer({ name: mobileAddData.name, email: mobileAddData.email, password: mobileAddData.password, phone: formatPhone(mobileAddData.phone), taxId: formatTaxId(mobileAddData.taxId), discount: mobileAddData.discount || '0' });
                 setShowMobileAdd(false);
               }}>Ekle</button>
             </div>
@@ -494,7 +594,7 @@ export default function Customers() {
       )}
 
       {confirm && (
-        <div className="modal-overlay" onClick={() => setConfirm(null)}>
+        <div className="modal-overlay">
           <div className="premium-confirm" onClick={e => e.stopPropagation()}>
             <div className="confirm-header">
               <span className="warn-icon">⚠️</span>
@@ -513,7 +613,7 @@ export default function Customers() {
 
       {/* MÜŞTERİ BİLGİ/PROFİL MODALI - PREMİUM REDESIGN */}
       {infoModal && (
-        <div className="modal-overlay" onClick={() => setInfoModal(null)} style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
+        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}>
           <div className="premium-confirm" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px', width: '95%', padding: 0, overflow: 'hidden', borderRadius: '24px' }}>
             {/* Header with Gradient */}
             <div style={{ 
@@ -529,7 +629,7 @@ export default function Customers() {
                   <p style={{ margin: '2px 0 0 0', fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>Müşteri Detaylı Bilgi Kartı</p>
                 </div>
               </div>
-              <button onClick={() => setInfoModal(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: '28px', height: '28px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>✕</button>
+              <button onClick={() => setInfoModal(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
             </div>
 
             <div style={{ padding: '32px', background: '#fff' }}>
@@ -575,7 +675,7 @@ export default function Customers() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏷️ Özel İskonto Oranı</span>
-                    <span style={{ fontSize: '14px', color: 'var(--primary)', fontWeight: '800' }}>%{infoModal.discount || 0} İndirim</span>
+                    <span style={{ fontSize: '14px', color: 'var(--primary)', fontWeight: '800' }}>{displayDiscount(infoModal.discount)} İndirim</span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
