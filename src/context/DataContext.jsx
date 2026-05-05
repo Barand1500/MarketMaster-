@@ -45,8 +45,8 @@ export function DataProvider({ children }) {
         }
 
         // Veritabani alanlarini frontend alanlarina maple
-        setCategories(cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })));
-        setProducts(prods.map(p => ({ 
+        setCategories(Array.isArray(cats) ? cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })) : []);
+        setProducts(Array.isArray(prods) ? prods.map(p => ({ 
           id: p.id, 
           name: p.urun_adi, 
           price: parseFloat(p.fiyat), 
@@ -57,9 +57,9 @@ export function DataProvider({ children }) {
           updatedAt: p.guncelleme_tarihi,
           lastInfoChange: p.bilgi_guncelleme_tarihi || null,
           lastPriceChange: p.son_fiyat_degisimi || null
-        })));
-        setUnits(brm.map(b => ({ id: b.id, name: b.birim_adi })));
-        setCustomers(cust.map(c => ({ 
+        })) : []);
+        setUnits(Array.isArray(brm) ? brm.map(b => ({ id: b.id, name: b.birim_adi })) : []);
+        setCustomers(Array.isArray(cust) ? cust.map(c => ({ 
           id: c.id, 
           name: c.ad_soyad, 
           taxId: c.vkn_tc, 
@@ -69,14 +69,14 @@ export function DataProvider({ children }) {
           discount: parseFloat(c.iskonto_orani), 
           address: c.adres,
           createdAt: c.kayit_tarihi
-        })));
-        setUsers(staff.map(s => ({ 
+        })) : []);
+        setUsers(Array.isArray(staff) ? staff.map(s => ({ 
           id: s.id, 
           contact: s.ad_soyad, 
           username: s.kullanici_adi,
           password: s.sifre,
           allowedPages: s.yetkiler || []
-        })));
+        })) : []);
         
         setLoading(false);
       } catch (error) {

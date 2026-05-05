@@ -154,6 +154,19 @@ db.query(`ALTER TABLE urunler DROP COLUMN fiyat_guncelleme_tarihi`, (err) => {
   }
 });
 
+// Startup migration: fiyat_gecmisi tablosu yoksa olustur
+db.query(`CREATE TABLE IF NOT EXISTS fiyat_gecmisi (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  urun_id INT NOT NULL,
+  eski_fiyat DECIMAL(10,2) NOT NULL,
+  yeni_fiyat DECIMAL(10,2) NOT NULL,
+  degisim_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (urun_id) REFERENCES urunler(id) ON DELETE CASCADE
+)`, (err) => {
+  if (err) console.warn('fiyat_gecmisi tablo olusturma hatasi:', err.message);
+  else console.log('✅ Migration: fiyat_gecmisi tablosu hazir');
+});
+
 // --- BIRIMLER API ---
 app.get('/api/birimler', (req, res) => {
   db.query('SELECT * FROM birimler', (err, results) => {
@@ -859,23 +872,32 @@ app.post('/api/restore-sql', (req, res) => {
     return res.status(400).json({ success: false, error: 'SQL dosyasında geçerli komut bulunamadı.' });
   }
 
+  // Foreign key kontrolünü kapat, tüm komutları çalıştır, sonra tekrar aç
+  const allStatements = [
+    'SET FOREIGN_KEY_CHECKS=0',
+    ...statements,
+    'SET FOREIGN_KEY_CHECKS=1'
+  ];
+
   let idx = 0;
   let executed = 0;
   const runNext = () => {
-    if (idx >= statements.length) {
-      console.log(`[SQL Restore] Tamamlandı: ${executed}/${statements.length} komut çalıştırıldı.`);
+    if (idx >= allStatements.length) {
+      console.log(`[SQL Restore] Tamamlandı: ${executed}/${allStatements.length} komut çalıştırıldı.`);
       return res.json({ success: true, executed });
     }
-    const stmt = statements[idx++];
+    const stmt = allStatements[idx++];
     db.query(stmt, (err) => {
       if (err) {
         const preview = stmt.replace(/\n/g, ' ').slice(0, 150);
-        console.error(`[SQL Restore] Hata (komut ${idx}/${statements.length}):`, preview, '→', err.message);
+        console.error(`SQL restore hatası: ${preview} ${err.message}`);
         const up = stmt.trim().toUpperCase();
         if (up.startsWith('INSERT') || up.startsWith('TRUNCATE') || up.startsWith('DELETE')) {
+          // Önce foreign key kontrolünü geri aç
+          db.query('SET FOREIGN_KEY_CHECKS=1', () => {});
           return res.status(500).json({
             success: false,
-            error: `Komut ${idx}/${statements.length} başarısız: ${err.message}`,
+            error: `Komut ${idx}/${allStatements.length} başarısız: ${err.message}`,
             failedStatement: stmt.slice(0, 200)
           });
         }

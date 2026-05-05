@@ -959,8 +959,8 @@ export default function Products() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ fontSize: '13px', color: '#475569', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px' }}>
                     ✅ <strong>{excelRows.length} satır</strong> bulundu. —&nbsp;
-                    <span style={{ color: '#15803d' }}>🟢 {excelRows.filter(r => !r.existing).length} yeni</span>&nbsp;&nbsp;
-                    <span style={{ color: '#b45309' }}>🟡 {excelRows.filter(r => r.existing).length} güncelleme</span>
+                    <span style={{ color: '#15803d' }}>🟢 {excelRows.filter(r => !r.existing).length} yeni kayıt</span>&nbsp;&nbsp;
+                    <span style={{ color: '#b45309' }}>🟡 {excelRows.filter(r => r.existing).length} güncellenecek kayıt</span>
                   </div>
                   <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -973,19 +973,35 @@ export default function Products() {
                         </tr>
                       </thead>
                       <tbody>
-                        {excelRows.map((r, i) => (
-                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: r.existing ? '#fffbeb' : '#fff' }}>
-                            <td style={{ padding: '7px 12px', color: '#94a3b8' }}>{i + 1}</td>
-                            <td style={{ padding: '7px 12px', color: '#0f172a', fontWeight: '600' }}>{r.name}</td>
-                            <td style={{ padding: '7px 12px', color: '#16a34a', fontWeight: '700' }}>{r.price ? `${Number(r.price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : <span style={{ color: '#94a3b8' }}>—</span>}</td>
-                            <td style={{ padding: '7px 12px' }}>
-                              {r.existing
-                                ? <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟡 Güncelle</span>
-                                : <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟢 Yeni</span>
-                              }
-                            </td>
-                          </tr>
-                        ))}
+                        {excelRows.map((r, i) => {
+                          const newPrice = parseFloat(r.price) || 0;
+                          const oldPrice = r.existing ? parseFloat(r.existing.price) || 0 : null;
+                          const priceChanged = r.existing && newPrice !== oldPrice;
+                          const fmt = (v) => Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+                          return (
+                            <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: r.existing ? '#fffbeb' : '#fff' }}>
+                              <td style={{ padding: '7px 12px', color: '#94a3b8' }}>{i + 1}</td>
+                              <td style={{ padding: '7px 12px', color: '#0f172a', fontWeight: '600' }}>{r.name}</td>
+                              <td style={{ padding: '7px 12px' }}>
+                                {r.existing ? (
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                    <span style={{ color: '#94a3b8', fontWeight: '600', fontSize: '12px', textDecoration: 'line-through' }}>{fmt(oldPrice)}</span>
+                                    <span style={{ color: '#64748b', fontSize: '11px' }}>→</span>
+                                    <span style={{ color: priceChanged ? '#dc2626' : '#16a34a', fontWeight: '800', fontSize: '13px' }}>{fmt(newPrice)}</span>
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#16a34a', fontWeight: '700' }}>{r.price ? fmt(newPrice) : <span style={{ color: '#94a3b8' }}>—</span>}</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '7px 12px' }}>
+                                {r.existing
+                                  ? <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟡 Güncellenecek</span>
+                                  : <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', borderRadius: '5px', padding: '2px 7px', fontWeight: '700' }}>🟢 Yeni Eklenecek</span>
+                                }
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -17,7 +17,7 @@ async function seedAdmin() {
     console.log('⏳ Varsayilan Admin kullanicisi olusturuluyor...');
 
     // 1. Admin var mi kontrol et
-    const [rows] = await connection.execute('SELECT * FROM personeller WHERE kullanici_adi = "baran"');
+    const [rows] = await connection.execute('SELECT * FROM personeller WHERE kullanici_adi = ?', ['baran']);
 
     if (rows.length === 0) {
       // 2. Admini ekle

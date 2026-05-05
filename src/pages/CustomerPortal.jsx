@@ -107,6 +107,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     ? categories.filter(c => selectedCategories.includes(c.id))
     : roots;
 
+  // Kategori ilişkisi olmayan ürünleri kontrol et
+  const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
+  const hasNoCategoryRelations = filteredProducts.length > 0 && filteredProducts.every(p => !p.categoryIds || p.categoryIds.length === 0);
+
   return (
     <div className="page-container wide" style={{ paddingTop: 0 }}>
       {/* COMPACT RESPONSIVE HEADER */}
@@ -394,6 +398,111 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           padding: 6px;
         }
       `}</style>
+
+      {/* DEBUG: Ürün/Kategori durum bilgisi */}
+      {(products.length === 0 || categories.length === 0 || (!hasNoCategoryRelations && displayCategories.every(cat => filteredProducts.filter(p => p.categoryIds.includes(cat.id)).length === 0))) && !hasNoCategoryRelations && (
+        <div style={{ margin: '40px auto', maxWidth: '480px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '12px', padding: '20px 24px' }}>
+          <div style={{ fontWeight: '700', color: '#856404', marginBottom: '8px', fontSize: '15px' }}>⚠️ Ürün Listesi Boş</div>
+          <div style={{ fontSize: '13px', color: '#664d03', lineHeight: '1.8' }}>
+            <div>• Toplam ürün sayısı: <b>{products.length}</b></div>
+            <div>• Toplam kategori sayısı: <b>{categories.length}</b></div>
+            <div>• Gösterilen kategori sayısı: <b>{displayCategories.length}</b></div>
+            <div>• Kategori-ürün ilişkisi olan ürün: <b>{products.filter(p => p.categoryIds && p.categoryIds.length > 0).length}</b></div>
+            <div>• Stokta olan ürün: <b>{products.filter(p => p.inStock !== false).length}</b></div>
+          </div>
+          {products.length === 0 && (
+            <div style={{ marginTop: '10px', fontSize: '13px', color: '#664d03' }}>
+              ⚠️ Veritabanında ürün bulunamadı. Backend'e bağlanılamıyor ya da urunler tablosu boş.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Kategori ilişkisi yoksa tüm ürünleri düz listele */}
+      {hasNoCategoryRelations && (
+        <div className="customer-category-section">
+          <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+            <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
+            Tüm Ürünler
+            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
+          </h2>
+          <div className="product-grid">
+            {filteredProducts.map(p => {
+              const discountedPrice = p.price * (1 - discount / 100);
+              const lastInfoUpdate = p.lastInfoChange
+                ? new Date(p.lastInfoChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : null;
+              const lastPriceUpdate = p.lastPriceChange
+                ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : null;
+              return (
+                <div key={p.id} className="product-card" style={{ opacity: p.inStock === false ? 0.6 : 1, filter: p.inStock === false ? 'grayscale(0.3)' : 'none' }}>
+                  <div className="product-image-container">
+                    {discount > 0 && p.inStock !== false && (
+                      <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'var(--danger)', color: '#fff', padding: '4px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', zIndex: 2, boxShadow: '0 2px 4px rgba(239, 68, 68, 0.3)' }}>
+                        %{discount}
+                      </div>
+                    )}
+                    {p.inStock === false && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3 }}>
+                        <span style={{ background: 'var(--danger)', color: '#fff', padding: '6px 16px', borderRadius: '8px', fontWeight: '900', fontSize: '13px', letterSpacing: '0.5px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>STOKTA YOK</span>
+                      </div>
+                    )}
+                    {p.image ? (
+                      <img src={p.image} alt={p.name} className="product-image" />
+                    ) : (
+                      <span style={{ fontSize: '60px' }}>🍎</span>
+                    )}
+                  </div>
+                  <div className="card-body">
+                    <div style={{ marginBottom: '4px' }}>
+                      <strong className="card-name">{p.name}</strong>
+                      <div><span className="card-unit-badge">{p.unit || 'Kg'}</span></div>
+                    </div>
+                    <div style={{ marginTop: 'auto', paddingTop: '8px', textAlign: 'center' }}>
+                      {discount > 0 ? (
+                        <>
+                          <div style={{ marginBottom: '12px' }}>
+                            <span style={{ color: '#64748b', fontSize: '14px', fontWeight: '700', borderBottom: '1.5px solid rgba(100, 116, 139, 0.3)', paddingBottom: '2px', display: 'inline-block' }}>
+                              {fmtPrice(p.price)}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '8.5px', color: '#fff', fontWeight: '900', background: 'linear-gradient(135deg, #ff7675 0%, #d63031 100%)', padding: '3px 7px', borderRadius: '7px', boxShadow: '0 3px 6px rgba(214, 48, 49, 0.25)', whiteSpace: 'nowrap', transform: 'rotate(-3deg)', display: 'inline-block', letterSpacing: '0.3px', marginBottom: '2px' }}>
+                              SANA ÖZEL
+                            </span>
+                            <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
+                              {(() => {
+                                const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                                const parts = str.split(',');
+                                return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
+                              })()}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: '18px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
+                          {fmtPrice(p.price)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="card-footer">
+                      <div className="card-footer-row">
+                        <span className="card-footer-label bilgi">📋 Son Bilgi Güncellemesi :</span>
+                        <span className="card-footer-date">{lastInfoUpdate || 'Henüz yok'}</span>
+                      </div>
+                      <div className="card-footer-row">
+                        <span className="card-footer-label fiyat">💰 Son Fiyat Güncellemesi :</span>
+                        <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {displayCategories.map((cat, catIdx) => {
         const catProducts = filteredProducts.filter(p => p.categoryIds.includes(cat.id));
