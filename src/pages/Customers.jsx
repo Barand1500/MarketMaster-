@@ -137,32 +137,52 @@ export default function Customers() {
         title="👥 Müşteri Yönetimi" 
         sub="Müşteri portföyünüzü ve özel portal erişimlerini hızla yönetin."
         helpContent={
-          <div>
-            <p>Müşterilerinizin özel indirimli fiyatları görebilmesi ve sisteme giriş yapabilmesi için aşağıdaki bilgileri doldurun:</p>
-            <ul>
-              <li><strong>👤 Kullanıcı Adı / E-posta:</strong> Müşteriler, tablodaki <b>Müşteri Adı</b> veya <b>E-posta</b> bilgisini kullanarak giriş yapar.</li>
-              <li><strong>🔑 Şifre:</strong> Buraya atadığınız şifreyle sisteme erişirler. Göz (👁️) simgesine tıklayarak mevcut şifreyi görebilirsiniz.</li>
-              <li><strong>📧 Şifre Sıfırlama:</strong> Müşteri şifresini unutursa giriş ekranından e-posta ile sıfırlama yapabilir. <b>E-posta alanı zorunludur.</b></li>
-              <li><strong>% İskonto:</strong> Müşteriye özel indirim oranıdır. Örneğin "10" yazarsanız tüm fiyatları %10 indirimli görür.</li>
-            </ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Müşteri Eklemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırı yeni müşteri eklemek içindir. Ad, e-posta ve şifre alanlarını doldurup <strong>EKLE</strong> butonuna basın veya <strong>Enter</strong>'a tıklayın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Mevcut Müşteri Bilgisini Değiştirmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Herhangi bir hücreye <strong>çift tıklayın</strong> — alan anında düzenleme moduna geçer. Değişikliği yazıp <strong>Enter</strong>'a basın, otomatik kaydedilir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔑 Giriş Bilgileri ve Şifre</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteriler, <strong>Müşteri Adı</strong> veya <strong>E-posta</strong> + şifre ile sisteme giriş yapar. Göz (👁️) simgesine tıklayarak mevcut şifreyi görebilirsiniz.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>% İskonto (Özel İndirim)</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteriye özel indirim oranıdır. Örneğin <strong>10</strong> yazarsanız, o müşteri tüm fiyatları %10 indirimli görür.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📧 Şifre Sıfırlama</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteri şifresini unutursa giriş ekranından e-posta ile sıfırlama yapabilir. Bunun için <strong>e-posta alanının dolu olması zorunludur.</strong></div>
+            </div>
             <div className="help-tip">
-              <strong>💡 İpucu:</strong> Herhangi bir hücreye <strong>çift tıklayarak</strong> o bilgiyi anında güncelleyebilirsiniz.
+              <strong>💡 İpucu:</strong> Üstteki arama kutusuna yazarak müşterileri anında filtreleyebilirsiniz.
             </div>
           </div>
         }
         helpContentMobile={
-          <div>
-            <p>Mobil ekranda müşterileriniz kart listesi olarak görünür. Yapılabilecekler:</p>
-            <ul>
-              <li><strong>✏️ Düzenleme:</strong> Kartın sağındaki kalem ikonuna (<strong>✏️</strong>) dokunun. Açılan ekranda ad, e-posta, şifre, telefon, iskonto ve TC/VKN bilgilerini güncelleyip <strong>Kaydet</strong>'e basin.</li>
-              <li><strong>👤 Profil Görüntleme:</strong> Kartın sağındaki <strong>👤</strong> ikonuna dokunarak müşterinin detaylı profil bilgilerini görebilirsiniz.</li>
-              <li><strong>🔑 Şifre:</strong> Düzenleme ekranında göz ikonuna (👁️) dokunarak şifreyi görünez yapıp gösterebilirsiniz.</li>
-              <li><strong>% İskonto:</strong> Düzenleme ekranında iskonto oranını girerek müşteriye özel indirim tanımlayabilirsiniz.</li>
-              <li><strong>🗑️ Silme:</strong> Kartın sağındaki 🗑️ ikonuna dokunun, onay istenir.</li>
-              <li><strong>➕ Yeni Müşteri:</strong> Sağ alttaki yeşil <strong>️️+</strong> butonu ile hızlıca yeni müşteri ekleyebilirsiniz.</li>
-            </ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Müşteri Eklemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Sağ alttaki yeşil <strong>+</strong> butonuna dokunun. Açılan formda bilgileri doldurup <strong>Kaydet</strong>'e basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Müşteri Bilgisini Düzenlemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kartın sağındaki kalem <strong>✏️</strong> ikonuna dokunun. Açılan ekranda ad, e-posta, şifre, telefon ve iskonto bilgilerini değiştirip <strong>Kaydet</strong>'e basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔑 Şifre ve Giriş</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteriler, <strong>Müşteri Adı</strong> veya <strong>E-posta</strong> + şifre ile giriş yapar. Göz (👁️) ikonuna dokunarak şifreyi görebilirsiniz.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>% İskonto ve 🗑️ Silme</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Düzenleme ekranında iskonto oranı girerek müşteriye özel indirim tanımlayabilirsiniz. Silmek için 🗑️ ikonuna dokunun, onay istenir.</div>
+            </div>
             <div className="help-tip">
-              <strong>💡 İpucu:</strong> Müşteriler sisteme giriş yaparken <b>Müşteri Adı</b> veya <b>E-posta</b> + şife ile giriş yapar.
+              <strong>💡 İpucu:</strong> Müşteri adı veya e-posta ile arama yapabilirsiniz.
             </div>
           </div>
         }

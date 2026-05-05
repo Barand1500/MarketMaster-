@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import '../styles/Login.css';
 
 export default function Login({ onLogin }) {
-  const { users, customers } = useData();
+  const { users, customers, siteSettings } = useData();
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
@@ -120,8 +120,13 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-bg">
       <div className="login-card">
-        <div className="login-logo">🍉</div>
-        <h1 className="login-title">Bostan Manav</h1>
+        <div className="login-logo">
+          {siteSettings?.logo
+            ? <img src={siteSettings.logo} alt="logo" style={{ height: '56px', width: '56px', objectFit: 'contain', borderRadius: '12px' }} />
+            : <span>🍉</span>
+          }
+        </div>
+        <h1 className="login-title">{siteSettings?.site_adi || 'Bostan Manav'}</h1>
         <p className="login-sub">Yönetim ekranına veya müşteri paneline giriş yapın</p>
 
         {!forgot ? (

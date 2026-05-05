@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function PageHeader({ title, sub, helpContent, helpContentMobile }) {
+export default function PageHeader({ title, sub, helpContent, helpContentMobile, actions }) {
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
@@ -21,6 +21,7 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile 
         <p className="page-sub">{sub}</p>
       </div>
       <div className="header-right">
+        {actions && <div className="header-actions">{actions}</div>}
         <button className="btn-help" onClick={() => setShowHelp(true)}>
           <span>💡</span> Nasıl Kullanılır?
         </button>

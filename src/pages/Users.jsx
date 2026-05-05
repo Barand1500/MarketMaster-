@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -6,7 +6,8 @@ import '../styles/ExcelTable.css';
 const AVAILABLE_PAGES = [
   { id: 'products', label: '🍎 Ürün ve Stok' },
   { id: 'customers', label: '👥 Müşteriler' },
-  { id: 'users', label: '🛡️ Personel Yönetimi' }
+  { id: 'users', label: '🛡️ Personel Yönetimi' },
+  { id: 'settings', label: '⚙️ Site Ayarları' }
 ];
 
 export default function Users() {
@@ -28,12 +29,13 @@ export default function Users() {
   const [mobileEditPass, setMobileEditPass] = useState(false);
   const [mobileAddPass, setMobileAddPass] = useState(false);
 
+  // YEDEK & GERİ YÜKLEME
   const togglePassword = (id, e) => {
     e.stopPropagation();
     setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     setErrorMsg('');
     if (!newRow.contact.trim() || !newRow.username.trim() || !newRow.password) {
       setErrorMsg("Ad Soyad, Kullanıcı Adı ve Şifre zorunludur!");
@@ -43,7 +45,11 @@ export default function Users() {
       setErrorMsg(`Bu kullanıcı adı (${newRow.username}) zaten kullanılıyor!`);
       return;
     }
-    addUser(newRow);
+    const result = await addUser(newRow);
+    if (result?.ok === false) {
+      setErrorMsg(result.error || 'Personel eklenemedi.');
+      return;
+    }
     setNewRow({ contact: '', username: '', password: '', allowedPages: ['products'] });
   };
 
@@ -88,30 +94,50 @@ export default function Users() {
         title="🛡️ Personel Yönetimi" 
         sub="Sisteme girebilecek personelleri ve erişebilecekleri sayfaları belirleyin."
         helpContent={
-          <div>
-            <p>Sisteme giriş yapabilecek çalışanlarınızı veya ortaklarınızı buradan ekleyebilirsiniz.</p>
-            <ul>
-              <li><strong>👤 Ad Soyad:</strong> Personelin gerçek adı (bilgi amaçlı).</li>
-              <li><strong>🔤 Kullanıcı Adı:</strong> Sisteme girişte kullanacağı benzersiz ad. (Örn: ali123)</li>
-              <li><strong>🔑 Şifre:</strong> Sisteme girişte kullanacağı şifre.</li>
-              <li><strong>🔒 Erişim İzinleri:</strong> Hangi sayfalara girebileceğini kutucuklarla seçersiniz. Örn. sadece "Ürün ve Stok" seçilirse Müşteriler sayfasını göremez.</li>
-            </ul>
-            <div className="help-tip" style={{ borderLeftColor: '#e53e3e', background: '#fff5f5', color: '#742a2a' }}>
-              <strong>⚠️ Önemli:</strong> "admin" hesabı silinemez ve kısıtlanamaz — yönetici her zaman tüm sayfalara erişir.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Personel Nasıl Eklenir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırındaki boş alanlara personelin <strong>Ad Soyad</strong>, <strong>Kullanıcı Adı</strong> ve <strong>Şifre</strong> bilgilerini girin. Ardından hangi sayfalara girebileceğini kutucuklardan seçip <strong>EKLE</strong> butonuna basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔤 Kullanıcı Adı Nedir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personelin sisteme giriş yaparken kullanacağı özel isimdir. Her personelin kullanıcı adı <strong>birbirinden farklı</strong> olmak zorundadır. Örnek: <em>ali123</em>, <em>mehmet_depo</em></div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔒 Sayfa Erişim Yetkileri Nedir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Her personel yalnızca izin verilen sayfalara girebilir. Örneğin; <strong>Ürün ve Stok</strong> seçilip <strong>Müşteriler</strong> seçilmezse o personel müşteri listesini hiç göremez. Yetkileri istediğiniz zaman güncelleyebilirsiniz.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Bilgileri Güncellemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ad Soyad, Kullanıcı Adı veya Şifre alanlarının üzerine <strong>çift tıklayın</strong> — alan düzenleme moduna geçer. Değişikliği yazıp Enter'a basın veya başka bir yere tıklayın, otomatik kaydedilir. Yetki kutucuklarına tıklayarak da erişim haklarını anında değiştirebilirsiniz.</div>
+            </div>
+            <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Dikkat: Admin Hesabı</div>
+              <div style={{ fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' }}><strong>admin</strong> hesabı silinemez, yetkileri kısıtlanamaz ve her zaman tüm sayfalara erişir. Bu hesap sistemin yönetici hesabıdır.</div>
             </div>
           </div>
         }
         helpContentMobile={
-          <div>
-            <p style={{ marginBottom: '10px' }}>Sisteme giriş yapacak personelleri buradan yönetirsiniz.</p>
-            <ul style={{ paddingLeft: '18px', lineHeight: '1.8' }}>
-              <li><strong>🧑‍💼 Kart:</strong> Her personel bir kart olarak görünür. Ad, kullanıcı adı ve yetkili sayfalar kartın üzerinde yazar.</li>
-              <li><strong>✏️ Düzenle:</strong> Kart üzerindeki kalem ikonuna basarak personelin bilgilerini ve sayfa erişimlerini güncelleyin.</li>
-              <li><strong>🗑 Sil:</strong> Çöp kutusu ikonuna basarak personeli kaldırın.</li>
-              <li><strong>＋ Ekle:</strong> Sağ alttaki yeşil yuvarlak butona basarak yeni personel ekleyin.</li>
-            </ul>
-            <div className="help-tip" style={{ borderLeftColor: '#e53e3e', background: '#fff5f5', color: '#742a2a', marginTop: '10px' }}>
-              <strong>⚠️ Not:</strong> 👑 Admin hesabı düzenlenemez ve silinemez.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Personel Eklemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ekranın sağ alt köşesindeki yeşil <strong>+</strong> butonuna dokunun. Açılan formda Ad Soyad, Kullanıcı Adı ve Şifre girin, yetkileri seçin, <strong>Ekle</strong>'ye basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Personel Bilgilerini Değiştirmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel kartındaki kalem <strong>✏️</strong> ikonuna dokunun. Açılan ekranda bilgileri ve sayfa erişimlerini düzenleyip <strong>Kaydet</strong>'e basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗑️ Personel Silmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel kartındaki çöp kutusu <strong>🗑️</strong> ikonuna dokunun. Silmek istediğinizden emin olup olmadığınız sorulacak, onayladıktan sonra silinir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔒 Sayfa Yetkileri Nedir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Personel yalnızca yetkili olduğu sayfalara girebilir. Düzenleme ekranındaki kutucuklarla hangi sayfalara erişebileceğini ayarlayabilirsiniz.</div>
+            </div>
+            <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Admin Hesabı</div>
+              <div style={{ fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' }}>👑 Admin hesabı düzenlenemez ve silinemez. Her zaman tüm sayfalara erişimi vardır.</div>
             </div>
           </div>
         }

@@ -48,6 +48,8 @@ body {
 /* Headers */
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
 .header-left { flex: 1; }
+.header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .page-title { font-size: 28px; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
 .page-sub { color: var(--text-muted); font-size: 15px; }
 

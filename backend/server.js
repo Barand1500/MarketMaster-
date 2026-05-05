@@ -56,6 +56,7 @@ function checkDailyLimit() {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(express.text({ limit: '50mb', type: 'text/plain' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Veritabani Baglantisi
@@ -87,6 +88,60 @@ db.getConnection((err, connection) => {
     } else if (!err) {
       console.log(`✅ Migration: ${col} kolonu eklendi`);
     }
+  });
+});
+
+// Startup migration: personeller tablosuna eposta kolonu ekle
+db.query('ALTER TABLE personeller ADD COLUMN eposta VARCHAR(255) DEFAULT NULL', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') {
+    console.warn('Migration uyarisi (personeller.eposta):', err.message);
+  } else if (!err) {
+    console.log('✅ Migration: personeller.eposta kolonu eklendi');
+  }
+});
+
+// Startup migration: site_settings tablosu oluştur
+db.query(`CREATE TABLE IF NOT EXISTS site_settings (
+  \`key\` VARCHAR(100) PRIMARY KEY,
+  \`value\` MEDIUMTEXT
+)`, (err) => {
+  if (err) { console.warn('site_settings tablo oluşturma hatası:', err.message); return; }
+  // Varsayılan değerleri ekle (INSERT IGNORE: varsa atla)
+  const defaults = [
+    ['site_adi', 'Bostan Manav'],
+    ['logo', ''],
+    ['favicon', '']
+  ];
+  defaults.forEach(([k, v]) => {
+    db.query('INSERT IGNORE INTO site_settings (`key`, `value`) VALUES (?, ?)', [k, v]);
+  });
+});
+
+// --- SİTE AYARLARI API ---
+app.get('/api/ayarlar', (req, res) => {
+  db.query('SELECT `key`, `value` FROM site_settings', (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const settings = {};
+    rows.forEach(r => { settings[r.key] = r.value; });
+    res.json(settings);
+  });
+});
+
+app.put('/api/ayarlar', (req, res) => {
+  const { site_adi, logo, favicon } = req.body;
+  const updates = [];
+  if (site_adi !== undefined) updates.push(['site_adi', site_adi]);
+  if (logo !== undefined) updates.push(['logo', logo]);
+  if (favicon !== undefined) updates.push(['favicon', favicon]);
+  if (updates.length === 0) return res.json({ success: true });
+  let done = 0;
+  let hasError = false;
+  updates.forEach(([k, v]) => {
+    db.query('INSERT INTO site_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?', [k, v, v], (err) => {
+      if (err && !hasError) { hasError = true; return res.status(500).json({ error: err.message }); }
+      done++;
+      if (done === updates.length && !hasError) res.json({ success: true });
+    });
   });
 });
 
@@ -362,7 +417,7 @@ app.post('/api/personeller', (req, res) => {
   const { ad_soyad, kullanici_adi, sifre, yetkiler } = req.body;
   if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Ad Soyad zorunludur.' });
   if (!kullanici_adi || !kullanici_adi.trim()) return res.status(400).json({ error: 'Kullanıcı adı zorunludur.' });
-  if (!sifre || sifre.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalıdır.' });
+  if (!sifre) return res.status(400).json({ error: 'Şifre zorunludur.' });
   db.query('INSERT INTO personeller (ad_soyad, kullanici_adi, sifre) VALUES (?, ?, ?)',
     [ad_soyad, kullanici_adi, sifre], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -378,16 +433,16 @@ app.post('/api/personeller', (req, res) => {
 });
 
 app.put('/api/personeller/:id', (req, res) => {
-  const { ad_soyad, kullanici_adi, sifre, yetkiler } = req.body;
+  const { ad_soyad, kullanici_adi, sifre, yetkiler, eposta } = req.body;
   if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Ad Soyad zorunludur.' });
   if (!kullanici_adi || !kullanici_adi.trim()) return res.status(400).json({ error: 'Kullanıcı adı zorunludur.' });
-  if (sifre && sifre.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalıdır.' });
+
   const sql = sifre
-    ? 'UPDATE personeller SET ad_soyad=?, kullanici_adi=?, sifre=? WHERE id=?'
-    : 'UPDATE personeller SET ad_soyad=?, kullanici_adi=? WHERE id=?';
+    ? 'UPDATE personeller SET ad_soyad=?, kullanici_adi=?, sifre=?, eposta=? WHERE id=?'
+    : 'UPDATE personeller SET ad_soyad=?, kullanici_adi=?, eposta=? WHERE id=?';
   const params = sifre
-    ? [ad_soyad, kullanici_adi, sifre, req.params.id]
-    : [ad_soyad, kullanici_adi, req.params.id];
+    ? [ad_soyad, kullanici_adi, sifre, eposta || null, req.params.id]
+    : [ad_soyad, kullanici_adi, eposta || null, req.params.id];
   db.query(sql, params, (err) => {
     if (err) return res.status(500).json({ error: err.message });
     if (Array.isArray(yetkiler)) {
@@ -398,6 +453,76 @@ app.put('/api/personeller/:id', (req, res) => {
         }
       });
     }
+    res.json({ success: true });
+  });
+});
+
+// Profil güncelleme (sadece ad_soyad ve eposta)
+app.patch('/api/personeller/:id/profil', (req, res) => {
+  const { ad_soyad, eposta } = req.body;
+  if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Ad Soyad zorunludur.' });
+  db.query('UPDATE personeller SET ad_soyad=?, eposta=? WHERE id=?',
+    [ad_soyad.trim(), eposta ? eposta.trim() : null, req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Şifre değiştirme (mevcut şifre doğrulama ile)
+app.post('/api/personeller/:id/sifre-degistir', (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!newPassword) return res.status(400).json({ error: 'Yeni şifre zorunludur.' });
+  db.query('SELECT id FROM personeller WHERE id=? AND sifre=?', [req.params.id, currentPassword], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!rows || rows.length === 0) return res.status(400).json({ error: 'Mevcut şifre yanlış.' });
+    db.query('UPDATE personeller SET sifre=? WHERE id=?', [newPassword, req.params.id], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json({ success: true });
+    });
+  });
+});
+
+// Personel şifre sıfırlama: kod gönder
+app.post('/api/personeller-reset/send-code', (req, res) => {
+  const { email } = req.body;
+  db.query('SELECT id, ad_soyad FROM personeller WHERE eposta = ?', [email], async (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (rows.length === 0) return res.status(404).json({ error: 'Bu e-posta adresiyle kayıtlı personel bulunamadı.' });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = Date.now() + 5 * 60 * 1000;
+    resetCodes[email] = { code, expires };
+
+    const limitCheck = checkDailyLimit();
+    if (!limitCheck.allowed) return res.status(429).json({ error: 'Günlük email limitine ulaşıldı.' });
+    if (!resend) return res.status(503).json({ error: 'E-posta servisi şu an kullanılamıyor.' });
+
+    try {
+      await resend.emails.send({
+        from: 'Bostan Manav <onboarding@resend.dev>',
+        to: email,
+        subject: '🔐 Şifre Sıfırlama Kodunuz',
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#f0fdf4;border-radius:16px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:48px">🍉</div><h2 style="color:#0f172a">Bostan Manav</h2></div><p>Merhaba <strong>${rows[0].ad_soyad}</strong>,</p><p>Şifre sıfırlama kodunuz:</p><div style="text-align:center;padding:24px;background:#fff;border-radius:12px;border:2px dashed #00b894;margin:24px 0"><span style="font-size:36px;font-weight:800;color:#00b894;letter-spacing:8px;font-family:monospace">${code}</span></div><p style="color:#64748b;font-size:13px">Bu kod 5 dakika geçerlidir. Kimseyle paylaşmayın.</p></div>`
+      });
+      dailyEmailCount.count++;
+      saveEmailCount(dailyEmailCount);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'E-posta gönderilemedi.' });
+    }
+  });
+});
+
+// Personel şifre sıfırlama: kodu doğrula ve yeni şifre ata
+app.post('/api/personeller-reset/reset-password', (req, res) => {
+  const { email, code, newPassword } = req.body;
+  const entry = resetCodes[email];
+  if (!entry || entry.code !== code || Date.now() > entry.expires) {
+    return res.status(400).json({ error: 'Geçersiz veya süresi dolmuş kod.' });
+  }
+  db.query('UPDATE personeller SET sifre=? WHERE eposta=?', [newPassword, email], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    delete resetCodes[email];
     res.json({ success: true });
   });
 });
@@ -426,9 +551,10 @@ app.post('/api/login', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (staff && staff.length > 0) {
       const pId = staff[0].id;
+      const isAdmin = staff[0].kullanici_adi === 'admin';
       db.query('SELECT sayfa_adi FROM personel_yetkileri WHERE personel_id = ?', [pId], (err3, perms) => {
         const yetkiler = perms ? perms.map(p => p.sayfa_adi) : [];
-        return res.json({ user: { ...staff[0], yetkiler }, role: 'staff' });
+        return res.json({ user: { ...staff[0], yetkiler }, role: isAdmin ? 'admin' : 'staff' });
       });
       return;
     }
@@ -600,6 +726,250 @@ app.post('/api/reset-password', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     delete resetCodes[email];
     res.json({ success: true, message: 'Sifreniz basariyla guncellendi.' });
+  });
+});
+
+// ==================== VERİ YEDEKLEMe & GERİ YÜKLEME ====================
+
+app.get('/api/backup', (req, res) => {
+  const queries = {
+    urunler: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi FROM urunler',
+    kategoriler: 'SELECT * FROM kategoriler',
+    birimler: 'SELECT * FROM birimler',
+    musteriler: 'SELECT id, ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres FROM musteriler',
+    personeller: 'SELECT id, ad_soyad, kullanici_adi, sifre FROM personeller',
+    personel_yetkileri: 'SELECT personel_id, sayfa_adi FROM personel_yetkileri',
+    urun_kategori_iliskisi: 'SELECT urun_id, kategori_id FROM urun_kategori_iliskisi',
+  };
+  const result = {};
+  const keys = Object.keys(queries);
+  let done = 0;
+  keys.forEach(key => {
+    db.query(queries[key], (err, rows) => {
+      if (err) { result[key] = []; } else { result[key] = rows; }
+      done++;
+      if (done === keys.length) {
+        res.setHeader('Content-Disposition', `attachment; filename="bostan_yedek_${new Date().toISOString().slice(0,10)}.json"`);
+        res.json({ version: 2, createdAt: new Date().toISOString(), data: result });
+      }
+    });
+  });
+});
+
+// ── SQL Backup ────────────────────────────────────────────────────────────────
+app.get('/api/backup-sql', (req, res) => {
+  const tableConfigs = {
+    kategoriler:            { sql: 'SELECT id, kategori_adi, ust_kategori_id FROM kategoriler',                                                                                             fields: ['id','kategori_adi','ust_kategori_id'] },
+    birimler:               { sql: 'SELECT id, birim_adi FROM birimler',                                                                                                                    fields: ['id','birim_adi'] },
+    urunler:                { sql: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi FROM urunler',                                                  fields: ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'] },
+    musteriler:             { sql: 'SELECT id, ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres FROM musteriler',                                                             fields: ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'] },
+    personeller:            { sql: 'SELECT id, ad_soyad, kullanici_adi, sifre FROM personeller WHERE kullanici_adi != "admin"',                                                            fields: ['id','ad_soyad','kullanici_adi','sifre'] },
+    personel_yetkileri:     { sql: 'SELECT personel_id, sayfa_adi FROM personel_yetkileri',                                                                                                 fields: ['personel_id','sayfa_adi'] },
+    urun_kategori_iliskisi: { sql: 'SELECT urun_id, kategori_id FROM urun_kategori_iliskisi',                                                                                               fields: ['urun_id','kategori_id'] },
+  };
+
+  const escapeSql = (v) => {
+    if (v === null || v === undefined) return 'NULL';
+    // MySQL2 TIMESTAMP/DATETIME alanlarini Date objesi olarak dondurur — ISO formatina cevir
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return 'NULL';
+      return "'" + v.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '') + "'";
+    }
+    if (typeof v === 'number') return String(v);
+    if (typeof v === 'boolean') return v ? '1' : '0';
+    return "'" + String(v)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\x00/g, '\\0') + "'";
+  };
+
+  const results = {};
+  const keys = Object.keys(tableConfigs);
+  let done = 0;
+
+  keys.forEach(key => {
+    db.query(tableConfigs[key].sql, (err, rows) => {
+      results[key] = err ? [] : rows;
+      done++;
+      if (done === keys.length) {
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10);
+        let out = `-- Bostan Manav SQL Yedeği\n`;
+        out += `-- Oluşturulma: ${now.toISOString()}\n`;
+        out += `-- Sürüm: 3\n`;
+        out += `-- Bu dosya otomatik oluşturulmuştur.\n\n`;
+        out += `SET FOREIGN_KEY_CHECKS = 0;\n\n`;
+        out += `-- Mevcut verileri temizle\n`;
+        out += `TRUNCATE TABLE \`urun_kategori_iliskisi\`;\n`;
+        out += `TRUNCATE TABLE \`personel_yetkileri\`;\n`;
+        out += `TRUNCATE TABLE \`fiyat_gecmisi\`;\n`;
+        out += `TRUNCATE TABLE \`urunler\`;\n`;
+        out += `TRUNCATE TABLE \`kategoriler\`;\n`;
+        out += `TRUNCATE TABLE \`birimler\`;\n`;
+        out += `TRUNCATE TABLE \`musteriler\`;\n`;
+        out += `DELETE FROM \`personeller\` WHERE \`kullanici_adi\` != 'admin';\n\n`;
+
+        const insertOrder = ['kategoriler','birimler','urunler','musteriler','personeller','personel_yetkileri','urun_kategori_iliskisi'];
+        insertOrder.forEach(tbl => {
+          const rows = results[tbl] || [];
+          const fields = tableConfigs[tbl].fields;
+          out += `-- ${tbl}\n`;
+          if (rows.length === 0) { out += `-- (boş tablo)\n\n`; return; }
+          const fieldList = fields.map(f => `\`${f}\``).join(', ');
+          const CHUNK = 100;
+          for (let i = 0; i < rows.length; i += CHUNK) {
+            const chunk = rows.slice(i, i + CHUNK);
+            const vals = chunk.map(row => `(${fields.map(f => escapeSql(row[f])).join(', ')})`).join(',\n  ');
+            out += `INSERT INTO \`${tbl}\` (${fieldList}) VALUES\n  ${vals};\n`;
+          }
+          out += '\n';
+        });
+
+        out += `SET FOREIGN_KEY_CHECKS = 1;\n`;
+
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="bostan_yedek_${dateStr}.sql"`);
+        res.send(out);
+      }
+    });
+  });
+});
+
+// ── SQL Restore ───────────────────────────────────────────────────────────────
+app.post('/api/restore-sql', (req, res) => {
+  // express.text() ile body string olarak gelir
+  const body = typeof req.body === 'string' ? req.body : '';
+  if (!body || !body.includes('-- Bostan Manav SQL Yedeği')) {
+    return res.status(400).json({ success: false, error: 'Geçersiz SQL dosyası. Yalnızca bu sistemden alınan .sql yedekleri yüklenebilir.' });
+  }
+
+  // Her ; sonrası newline ile ayır; her chunk'tan başındaki yorum satırlarını temizle
+  const statements = body
+    .split(/;\s*\r?\n/)
+    .map(s => {
+      // Başındaki -- yorum satırlarını sil, geri kalanı al
+      const lines = s.split('\n').filter(line => !line.trim().startsWith('--'));
+      return lines.join('\n').trim();
+    })
+    .filter(s => s.length > 0);
+
+  if (statements.length === 0) {
+    return res.status(400).json({ success: false, error: 'SQL dosyasında geçerli komut bulunamadı.' });
+  }
+
+  let idx = 0;
+  let executed = 0;
+  const runNext = () => {
+    if (idx >= statements.length) {
+      console.log(`[SQL Restore] Tamamlandı: ${executed}/${statements.length} komut çalıştırıldı.`);
+      return res.json({ success: true, executed });
+    }
+    const stmt = statements[idx++];
+    db.query(stmt, (err) => {
+      if (err) {
+        const preview = stmt.replace(/\n/g, ' ').slice(0, 150);
+        console.error(`[SQL Restore] Hata (komut ${idx}/${statements.length}):`, preview, '→', err.message);
+        const up = stmt.trim().toUpperCase();
+        if (up.startsWith('INSERT') || up.startsWith('TRUNCATE') || up.startsWith('DELETE')) {
+          return res.status(500).json({
+            success: false,
+            error: `Komut ${idx}/${statements.length} başarısız: ${err.message}`,
+            failedStatement: stmt.slice(0, 200)
+          });
+        }
+        // SET, ALTER vb. hataları logla ama devam et
+      } else {
+        executed++;
+      }
+      runNext();
+    });
+  };
+  runNext();
+});
+
+app.post('/api/restore', (req, res) => {
+  const backup = req.body;
+  if (!backup || !backup.data) {
+    return res.status(400).json({ error: 'Geçersiz yedek dosyası.' });
+  }
+  const { urunler, kategoriler, birimler, musteriler, personeller, personel_yetkileri } = backup.data;
+  // Hem eski (urun_kategoriler) hem yeni (urun_kategori_iliskisi) key adını kabul et
+  const urun_kategori_iliskisi = backup.data.urun_kategori_iliskisi || backup.data.urun_kategoriler || [];
+
+  // Admin personeli koru
+  const safePersoneller = (personeller || []).filter(p => p.kullanici_adi !== 'admin');
+
+  // ISO tarih string'ini MySQL formatına çevirir: '2026-05-04T14:08:13.000Z' → '2026-05-04 14:08:13'
+  const toMysqlDate = (v) => {
+    if (!v) return null;
+    if (typeof v === 'string' && v.includes('T')) {
+      return v.replace('T', ' ').replace(/\.\d+Z$/, '').replace('Z', '');
+    }
+    return v;
+  };
+
+  const insertRows = (table, rows, fields, cb) => {
+    if (!rows || rows.length === 0) return cb(null);
+    const placeholders = rows.map(() => `(${fields.map(() => '?').join(',')})`).join(',');
+    const values = rows.flatMap(r => fields.map(f => {
+      const v = r[f] !== undefined ? r[f] : null;
+      // sifre NULL olamaz (Excel yedeğinde şifre bulunmaz), boş string kullan
+      if (f === 'sifre' && (v === null || v === undefined)) return '';
+      return toMysqlDate(v);
+    }));
+    db.query(`INSERT INTO ${table} (${fields.join(',')}) VALUES ${placeholders}`, values, cb);
+  };
+
+  // FK kontrolleri kapat, temizle, yükle, aç
+  db.query('SET FOREIGN_KEY_CHECKS=0', (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const deletes = [
+      'DELETE FROM urun_kategori_iliskisi',
+      'DELETE FROM fiyat_gecmisi',
+      'DELETE FROM personel_yetkileri',
+      'DELETE FROM urunler',
+      'DELETE FROM kategoriler',
+      'DELETE FROM birimler',
+      'DELETE FROM musteriler',
+      'DELETE FROM personeller WHERE kullanici_adi != "admin"',
+    ];
+    let di = 0;
+    const runDeletes = () => {
+      if (di >= deletes.length) return runInserts();
+      db.query(deletes[di++], (e) => { if (e) console.warn('Delete uyarı:', e.message); runDeletes(); });
+    };
+    const runInserts = () => {
+      insertRows('kategoriler', kategoriler, ['id','kategori_adi','ust_kategori_id'], err => {
+        if (err) return finish(err);
+        insertRows('birimler', birimler, ['id','birim_adi'], err => {
+          if (err) return finish(err);
+          insertRows('urunler', urunler, ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'], err => {
+            if (err) return finish(err);
+            insertRows('musteriler', musteriler, ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'], err => {
+              if (err) return finish(err);
+              insertRows('personeller', safePersoneller, ['id','ad_soyad','kullanici_adi','sifre'], err => {
+                if (err) return finish(err);
+                insertRows('personel_yetkileri', personel_yetkileri || [], ['personel_id','sayfa_adi'], err => {
+                  if (err) return finish(err);
+                  insertRows('urun_kategori_iliskisi', urun_kategori_iliskisi || [], ['urun_id','kategori_id'], err => {
+                    finish(err);
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    };
+    const finish = (err) => {
+      db.query('SET FOREIGN_KEY_CHECKS=1', () => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Veriler başarıyla geri yüklendi.' });
+      });
+    };
+    runDeletes();
   });
 });
 

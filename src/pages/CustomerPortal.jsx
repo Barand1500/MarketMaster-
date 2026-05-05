@@ -35,8 +35,9 @@ const formatPhone = (val) => {
 };
 
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
-  const { categories, products, updateCustomer, refetchProducts } = useData();
+  const { categories, products, updateCustomer, refetchProducts, siteSettings } = useData();
   const [search, setSearch] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [showCatDrop, setShowCatDrop] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
@@ -107,11 +108,17 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     : roots;
 
   return (
-    <div className="page-container wide">
+    <div className="page-container wide" style={{ paddingTop: 0 }}>
       {/* COMPACT RESPONSIVE HEADER */}
       <div className="customer-header">
         <div className="header-left">
-          <div className="nav-logo" style={{ fontSize: '18px', margin: 0 }}>🍉 Bostan</div>
+          <div className="nav-logo" style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {siteSettings?.logo
+              ? <img src={siteSettings.logo} alt="logo" style={{ height: '26px', width: '26px', objectFit: 'contain', borderRadius: '4px' }} />
+              : <span>🍉</span>
+            }
+            {siteSettings?.site_adi || 'Bostan'}
+          </div>
           <div className="header-divider"></div>
           <div className="customer-name-display">{customer.name}</div>
         </div>
@@ -154,7 +161,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
         <div className="header-right">
           <button onClick={() => setShowProfile(true)} className="profile-btn-header">👤 Profil</button>
-          <button onClick={onLogout} className="logout-btn-header">🚪 Çıkış</button>
+          <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header">🚪 Çıkış</button>
         </div>
       </div>
 
@@ -287,6 +294,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
         }
         .refresh-btn-link { background: transparent; border: none; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+        .customer-category-section { padding-bottom: 28px; margin-bottom: 0; }
+        .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 32px 0; border-radius: 2px; }
 
         @media (max-width: 768px) {
           .customer-header {
@@ -376,25 +385,23 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         }
         @media (max-width: 640px) {
           .product-image-container { aspect-ratio: 4 / 3 !important; }
-          .product-image { object-fit: cover !important; }
+          .product-image { object-fit: contain !important; }
         }
         .product-image {
           width: 100%;
           height: 100%;
-          object-fit: cover;
-          transition: transform 0.4s ease;
-        }
-        .product-card:hover .product-image {
-          transform: scale(1.05);
+          object-fit: contain;
+          padding: 6px;
         }
       `}</style>
 
-      {displayCategories.map(cat => {
+      {displayCategories.map((cat, catIdx) => {
         const catProducts = filteredProducts.filter(p => p.categoryIds.includes(cat.id));
         if (catProducts.length === 0) return null;
+        const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0);
 
         return (
-          <div key={cat.id} className="customer-category-section" style={{ marginBottom: '32px' }}>
+          <div key={cat.id} className="customer-category-section">
             <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
               <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
               {cat.name}
@@ -503,9 +510,25 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                 );
               })}
             </div>
+            {!isLast && <div className="category-divider" />}
           </div>
         );
       })}
+      {/* LOGOUT CONFIRM MODAL */}
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setShowLogoutConfirm(false)}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '32px 28px', maxWidth: '360px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚪</div>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px' }}>Çıkış Yap</h3>
+            <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px', lineHeight: '1.5' }}>Hesabınızdan çıkmak istediğinizden emin misiniz?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
+              <button onClick={onLogout} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>Çıkış Yap</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PROFILE MODAL */}
       {/* PREMIUM PROFILE MODAL */}
       {showProfile && (

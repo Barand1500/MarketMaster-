@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -62,7 +63,7 @@ function pBtn(disabled, active = false) {
 }
 
 export default function Products() {
-  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit } = useData();
+  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, siteSettings } = useData();
 
   const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true });
   const [editing, setEditing] = useState(null); // { id, field }
@@ -90,6 +91,14 @@ export default function Products() {
   const editFileRef = useRef(null);
   const mobileFileRef = useRef(null);
   const mobileAddFileRef = useRef(null);
+  const excelFileRef = useRef(null);
+
+  // Excel import state
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [excelStep, setExcelStep] = useState('guide'); // 'guide' | 'preview' | 'done'
+  const [excelRows, setExcelRows] = useState([]);
+  const [excelError, setExcelError] = useState('');
+  const [excelLoading, setExcelLoading] = useState(false);
 
   // MOBİL: edit modal state
   const [mobileEdit, setMobileEdit] = useState(null); // { ...product fields }
@@ -283,36 +292,71 @@ export default function Products() {
   return (
     <div className="page-container wide">
       <PageHeader 
-        title="🍉 Bostan Manav" 
-        sub="Ürün Veritabanı ve Stok Yönetimi" 
+        title={siteSettings?.logo
+          ? <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><img src={siteSettings.logo} alt="logo" style={{ height: '32px', width: '32px', objectFit: 'contain', borderRadius: '6px' }} />{siteSettings.site_adi || 'Bostan Manav'}</span>
+          : `🍉 ${siteSettings?.site_adi || 'Bostan Manav'}`
+        }
+        sub="Ürün Veritabanı ve Stok Yönetimi"
+        actions={
+          <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+            borderRadius: '10px', border: '1.5px solid #22c55e', background: 'rgba(34,197,94,0.07)',
+            color: '#16a34a', fontWeight: '700', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap'
+          }}>
+            📅 Excel'den Yükle
+          </button>
+        } 
         helpContent={
-          <div>
-            <p>Bu ekrandan ürünlerinizi hızlı ve kolay şekilde yönetebilirsiniz.</p>
-            <ul>
-              <li><strong>📷 Görsel Ekleme:</strong> Kamera ikonuna tıklayarak resim ekleyip değiştirebilirsiniz.</li>
-              <li><strong>✏️ Hızlı Düzenleme:</strong> Ürün adı, fiyatı veya birimi üzerine <strong>çift tıklayarak</strong> anında düzenleme yapabilirsiniz.</li>
-              <li><strong>🏷️ Kategoriler:</strong> Ürünlerin hangi reyonlarda görüneceğini seçebilirsiniz. Tablo başlığındaki <strong>+</strong> ile yeni kategori ekleyin.</li>
-              <li><strong>⚖️ Birimler:</strong> Kg, Adet, Demet gibi birimleri belirleyebilirsiniz. Tablo başlığındaki <strong>+</strong> ile yeni birim ekleyin.</li>
-              <li><strong>🔍 Arama:</strong> Üstteki arama çubuğu ile ürünler arasında anında filtreleme yapabilirsiniz.</li>
-            </ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Ürün Nasıl Eklenir?</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırı boş bırakılmıştır, orası yeni ürün eklemek içindir. Ürün adını, fiyatını ve birimini yazın, ardından sağdaki <strong>EKLE</strong> butonuna basın ya da klavyenizden <strong>Enter</strong>'a tıklayın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Mevcut Ürünü Değiştirmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ürün adı, fiyat veya birim üzerine <strong>çift tıklayın</strong> — alan anında düzenleme moduna geçer. Değişikliği yazıp <strong>Enter</strong>'a basın veya başka bir yere tıklayın, otomatik kaydedilir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📷 Ürün Görseli Eklemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Satırdaki kamera ikonuna tıklayın, bilgisayarınızdan bir resim seçin. Resim otomatik olarak kaydedilir ve müşterilere gösterilir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🏷️ Kategoriler ve ⚖️ Birimler</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablo başlığındaki <strong>Kategoriler +</strong> ve <strong>Birim +</strong> butonları ile yeni kategori veya birim (kg, adet, demet vb.) ekleyebilirsiniz. Her ürüne birden fazla kategori atayabilirsiniz.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📦 Stok Durumu (VAR / YOK)</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Stok sütunundaki butona tıklayarak ürünü <strong>VAR</strong> veya <strong>YOK</strong> olarak işaretleyebilirsiniz. YOK olarak işaretlenen ürünler müşteri ekranında soluk ve "Stokta Yok" yazılı görünür.</div>
+            </div>
             <div className="help-tip">
-              <strong>💡 İpucu:</strong> Yeni ürün eklemek için tablonun en üstündeki <strong>boş satırı</strong> doldurup "EKLE" butonuna basın veya Enter tuşunu kullanın!
+              <strong>💡 İpucu:</strong> Üstteki arama kutusuna yazarak ürünleri anında filtreleyebilirsiniz. Sayfa başına kaç ürün göreceğinizi sağ alttaki 5 / 10 / 20 butonlarıyla ayarlayabilirsiniz.
             </div>
           </div>
         }
         helpContentMobile={
-          <div>
-            <p>Mobil ekranda ürünleriniz kart listesi olarak görünür. Yapılabilecekler:</p>
-            <ul>
-              <li><strong>✏️ Düzenleme:</strong> Herhangi bir ürün kartındaki kalem ikonuna (<strong>✏️</strong>) dokunun. Açılan ekranda ad, fiyat, birim, kategoriler ve görseli düzenleyip <strong>Kaydet</strong>'e basin.</li>
-              <li><strong>VAR / YOK:</strong> Kartın sağındaki butona dokunarak stok durumunu anında değiştirebilirsiniz.</li>
-              <li><strong>🗑️ Silme:</strong> Kalem ikonunun altındaki 🗑️ butonuna dokunun, onay istenir.</li>
-              <li><strong>➕ Yeni Ürün:</strong> Sağ alttaki yeşil <strong>️️+</strong> butonu ile yeni ürün ekleyebilirsiniz.</li>
-              <li><strong>📁 Kategori / ⚖️ Birim:</strong> Listenin üstündeki <strong>Kategori Yönetimi</strong> ve <strong>Birim Yönetimi</strong> butonları ile yönetim ekranını açabilirsiniz.</li>
-              <li><strong>🔍 Arama:</strong> Listenin üstündeki arama kutusuna yazarak anında filtreleyebilirsiniz.</li>
-            </ul>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid var(--primary)' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Ürün Eklemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ekranın sağ alt köşesindeki büyük yeşil <strong>+</strong> butonuna dokunun. Açılan formda ürün bilgilerini doldurup <strong>Kaydet</strong>'e basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Ürün Düzenlemek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ürün kartındaki kalem <strong>✏️</strong> ikonuna dokunun. Açılan ekranda ad, fiyat, birim, kategori ve görseli değiştirip <strong>Kaydet</strong>'e basın.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📦 Stok Durumu Değiştirmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ürün kartının sağındaki <strong>VAR</strong> veya <strong>YOK</strong> butonuna dokunun — stok durumu anında değişir ve kaydedilir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗑️ Ürün Silmek</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kalem ikonuna dokunduktan sonra altta beliren <strong>🗑️ Sil</strong> butonuna basın. Onay istenecek, onayladıktan sonra ürün silinir.</div>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '13px 14px', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📁 Kategori ve Birim Yönetimi</div>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Listenin üstündeki <strong>Kategori Yönetimi</strong> ve <strong>Birim Yönetimi</strong> butonlarına dokunarak yeni kategori veya birim ekleyip mevcut olanları silebilirsiniz.</div>
+            </div>
             <div className="help-tip">
-              <strong>💡 İpucu:</strong> Kategoriler ve birimler ekranında çift parmakla kaydırarak tüm listeyi görebilirsiniz.
+              <strong>💡 İpucu:</strong> Arama kutusuna yazarak ürünleri anında filtreleyebilirsiniz.
             </div>
           </div>
         }
@@ -796,6 +840,162 @@ export default function Products() {
                   </div>
                 </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EXCEL IMPORT MODAL */}
+      {showExcelModal && (
+        <div className="modal-overlay" onClick={() => setShowExcelModal(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px', width: '100%', maxWidth: '520px', boxShadow: '0 25px 50px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', padding: '20px 24px 16px', borderBottom: '1px solid #bbf7d0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: '#14532d' }}>📥 Excel'den Ürün Yükle</div>
+                  <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '2px' }}>Toplu ürün ekleme — hızlı ve kolay</div>
+                </div>
+                <button onClick={() => setShowExcelModal(false)} style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px' }}>
+              {excelStep === 'guide' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Adım 1 */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', background: '#f8fafc', borderRadius: '12px', padding: '14px' }}>
+                    <div style={{ width: '28px', height: '28px', background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>1</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginBottom: '3px' }}>Excel dosyanızı hazırlayın</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+                        Excel dosyanızın <strong>ilk satırı başlık satırı</strong> olmalıdır. <br />
+                        İlk sütun <strong>Ürün Adı</strong>, ikinci sütun <strong>Fiyat</strong> olmalıdır.<br />
+                        <span style={{ color: '#94a3b8' }}>Örnek: A1 = "Ürün Adı", B1 = "Fiyat", A2 = "Domates", B2 = "25"</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const wb = XLSX.utils.book_new();
+                          const sampleData = [
+                            ['Ürün Adı', 'Fiyat'],
+                            ['Domates', '25'],
+                            ['Biber', '30'],
+                            ['Elma', '45'],
+                            ['Patates', '18'],
+                          ];
+                          const ws = XLSX.utils.aoa_to_sheet(sampleData);
+                          ws['!cols'] = [{ wch: 25 }, { wch: 12 }];
+                          XLSX.utils.book_append_sheet(wb, ws, 'Urunler');
+                          XLSX.writeFile(wb, 'ornek_urun_sablonu.xlsx');
+                        }}
+                        style={{ marginTop: '10px', padding: '7px 14px', borderRadius: '8px', border: '1px solid #22c55e', background: '#f0fdf4', color: '#16a34a', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        📥 Örnek Dosya İndir
+                      </button>
+                    </div>
+                  </div>
+                  {/* Adım 2 */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', background: '#f8fafc', borderRadius: '12px', padding: '14px' }}>
+                    <div style={{ width: '28px', height: '28px', background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>2</div>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginBottom: '3px' }}>Dosyayı seçin</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+                        Aşağıdaki butona tıklayarak bilgisayarınızdaki <strong>.xlsx</strong> veya <strong>.xls</strong> dosyasını seçin. Yalnızca <strong>Ürün Adı</strong> ve <strong>Fiyat</strong> bilgileri alınır, diğer sütunlar dikkate alınmaz.
+                      </div>
+                    </div>
+                  </div>
+                  {/* Adım 3 */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', background: '#f8fafc', borderRadius: '12px', padding: '14px' }}>
+                    <div style={{ width: '28px', height: '28px', background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '800', fontSize: '13px', flexShrink: 0 }}>3</div>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginBottom: '3px' }}>Önizleme ve onay</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.6' }}>
+                        Dosya seçildikten sonra ürünler size gösterilir. Doğru görünüyorsa <strong>Sisteme Ekle</strong> butonuna basın, hatalıysa iptal edip tekrar deneyin.
+                      </div>
+                    </div>
+                  </div>
+
+                  {excelError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#dc2626' }}>⚠️ {excelError}</div>}
+
+                  <input ref={excelFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    setExcelError('');
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                        const ws = wb.Sheets[wb.SheetNames[0]];
+                        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                        if (data.length < 2) { setExcelError('Dosyada hiç veri bulunamadı.'); return; }
+                        // İlk satır başlık, diğerleri veri
+                        const rows = data.slice(1).map(r => ({ name: String(r[0] || '').trim(), price: String(r[1] || '').replace(',', '.').trim() })).filter(r => r.name);
+                        if (rows.length === 0) { setExcelError('Geçerli ürün satırı bulunamadı. A sütunu ürün adı, B sütunu fiyat olmalıdır.'); return; }
+                        setExcelRows(rows);
+                        setExcelStep('preview');
+                      } catch {
+                        setExcelError('Dosya okunamadı. Lütfen geçerli bir Excel dosyası seçin.');
+                      }
+                    };
+                    reader.readAsArrayBuffer(file);
+                    e.target.value = '';
+                  }} />
+
+                  <button onClick={() => excelFileRef.current?.click()} style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer', marginTop: '4px' }}>
+                    📂 Excel Dosyası Seç
+                  </button>
+                </div>
+              )}
+
+              {excelStep === 'preview' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ fontSize: '13px', color: '#475569', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px' }}>
+                    ✅ <strong>{excelRows.length} ürün</strong> bulundu. Aşağıda göründüğü gibi sisteme eklenecek.
+                  </div>
+                  <div style={{ maxHeight: '240px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>#</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>Ürün Adı</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#475569' }}>Fiyat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {excelRows.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '7px 12px', color: '#94a3b8' }}>{i + 1}</td>
+                            <td style={{ padding: '7px 12px', color: '#0f172a', fontWeight: '600' }}>{r.name}</td>
+                            <td style={{ padding: '7px 12px', color: '#16a34a', fontWeight: '700' }}>{r.price ? `${Number(r.price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => { setExcelStep('guide'); setExcelRows([]); }} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#475569', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>↩ Geri</button>
+                    <button disabled={excelLoading} onClick={async () => {
+                      setExcelLoading(true);
+                      for (const r of excelRows) {
+                        await addProduct({ name: r.name, price: parseFloat(r.price) || 0, unit: 'Kg', categoryIds: [], image: '', inStock: true });
+                      }
+                      setExcelLoading(false);
+                      setExcelStep('done');
+                    }} style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: excelLoading ? '#86efac' : 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: '800', fontSize: '13px', cursor: excelLoading ? 'default' : 'pointer' }}>
+                      {excelLoading ? '⏳ Ekleniyor...' : `✅ ${excelRows.length} Ürünü Sisteme Ekle`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {excelStep === 'done' && (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div style={{ fontSize: '56px', marginBottom: '12px' }}>🎉</div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#14532d', marginBottom: '8px' }}>Başarıyla Eklendi!</div>
+                  <div style={{ fontSize: '13px', color: '#16a34a', marginBottom: '24px' }}>{excelRows.length} ürün sisteme eklendi.</div>
+                  <button onClick={() => setShowExcelModal(false)} style={{ padding: '12px 32px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Tamam</button>
+                </div>
+              )}
             </div>
           </div>
         </div>

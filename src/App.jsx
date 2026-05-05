@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Users from './pages/Users';
+import Settings from './pages/Settings';
 import './styles/global.css';
 
 import CustomerPortal from './pages/CustomerPortal';
@@ -38,7 +39,7 @@ const setStoredSession = (session) => {
 };
 
 export default function App() {
-  const { loading, apiError, clearApiError } = useData();
+  const { loading, apiError, clearApiError, siteSettings } = useData();
   const [session, setSessionState] = useState(getStoredSession);
   const [page, setPage] = useState('products');
 
@@ -59,11 +60,25 @@ export default function App() {
     }
   }, []);
 
+  // siteSettings geldiğinde favicon ve sayfa başlığını uygula
+  useEffect(() => {
+    if (siteSettings?.site_adi) document.title = siteSettings.site_adi;
+    if (siteSettings?.favicon) {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+      link.href = siteSettings.favicon;
+    }
+  }, [siteSettings]);
+
   if (loading) {
+    const siteName = siteSettings?.site_adi || 'Bostan Manav';
+    const logoSrc = siteSettings?.logo || '';
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ fontSize: '48px' }}>🌿</div>
-        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>Bostan Manav</div>
+        {logoSrc
+          ? <img src={logoSrc} alt={siteName} style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+          : <div style={{ fontSize: '56px' }}>🍉</div>}
+        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{siteName}</div>
         <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Sunucuya bağlanılıyor...</div>
       </div>
     );
@@ -89,7 +104,7 @@ export default function App() {
     return (
       <>
         {errorToast}
-        <div className="main-content" style={{ marginLeft: 0, padding: '40px' }}>
+        <div className="main-content" style={{ marginLeft: 0, padding: '0 20px 20px' }}>
           <CustomerPortal customer={session} onLogout={() => setSession(null)} onSessionUpdate={setSession} />
         </div>
       </>
@@ -98,7 +113,7 @@ export default function App() {
 
   // STAFF VIEW
   const renderPage = () => {
-    const isSysAdmin = session.id === 'admin';
+    const isSysAdmin = session.role === 'admin';
     const allowed = session.allowedPages || [];
     
     // Güvenlik: Eğer sayfa yetkisi yoksa veya ilk girişse, izinli olduğu ilk sayfaya yönlendir
@@ -114,6 +129,7 @@ export default function App() {
       case 'products': return <Products />;
       case 'customers': return <Customers />;
       case 'users': return <Users />;
+      case 'settings': return (isSysAdmin || allowed.includes('settings')) ? <Settings /> : <div style={{ padding: '40px', textAlign: 'center' }}><h2>Yetkiniz Bulunmuyor</h2></div>;
       default: return <Products />;
     }
   };
@@ -127,6 +143,7 @@ export default function App() {
           onNav={setPage}
           onLogout={() => setSession(null)}
           session={session}
+          onSessionUpdate={setSession}
         />
         <main className="main-content" style={{ marginLeft: 0 }}>
           {renderPage()}

@@ -30,7 +30,7 @@ async function seedAdmin() {
       console.log(`✅ Admin personeli olusturuldu (ID: ${adminId})`);
 
       // 4. Yetkileri ekle
-      const pages = ['products', 'customers', 'users'];
+      const pages = ['products', 'customers', 'users', 'settings'];
       for (const page of pages) {
         await connection.execute(
           'INSERT INTO personel_yetkileri (personel_id, sayfa_adi) VALUES (?, ?)',
@@ -39,7 +39,24 @@ async function seedAdmin() {
       }
       console.log('✅ Admin yetkileri tanimlandi.');
     } else {
-      console.log('ℹ️ Admin zaten mevcut, tekrar olusturulmadi.');
+      console.log('ℹ️ Admin zaten mevcut, yetkiler guncelleniyor...');
+      const adminId = rows[0].id;
+      const allPages = ['products', 'customers', 'users', 'settings'];
+      const [existingPerms] = await connection.execute(
+        'SELECT sayfa_adi FROM personel_yetkileri WHERE personel_id = ?',
+        [adminId]
+      );
+      const existing = existingPerms.map(p => p.sayfa_adi);
+      for (const page of allPages) {
+        if (!existing.includes(page)) {
+          await connection.execute(
+            'INSERT INTO personel_yetkileri (personel_id, sayfa_adi) VALUES (?, ?)',
+            [adminId, page]
+          );
+          console.log(`✅ Yetki eklendi: ${page}`);
+        }
+      }
+      console.log('✅ Yetkiler guncellendi.');
     }
 
   } catch (error) {

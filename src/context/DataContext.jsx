@@ -12,17 +12,24 @@ export function DataProvider({ children }) {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('siteSettings');
+      return saved ? JSON.parse(saved) : { site_adi: 'Bostan Manav', logo: '', favicon: '' };
+    } catch { return { site_adi: 'Bostan Manav', logo: '', favicon: '' }; }
+  });
 
   // VERILERI API'DEN CEK
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [catsRes, prodsRes, unitsRes, custsRes, staffRes] = await Promise.all([
+        const [catsRes, prodsRes, unitsRes, custsRes, staffRes, settingsRes] = await Promise.all([
           fetch(`${API_URL}/kategoriler`),
           fetch(`${API_URL}/urunler`),
           fetch(`${API_URL}/birimler`),
           fetch(`${API_URL}/musteriler`),
-          fetch(`${API_URL}/personeller`)
+          fetch(`${API_URL}/personeller`),
+          fetch(`${API_URL}/ayarlar`)
         ]);
 
         const cats = await catsRes.json();
@@ -30,6 +37,12 @@ export function DataProvider({ children }) {
         const brm = await unitsRes.json();
         const cust = await custsRes.json();
         const staff = await staffRes.json();
+        const settings = settingsRes.ok ? await settingsRes.json() : {};
+        if (settings && typeof settings === 'object') {
+          const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
+          setSiteSettings(merged);
+          try { localStorage.setItem('siteSettings', JSON.stringify(merged)); } catch {}
+        }
 
         // Veritabani alanlarini frontend alanlarina maple
         setCategories(cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })));
@@ -141,7 +154,12 @@ export function DataProvider({ children }) {
           yetkiler: user.allowedPages
         })
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let errMsg = 'Personel eklenemedi.';
+        try { const d = await res.json(); errMsg = d.error || errMsg; } catch {}
+        setApiError(errMsg);
+        return { ok: false, error: errMsg };
+      }
       const data = await res.json();
       setUsers(prev => [...prev, { 
         id: data.id, 
@@ -150,7 +168,15 @@ export function DataProvider({ children }) {
         password: data.sifre,
         allowedPages: data.yetkiler || []
       }]);
-    } catch { setApiError('Personel eklenemedi. Sunucu bağlantısını kontrol edin.'); }
+      return { ok: true };
+    } catch (e) {
+      const msg = 'Personel eklenemedi. Sunucu bağlantısını kontrol edin.';
+      setApiError(msg);
+      return { ok: false, error: msg };
+    }
+  };
+  const updateUserState = (id, updates) => {
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
   };
   const updateUser = async (id, updates) => {
     const current = users.find(u => u.id === id);
@@ -359,14 +385,34 @@ export function DataProvider({ children }) {
 
   // EXTRA PRICES - Kaldirildi (Backend yapisinda musteriler tablosu iskonto kullaniyor)
 
+  const updateSiteSettings = async (newSettings) => {
+    try {
+      const res = await fetch(`${API_URL}/ayarlar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSiteSettings(prev => {
+        const merged = { ...prev, ...newSettings };
+        try { localStorage.setItem('siteSettings', JSON.stringify(merged)); } catch {}
+        return merged;
+      });
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Ayarlar kaydedilemedi.' };
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       categories, addCategory, updateCategory, deleteCategory,
       products, addProduct, updateProduct, deleteProduct,
-      users, addUser, updateUser, deleteUser,
+      users, addUser, updateUser, updateUserState, deleteUser,
       customers, addCustomer, updateCustomer, deleteCustomer,
       units, addUnit, updateUnit, deleteUnit,
-      loading, apiError, clearApiError: () => setApiError(null), refetchProducts
+      loading, apiError, clearApiError: () => setApiError(null), refetchProducts,
+      siteSettings, updateSiteSettings
     }}>
       {children}
     </DataContext.Provider>
