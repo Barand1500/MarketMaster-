@@ -400,7 +400,7 @@ export default function Products() {
                     <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={e => handleFile(e, setNewRow)} />
                   </div>
                 </td>
-                <td><input type="text" className="lite-input" placeholder="Adı..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value.toUpperCase()})} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
+                <td><input type="text" className="lite-input" placeholder="Adı..." value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow({...newRow, name:v}); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
                 <td><input type="text" className="lite-input" placeholder="0.00" value={newRow.price} onChange={e => {
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
@@ -462,7 +462,7 @@ export default function Products() {
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'name' })}>
                       {editing?.id === p.id && editing?.field === 'name' ? (
-                        <input autoFocus className="inline-edit" defaultValue={p.name} onFocus={e => e.target.select()} onChange={e => e.target.value = e.target.value.toUpperCase()} onBlur={(e) => handleBlur(p.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                        <input autoFocus className="inline-edit" defaultValue={p.name} onFocus={e => e.target.select()} onChange={e => { const s=e.target.selectionStart, n=e.target.selectionEnd; e.target.value=e.target.value.toLocaleUpperCase('tr-TR'); e.target.setSelectionRange(s,n); }} onBlur={(e) => handleBlur(p.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                       ) : (
                         <span className="edit-txt">{p.name}</span>
                       )}
@@ -655,7 +655,7 @@ export default function Products() {
 
               {/* Ad */}
               <label className="mobile-label">Ürün Adı</label>
-              <input className="mobile-input" value={mobileEdit.name} onChange={e => setMobileEdit(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} placeholder="Ürün adı..." />
+              <input className="mobile-input" value={mobileEdit.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setMobileEdit(prev=>({...prev, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Ürün adı..." />
 
               {/* Fiyat + Birim */}
               <div style={{ display: 'flex', gap: '10px' }}>
@@ -745,7 +745,7 @@ export default function Products() {
 
               {/* Ad */}
               <label className="mobile-label">Ürün Adı</label>
-              <input className="mobile-input" value={newRow.name} onChange={e => setNewRow(prev => ({ ...prev, name: e.target.value.toUpperCase() }))} placeholder="Ürün adı..." />
+              <input className="mobile-input" value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow(prev=>({...prev, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Ürün adı..." />
 
               {/* Fiyat + Birim */}
               <div style={{ display: 'flex', gap: '10px' }}>

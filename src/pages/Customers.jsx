@@ -211,7 +211,7 @@ export default function Customers() {
               </tr>
               {/* EXCEL ADD ROW */}
               <tr className="add-row">
-                <td><input className="lite-input" type="text" placeholder="Yeni müşteri..." value={newRow.name} onChange={e => setNewRow({...newRow, name: e.target.value.toUpperCase()})} /></td>
+                <td><input className="lite-input" type="text" placeholder="Yeni müşteri..." value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow({...newRow, name:v}); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} /></td>
                 <td><input className="lite-input" type="text" placeholder="Max 11 rakam" value={newRow.taxId} onChange={e => {
                   let val = e.target.value.replace(/\D/g, '');
                   if (val.length > 11) val = val.slice(0, 11);
@@ -254,7 +254,7 @@ export default function Customers() {
                   {/* INLINE EDITABLE CELLS */}
                   <td onDoubleClick={() => setEditing({ id: c.id, field: 'name' })}>
                     {editing?.id === c.id && editing?.field === 'name' ? (
-                      <input autoFocus className="lite-input" defaultValue={c.name} onChange={e => e.target.value = e.target.value.toUpperCase()} onBlur={(e) => handleBlur(c.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                      <input autoFocus className="lite-input" defaultValue={c.name} onChange={e => { const s=e.target.selectionStart, n=e.target.selectionEnd; e.target.value=e.target.value.toLocaleUpperCase('tr-TR'); e.target.setSelectionRange(s,n); }} onBlur={(e) => handleBlur(c.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
                       <span className="edit-txt">{c.name}</span>
                     )}
@@ -396,7 +396,7 @@ export default function Customers() {
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Müşteri Adı / Ünvan *</label>
-              <input className="mobile-input" value={mobileEdit.name} onChange={e => setMobileEdit(p => ({ ...p, name: e.target.value.toUpperCase() }))} placeholder="Müşteri adı..." />
+              <input className="mobile-input" value={mobileEdit.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setMobileEdit(p=>({...p, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Müşteri adı..." />
 
               <label className="mobile-label">E-posta *</label>
               <input className="mobile-input" type="email" value={mobileEdit.email} onChange={e => setMobileEdit(p => ({ ...p, email: e.target.value }))} placeholder="ornek@email.com" />
@@ -451,7 +451,7 @@ export default function Customers() {
             </div>
             <div className="mobile-modal-body">
               <label className="mobile-label">Müşteri Adı / Ünvan *</label>
-              <input className="mobile-input" value={mobileAddData.name} onChange={e => setMobileAddData(p => ({ ...p, name: e.target.value.toUpperCase() }))} placeholder="Müşteri adı..." />
+              <input className="mobile-input" value={mobileAddData.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setMobileAddData(p=>({...p, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Müşteri adı..." />
 
               <label className="mobile-label">E-posta *</label>
               <input className="mobile-input" type="email" value={mobileAddData.email} onChange={e => setMobileAddData(p => ({ ...p, email: e.target.value }))} placeholder="ornek@email.com" />

@@ -923,6 +923,17 @@ app.post('/api/restore', (req, res) => {
   };
 
   // FK kontrolleri kapat, temizle, yükle, aç
+  // Önce mevcut ürün resimlerini sakla — Excel yedeği gorsel_yolu içermez, resimleri koru
+  db.query('SELECT id, gorsel_yolu FROM urunler', (imgErr, imgRows) => {
+    const existingImages = {};
+    if (!imgErr && imgRows) {
+      imgRows.forEach(r => { if (r.gorsel_yolu) existingImages[r.id] = r.gorsel_yolu; });
+    }
+    // Excel restore'da gorsel_yolu null/undefined gelirse mevcut resmi geri koy
+    const urunlerMerged = (urunler || []).map(u => (
+      (!u.gorsel_yolu && existingImages[u.id]) ? { ...u, gorsel_yolu: existingImages[u.id] } : u
+    ));
+
   db.query('SET FOREIGN_KEY_CHECKS=0', (err) => {
     if (err) return res.status(500).json({ error: err.message });
     const deletes = [
@@ -945,7 +956,7 @@ app.post('/api/restore', (req, res) => {
         if (err) return finish(err);
         insertRows('birimler', birimler, ['id','birim_adi'], err => {
           if (err) return finish(err);
-          insertRows('urunler', urunler, ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'], err => {
+          insertRows('urunler', urunlerMerged, ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'], err => {
             if (err) return finish(err);
             insertRows('musteriler', musteriler, ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'], err => {
               if (err) return finish(err);
@@ -971,6 +982,7 @@ app.post('/api/restore', (req, res) => {
     };
     runDeletes();
   });
+  }); // SELECT gorsel_yolu
 });
 
 const PORT = process.env.PORT || 5000;
