@@ -143,8 +143,8 @@
 .pm-modal { width: 500px; max-width: 95vw; padding: 0; border-radius: 20px; overflow: hidden; background: #fff; box-shadow: 0 25px 70px rgba(0,0,0,0.15); display: flex; flex-direction: column; }
 .pm-header { padding: 20px 25px; border-bottom: 1px solid #f1f5f9; background: #fcfdfe; display: flex; justify-content: space-between; align-items: center; }
 .pm-header h3 { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; }
-.pm-close { border: none; background: #f1f5f9; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-.pm-close:hover { background: #fee2e2; color: #ef4444; transform: rotate(90deg); }
+.pm-close { border: 1px solid #e2e8f0; background: #fff; border-radius: 20px; padding: 4px 10px; cursor: pointer; font-size: 11px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 4px; transition: all 0.2s; }
+.pm-close:hover { background: #fee2e2; color: #ef4444; border-color: #fecaca; }
 
 .pm-body { padding: 25px; }
 .pm-add-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px dashed #e2e8f0; }

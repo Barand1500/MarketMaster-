@@ -59,6 +59,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [pendingOrder, setPendingOrder] = useState(null);   // dropdown'da düzenlenen geçici sıra
   const [sortBy, setSortBy] = useState('default');
   const [showSortDrop, setShowSortDrop] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [showProfile, setShowProfile] = useState(false);
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -170,6 +171,135 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
   const hasNoCategoryRelations = filteredProducts.length > 0 && filteredProducts.every(p => !p.categoryIds || p.categoryIds.length === 0);
 
+  // Ürün render helper — grid veya list moduna göre
+  const renderProductItem = (p) => {
+    const discountedPrice = p.price * (1 - discount / 100);
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+    const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
+    const lastPriceUpdate = p.lastPriceChange
+      ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : null;
+
+    if (viewMode === 'list') {
+      return (
+        <tr key={p.id} className="cp-list-row">
+          {/* Görsel */}
+          <td style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
+            <div className="thumb-box">
+              {p.image
+                ? <div className="thumb-container"><img src={p.image} alt={p.name} /></div>
+                : <span style={{ fontSize: '20px' }}>🍎</span>}
+            </div>
+          </td>
+          {/* Ürün Adı */}
+          <td style={{ padding: '10px 10px' }}>
+            <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
+            <div><span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span></div>
+          </td>
+          {/* Fiyat */}
+          <td style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+            {discount > 0
+              ? <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }}>{fmtPrice(p.price)}</span>
+              : <span style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', cursor: 'default' }}>{fmtPrice(p.price)}</span>
+            }
+          </td>
+          {/* İndirim Oranı */}
+          {discount > 0 && (
+            <td style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+              <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
+                <span className="card-indirim-pct">Sana Özel</span>
+                <span className="card-indirim-label">%{discount} İndirim</span>
+              </span>
+            </td>
+          )}
+          {/* Sana Özel Fiyat */}
+          {discount > 0 && (
+            <td style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
+                {(() => {
+                  const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                  const parts = str.split(',');
+                  return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px' }}>,{parts[1]} ₺</span></>);
+                })()}
+              </span>
+            </td>
+          )}
+          {/* Son Fiyat Güncelleme */}
+          <td style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+            {fmtDate(p.lastPriceChange)
+              ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
+                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastPriceChange)}</span>
+                </div>
+              : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
+            }
+          </td>
+          {/* Son Bilgi Güncelleme */}
+          <td style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+            {fmtDate(p.lastInfoChange)
+              ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
+                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastInfoChange)}</span>
+                </div>
+              : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
+            }
+          </td>
+        </tr>
+      );
+    }
+
+    // ---- GRID CARD (mevcut tasarım) ----
+    return (
+      <div key={p.id} className="product-card">
+        <div className="product-image-container">
+          <div className="card-unit-corner">{p.unit || 'Kg'}</div>
+          {p.image ? (
+            <img src={p.image} alt={p.name} className="product-image" />
+          ) : (
+            <span style={{ fontSize: '60px' }}>🍎</span>
+          )}
+        </div>
+        <div className="card-body">
+          <strong className="card-name">{p.name}</strong>
+          <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
+            {discount > 0 ? (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }}>
+                    {fmtPrice(p.price)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+                  <span className="card-indirim-badge">
+                    <span className="card-indirim-pct">Sana Özel</span>
+                    <span className="card-indirim-label">%{discount} İndirim</span>
+                  </span>
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
+                  {(() => {
+                    const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+                    const parts = str.split(',');
+                    return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
+                  })()}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
+                {fmtPrice(p.price)}
+              </div>
+            )}
+          </div>
+          <div className="card-footer">
+            <div className="card-footer-row">
+              <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
+              <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="page-container wide" style={{ paddingTop: 0 }}>
       {/* COMPACT RESPONSIVE HEADER */}
@@ -195,6 +325,13 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               onChange={e => setSearch(e.target.value)}
               className="header-search-input"
             />
+            <button
+              onClick={async () => { await refetchProducts(); setLastRefreshed(new Date()); }}
+              title="Listeyi Yenile"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', padding: '4px 6px', borderRadius: '8px', lineHeight: 1, color: '#64748b', transition: 'background 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >🔄</button>
           </div>
 
           <div style={{ position: 'relative' }}>
@@ -392,7 +529,28 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span className="pulse-dot"></span>
             Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
           </div>
-          <button onClick={async () => { await refetchProducts(); setLastRefreshed(new Date()); }} className="refresh-btn-link">🔄 Yenile</button>
+          <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Kart Görünümü"
+              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                background: viewMode === 'grid' ? '#fff' : 'transparent',
+                boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
+            >
+              ⊞
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              title="Liste Görünümü"
+              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                background: viewMode === 'list' ? '#fff' : 'transparent',
+                boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
+            >
+              ☰
+            </button>
+          </div>
         </div>
       </div>
 
@@ -613,14 +771,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-          transition: all 0.2s ease;
+          transition: all 0.22s ease;
           display: flex;
           flex-direction: column;
-          border: 1px solid #f1f5f9;
+          border: 1.5px solid #f1f5f9;
         }
         .product-card:hover {
           transform: translateY(-4px);
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+          box-shadow: 0 0 0 2px rgba(0,184,148,0.25), 0 8px 24px rgba(0,184,148,0.12), 0 2px 6px rgba(0,0,0,0.06);
+          border-color: rgba(0,184,148,0.55);
         }
         .product-image-container {
           position: relative;
@@ -642,6 +801,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           object-fit: contain;
           padding: 6px;
         }
+        .product-list-view {
+          background: #fff;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .cp-list-row td { border-bottom: 2px solid #e8f5e9 !important; }
+        .cp-list-row:last-child td { border-bottom: none !important; }
+        .cp-list-row:hover td { background: #f0fdf4 !important; }
       `}</style>
 
       {/* DEBUG: Ürün/Kategori durum bilgisi */}
@@ -671,63 +839,25 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             Tüm Ürünler
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
-          <div className="product-grid">
-            {applySorting(filteredProducts).map(p => {
-              const discountedPrice = p.price * (1 - discount / 100);
-              const lastPriceUpdate = p.lastPriceChange
-                ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                : null;
-              return (
-                <div key={p.id} className="product-card">
-                  <div className="product-image-container">
-                    <div className="card-unit-corner">{p.unit || 'Kg'}</div>
-                    {p.image ? (
-                      <img src={p.image} alt={p.name} className="product-image" />
-                    ) : (
-                      <span style={{ fontSize: '60px' }}>🍎</span>
-                    )}
-                  </div>
-                  <div className="card-body">
-                    <strong className="card-name">{p.name}</strong>
-                    <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
-                      {discount > 0 ? (
-                        <>
-                          <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                            <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', textDecoration: 'line-through' }}>
-                              {fmtPrice(p.price)}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-                            <span className="card-indirim-badge">
-                              <span className="card-indirim-pct">Sana Özel</span>
-                              <span className="card-indirim-label">%{discount} İndirim</span>
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                            {(() => {
-                              const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                              const parts = str.split(',');
-                              return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
-                            })()}
-                          </div>
-                        </>
-                      ) : (
-                        <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                          {fmtPrice(p.price)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="card-footer">
-                      <div className="card-footer-row">
-                        <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
-                        <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {viewMode === 'grid'
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => renderProductItem(p))}</div>
+            : (
+              <div className="product-list-view">
+                <table className="excel-table" style={{ tableLayout: 'auto' }}>
+                  <thead><tr className="th-row">
+                    <th style={{ width: '52px' }}>Görsel</th>
+                    <th>Ürün Adı</th>
+                    <th style={{ textAlign: 'right' }}>Fiyat</th>
+                    {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                    {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                    <th style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
+                    <th style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                  </tr></thead>
+                  <tbody>{applySorting(filteredProducts).map(p => renderProductItem(p))}</tbody>
+                </table>
+              </div>
+            )
+          }
         </div>
       )}
 
@@ -737,72 +867,32 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0);
 
         return (
-          <div key={cat.id} className="customer-category-section">
+          <div key={cat.id} className="customer-category-section" style={viewMode === 'list' ? { marginBottom: '51px' } : {}}>
             <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
               <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
               {cat.name}
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
-
-            <div className="product-grid">
-              {applySorting(catProducts).map(p => {
-                const discountedPrice = p.price * (1 - discount / 100);
-                const lastPriceUpdate = p.lastPriceChange
-                  ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                  : null;
-
-                return (
-                  <div key={p.id} className="product-card">
-                    <div className="product-image-container">
-                      <div className="card-unit-corner">{p.unit || 'Kg'}</div>
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="product-image" />
-                      ) : (
-                        <span style={{ fontSize: '60px' }}>🍎</span>
-                      )}
-                    </div>
-                    <div className="card-body">
-                      <strong className="card-name">{p.name}</strong>
-                      <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
-                        {discount > 0 ? (
-                          <>
-                            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                              <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', textDecoration: 'line-through' }}>
-                                {fmtPrice(p.price)}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-                              <span className="card-indirim-badge">
-                                <span className="card-indirim-pct">Sana Özel</span>
-                                <span className="card-indirim-label">%{discount} İndirim</span>
-                              </span>
-                            </div>
-                          <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                          {(() => {
-                            const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                            const parts = str.split(',');
-                            return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
-                          })()}
-                          </div>
-                          </>
-                        ) : (
-                          <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                            {fmtPrice(p.price)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="card-footer">
-                        <div className="card-footer-row">
-                          <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
-                          <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {!isLast && <div className="category-divider" />}
+            {viewMode === 'grid'
+              ? <div className="product-grid">{applySorting(catProducts).map(p => renderProductItem(p))}</div>
+              : (
+                <div className="product-list-view">
+                  <table className="excel-table" style={{ tableLayout: 'auto' }}>
+                    <thead><tr className="th-row">
+                      <th style={{ width: '52px' }}>Görsel</th>
+                      <th>Ürün Adı</th>
+                      <th style={{ textAlign: 'right' }}>Fiyat</th>
+                      {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                      {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                      <th style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
+                      <th style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                    </tr></thead>
+                    <tbody>{applySorting(catProducts).map(p => renderProductItem(p))}</tbody>
+                  </table>
+                </div>
+              )
+            }
+            {!isLast && viewMode === 'grid' && <div className="category-divider" />}
           </div>
         );
       })}
