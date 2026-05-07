@@ -190,6 +190,29 @@
 /* PC'de mobil kartlar gizli */
 .mobile-product-list { display: none !important; }
 
+/* ── Tablet (769px – 1024px): tablo korunur, kompakt düzen ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .page-container.wide { padding: 14px 20px; }
+  .table-header-toolbar { padding: 10px 16px; }
+  .excel-table td, .excel-table th { padding: 8px 10px !important; font-size: 12.5px; }
+  .th-row th { padding: 9px 10px !important; font-size: 10px; }
+  .premium-search { width: 180px; }
+  .page-header { gap: 8px; margin-bottom: 10px; }
+  .toolbar-title { font-size: 14px; }
+}
+
+/* ── Geniş Mobil (601px – 768px): kart görünümü 2 sütun ── */
+@media (min-width: 601px) and (max-width: 768px) {
+  .mobile-product-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  /* Manage row ve search bar tam genişlik kaplasın */
+  .mobile-manage-row,
+  .mobile-search-bar { grid-column: 1 / -1; }
+}
+
 /* Mobilde masa gizli, kart listesi görünür */
 @media (max-width: 768px) {
   /* Tabloyu + araç çubuğunu gizle */
@@ -624,5 +647,13 @@
     font-weight: 600;
   }
   .mobile-perm-row input { width: 16px; height: 16px; accent-color: #38a169; flex-shrink: 0; }
+}
+
+/* Mobil: PageHeader aksiyon butonları gizli (mobil layout kendi butonlarını gösteriyor) */
+@media (max-width: 768px) {
+  .page-header .header-actions { display: none !important; }
+  .btn-help-text { display: none; }
+  .btn-help { padding: 8px 10px !important; font-size: 16px; }
+  .page-header { gap: 6px !important; margin-bottom: 8px !important; }
 }
 

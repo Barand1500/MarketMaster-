@@ -101,6 +101,11 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     return () => clearInterval(interval);
   }, [refetchProducts]);
 
+  const refreshProducts = async () => {
+    await refetchProducts();
+    setLastRefreshed(new Date());
+  };
+
   useEffect(() => {
     let interval;
     if (resetTimer > 0) {
@@ -184,7 +189,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       return (
         <tr key={p.id} className="cp-list-row">
           {/* Görsel */}
-          <td style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
+          <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
             <div className="thumb-box">
               {p.image
                 ? <div className="thumb-container"><img src={p.image} alt={p.name} /></div>
@@ -192,12 +197,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </div>
           </td>
           {/* Ürün Adı */}
-          <td style={{ padding: '10px 10px' }}>
+          <td className="cp-col-name" style={{ padding: '10px 10px' }}>
             <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
             <div><span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span></div>
           </td>
           {/* Fiyat */}
-          <td style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
             {discount > 0
               ? <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }}>{fmtPrice(p.price)}</span>
               : <span style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', cursor: 'default' }}>{fmtPrice(p.price)}</span>
@@ -205,7 +210,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           </td>
           {/* İndirim Oranı */}
           {discount > 0 && (
-            <td style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+            <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
               <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
                 <span className="card-indirim-pct">Sana Özel</span>
                 <span className="card-indirim-label">%{discount} İndirim</span>
@@ -214,7 +219,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           )}
           {/* Sana Özel Fiyat */}
           {discount > 0 && (
-            <td style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+            <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+              {/* Mobilde badge + ana fiyat üstte */}
+              <div className="cp-mobile-price-stack">
+                <span className="cp-mobile-base-price">{fmtPrice(p.price)}</span>
+                <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
+                  <span className="card-indirim-pct">Sana Özel</span>
+                  <span className="card-indirim-label">%{discount} İndirim</span>
+                </span>
+              </div>
               <span style={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
                 {(() => {
                   const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
@@ -225,7 +238,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </td>
           )}
           {/* Son Fiyat Güncelleme */}
-          <td style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {fmtDate(p.lastPriceChange)
               ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
@@ -235,7 +248,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             }
           </td>
           {/* Son Bilgi Güncelleme */}
-          <td style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+          <td className="cp-date-col" style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
             {fmtDate(p.lastInfoChange)
               ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
                   <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
@@ -325,13 +338,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               onChange={e => setSearch(e.target.value)}
               className="header-search-input"
             />
-            <button
-              onClick={async () => { await refetchProducts(); setLastRefreshed(new Date()); }}
-              title="Listeyi Yenile"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', padding: '4px 6px', borderRadius: '8px', lineHeight: 1, color: '#64748b', transition: 'background 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}
-            >🔄</button>
           </div>
 
           <div style={{ position: 'relative' }}>
@@ -525,10 +531,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
 
         <div className="info-right">
-          <div className="update-time-box">
+          <button
+            type="button"
+            className="update-time-box"
+            onClick={refreshProducts}
+            title="Ürünleri yenile"
+          >
             <span className="pulse-dot"></span>
             Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
-          </div>
+          </button>
           <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
             <button
               onClick={() => setViewMode('grid')}
@@ -651,7 +662,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .cat-more-count { font-size: 11px; color: #94a3b8; }
         
         .info-right { display: flex; align-items: center; gap: 12px; }
-        .update-time-box { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 8px; background: #fff; padding: 4px 10px; border-radius: 20px; border: 1px solid #f1f5f9; }
+        .update-time-box { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 8px; background: #fff; padding: 4px 10px; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+        .update-time-box:hover { background: #f8fafc; border-color: #dbe6ee; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06); }
+        .update-time-box:focus-visible { outline: none; border-color: rgba(0,184,148,0.45); box-shadow: 0 0 0 3px rgba(0,184,148,0.12); }
         .pulse-dot { 
           width: 8px; height: 8px; 
           background: var(--primary); 
@@ -669,6 +682,32 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .customer-category-section { padding-bottom: 0; margin-bottom: 0; }
         .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 36px 0; border-radius: 2px; }
 
+        /* ── Tablet (769px – 1024px) ─────────────────────────── */
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .customer-header { padding: 10px 16px; gap: 10px; }
+          .customer-name-display { max-width: 160px; }
+          .portal-content { padding: 12px 16px; }
+          /* Grid: 3 sütun (masaüstünde auto-fill ~5+ sütun) */
+          .product-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 12px; }
+          /* Liste: tarih sütunları görünür kalır ama daraltılır */
+          .cp-date-col { padding: 8px 12px !important; font-size: 11px; }
+          /* İnfo şeridini yatay tut */
+          .info-strip { flex-direction: row; align-items: center; }
+        }
+
+        /* ── Geniş Mobil (641px – 768px) ────────────────────── */
+        @media (min-width: 641px) and (max-width: 768px) {
+          .portal-content { padding: 10px 12px; }
+          /* Grid: 3 sütun (dar değil) */
+          .product-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px; }
+          .product-card { border-radius: 12px; }
+          .card-body { padding: 10px !important; }
+          .card-name { font-size: 13px !important; }
+          /* Liste: tarih sütunları gizle (dar tablo için) */
+          .cp-date-col { display: none !important; }
+          .product-list-view thead th.cp-date-col { display: none !important; }
+        }
+
         @media (max-width: 768px) {
           .customer-header {
             padding: 8px 12px;
@@ -679,7 +718,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           .header-left { order: 1; flex: 1; min-width: 0; }
           .header-right { order: 2; flex-shrink: 0; gap: 6px; }
           /* Satır 2: arama + filtreler (tam genişlik) */
-          .header-center { order: 3; width: 100%; max-width: none; flex-wrap: nowrap; }
+          .header-center { order: 3; width: 100%; flex-basis: 100%; max-width: none; flex-wrap: nowrap; }
 
           .header-divider { display: none; }
           .nav-logo { font-size: 15px !important; }
@@ -692,7 +731,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           }
 
           .info-strip { flex-direction: column; align-items: flex-start; gap: 10px; }
-          .info-left, .info-right { width: 100%; justify-content: space-between; }
+          .info-left { width: 100%; flex-direction: column; align-items: flex-start; gap: 6px; }
+          .info-right { width: 100%; justify-content: space-between; }
           .discount-badge-premium { padding: 4px 10px; }
           .badge-text { font-size: 11px; }
         }
@@ -733,6 +773,20 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           }
           .profile-modal-panel .confirm-footer {
             padding: 12px 14px !important;
+          }
+
+          .discount-badge-premium {
+            align-self: center;
+            margin: 0 auto;
+          }
+          .badge-text {
+            text-align: center;
+          }
+          .info-right {
+            gap: 10px;
+          }
+          .update-time-box {
+            justify-content: center;
           }
         }
 
@@ -776,10 +830,20 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           flex-direction: column;
           border: 1.5px solid #f1f5f9;
         }
-        .product-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 0 0 2px rgba(0,184,148,0.25), 0 8px 24px rgba(0,184,148,0.12), 0 2px 6px rgba(0,0,0,0.06);
-          border-color: rgba(0,184,148,0.55);
+        @media (hover: hover) and (pointer: fine) {
+          .product-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 0 2px rgba(0,184,148,0.25), 0 8px 24px rgba(0,184,148,0.12), 0 2px 6px rgba(0,0,0,0.06);
+            border-color: rgba(0,184,148,0.55);
+          }
+        }
+        @media (hover: none), (pointer: coarse) {
+          .product-card:hover,
+          .product-card:active {
+            transform: none;
+            box-shadow: 0 0 0 2px rgba(0,184,148,0.22), 0 6px 16px rgba(0,184,148,0.10), 0 2px 6px rgba(0,0,0,0.05);
+            border-color: rgba(0,184,148,0.5);
+          }
         }
         .product-image-container {
           position: relative;
@@ -806,10 +870,48 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+          width: 100%;
         }
+        .product-list-view table { width: 100% !important; }
         .cp-list-row td { border-bottom: 2px solid #e8f5e9 !important; }
         .cp-list-row:last-child td { border-bottom: none !important; }
         .cp-list-row:hover td { background: #f0fdf4 !important; }
+        /* PC'de mobil price stack gizli */
+        .cp-mobile-price-stack { display: none; }
+        /* Liste mobil: gereksiz sütunları gizle, layout'u koru */
+        @media (max-width: 640px) {
+          .product-list-view { overflow-x: hidden; border-radius: 12px; }
+          .cp-date-col,
+          .cp-col-price-base,
+          .cp-col-indirim { display: none !important; }
+          /* Masaüstünde mobile stack gizli */
+          .cp-mobile-price-stack { display: none !important; }
+          .cp-col-img { padding: 8px 6px 8px 10px !important; width: 40px !important; }
+          .cp-col-img .thumb-box { width: 34px !important; height: 34px !important; }
+          .cp-col-name { padding: 8px 6px !important; }
+          .cp-col-name > span { font-size: 13px !important; }
+          .cp-col-price-only { padding: 8px 12px 8px 6px !important; }
+          .cp-col-price-only > span { font-size: 16px !important; }
+          .cp-col-final { padding: 6px 12px 6px 6px !important; text-align: right !important; }
+          .cp-mobile-price-stack { display: flex !important; flex-direction: column !important; align-items: flex-end !important; gap: 2px !important; margin-bottom: 2px !important; }
+          .cp-mobile-badge { transform: scale(0.82) !important; transform-origin: right center !important; }
+          .cp-mobile-base-price { font-size: 11px !important; color: #94a3b8 !important; font-weight: 600 !important; }
+          .product-list-view thead { display: none !important; }
+          .cp-list-row td { border-bottom: 1px solid #e8f5e9 !important; }
+        }
+        @media (max-width: 480px) {
+          .header-center { gap: 4px; flex-wrap: nowrap; }
+          .header-filter-btn { padding: 5px 8px !important; font-size: 11px !important; gap: 3px !important; }
+          .portal-dropdown-panel {
+            position: fixed !important;
+            left: 8px !important;
+            right: 8px !important;
+            bottom: 12px !important;
+            top: auto !important;
+            max-height: 82dvh !important;
+            overflow-y: auto !important;
+          }
+        }
       `}</style>
 
       {/* DEBUG: Ürün/Kategori durum bilgisi */}
@@ -843,15 +945,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             ? <div className="product-grid">{applySorting(filteredProducts).map(p => renderProductItem(p))}</div>
             : (
               <div className="product-list-view">
-                <table className="excel-table" style={{ tableLayout: 'auto' }}>
+                <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                   <thead><tr className="th-row">
                     <th style={{ width: '52px' }}>Görsel</th>
                     <th>Ürün Adı</th>
                     <th style={{ textAlign: 'right' }}>Fiyat</th>
                     {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
                     {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
-                    <th style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
-                    <th style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                    <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
+                    <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
                   <tbody>{applySorting(filteredProducts).map(p => renderProductItem(p))}</tbody>
                 </table>
@@ -877,15 +979,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               ? <div className="product-grid">{applySorting(catProducts).map(p => renderProductItem(p))}</div>
               : (
                 <div className="product-list-view">
-                  <table className="excel-table" style={{ tableLayout: 'auto' }}>
+                  <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                     <thead><tr className="th-row">
                       <th style={{ width: '52px' }}>Görsel</th>
                       <th>Ürün Adı</th>
                       <th style={{ textAlign: 'right' }}>Fiyat</th>
                       {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
                       {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
-                      <th style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
-                      <th style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                      <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
+                      <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
                     <tbody>{applySorting(catProducts).map(p => renderProductItem(p))}</tbody>
                   </table>
@@ -950,7 +1052,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <div className="confirm-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="field-group">
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ opacity: 0.7 }}>🏢</span> Ticari Ünvan / Ad Soyad
+                  <span style={{ opacity: 0.7 }}>🏢</span>Ünvan / Ad Soyad
                 </label>
                 <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.title} onChange={e => setProfileData({ ...profileData, title: e.target.value })} />
               </div>
@@ -960,7 +1062,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ opacity: 0.7 }}>🆔</span> TC / VKN
                   </label>
-                  <input type="text" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.taxId} onChange={e => setProfileData({ ...profileData, taxId: e.target.value })} />
+                  <input type="text" className="lite-input" maxLength={11} style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.taxId} onChange={e => setProfileData({ ...profileData, taxId: e.target.value })} />
                 </div>
                 <div className="field-group">
                   <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -972,7 +1074,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
               <div className="field-group">
                 <label style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ opacity: 0.7 }}>📧</span> E-posta Adresi
+                  <span style={{ opacity: 0.7 }}>📧</span> E-Posta Adresi
                 </label>
                 <input type="email" className="lite-input" style={{ borderRadius: '12px', padding: '12px 16px', fontSize: '14px', border: '1px solid #e2e8f0' }} value={profileData.email} onChange={e => setProfileData({ ...profileData, email: e.target.value })} />
               </div>
@@ -1163,14 +1265,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               }}>Vazgeç</button>
               <button onClick={async () => {
                 // Validasyon
-                if (!profileData.title || profileData.title.trim().length < 2) {
-                  alert('Ad Soyad / Ticari Ünvan en az 2 karakter olmalıdır!');
-                  return;
-                }
                 if (profileData.taxId) {
                   const tcVkn = profileData.taxId.replace(/\s/g, '');
-                  if (!/^\d{10,11}$/.test(tcVkn)) {
-                    alert('TC Kimlik No 11 haneli, VKN ise 10 haneli sayısal olmalıdır!');
+                  if (tcVkn.length > 11) {
+                    alert('TC / VKN en fazla 11 karakter olabilir!');
                     return;
                   }
                 }

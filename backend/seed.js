@@ -17,13 +17,15 @@ async function seedAdmin() {
     console.log('⏳ Varsayilan Admin kullanicisi olusturuluyor...');
 
     // 1. Admin var mi kontrol et
+    // ⬇️ DEĞİŞTİR: Hangi kullanıcı adıyla kontrol yapılacağını belirler
     const [rows] = await connection.execute('SELECT * FROM personeller WHERE kullanici_adi = ?', ['baran']);
 
     if (rows.length === 0) {
       // 2. Admini ekle
+      // ⬇️ DEĞİŞTİR: Ad Soyad, kullanıcı adı ve şifreyi buradan ayarla
       const [result] = await connection.execute(
         'INSERT INTO personeller (ad_soyad, kullanici_adi, sifre) VALUES (?, ?, ?)',
-        ['Baran', 'baran', '123']
+        ['Baran', 'baran', '123'] // ['Ad Soyad', 'kullanici_adi', 'sifre']
       );
 
       const adminId = result.insertId;
@@ -38,6 +40,22 @@ async function seedAdmin() {
         );
       }
       console.log('✅ Admin yetkileri tanimlandi.');
+    // site_settings varsayilan degerleri
+    // ⬇️ DEĞİŞTİR: Sitenin adını buradan belirle
+    await connection.execute(
+      `INSERT INTO site_settings (\`key\`, \`value\`) VALUES ('site_adi', 'BOSTAN')
+       ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`
+    );
+    await connection.execute(
+      `INSERT INTO site_settings (\`key\`, \`value\`) VALUES ('logo', '')
+       ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`
+    );
+    await connection.execute(
+      `INSERT INTO site_settings (\`key\`, \`value\`) VALUES ('favicon', '')
+       ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`
+    );
+    console.log('✅ Site ayarlari varsayilan degerlerle yuklendi.');
+
     } else {
       console.log('ℹ️ Admin zaten mevcut, yetkiler guncelleniyor...');
       const adminId = rows[0].id;

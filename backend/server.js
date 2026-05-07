@@ -778,6 +778,8 @@ app.get('/api/backup-sql', (req, res) => {
     personeller:            { sql: 'SELECT id, ad_soyad, kullanici_adi, sifre FROM personeller WHERE kullanici_adi != "admin"',                                                            fields: ['id','ad_soyad','kullanici_adi','sifre'] },
     personel_yetkileri:     { sql: 'SELECT personel_id, sayfa_adi FROM personel_yetkileri',                                                                                                 fields: ['personel_id','sayfa_adi'] },
     urun_kategori_iliskisi: { sql: 'SELECT urun_id, kategori_id FROM urun_kategori_iliskisi',                                                                                               fields: ['urun_id','kategori_id'] },
+    fiyat_gecmisi:           { sql: 'SELECT id, urun_id, eski_fiyat, yeni_fiyat, degisim_tarihi FROM fiyat_gecmisi',                                                                          fields: ['id','urun_id','eski_fiyat','yeni_fiyat','degisim_tarihi'] },
+    site_settings:           { sql: 'SELECT `key`, `value` FROM site_settings',                                                                                                              fields: ['key','value'] },
   };
 
   const escapeSql = (v) => {
@@ -817,13 +819,14 @@ app.get('/api/backup-sql', (req, res) => {
         out += `TRUNCATE TABLE \`urun_kategori_iliskisi\`;\n`;
         out += `TRUNCATE TABLE \`personel_yetkileri\`;\n`;
         out += `TRUNCATE TABLE \`fiyat_gecmisi\`;\n`;
+        out += `TRUNCATE TABLE \`site_settings\`;\n`;
         out += `TRUNCATE TABLE \`urunler\`;\n`;
         out += `TRUNCATE TABLE \`kategoriler\`;\n`;
         out += `TRUNCATE TABLE \`birimler\`;\n`;
         out += `TRUNCATE TABLE \`musteriler\`;\n`;
         out += `DELETE FROM \`personeller\` WHERE \`kullanici_adi\` != 'admin';\n\n`;
 
-        const insertOrder = ['kategoriler','birimler','urunler','musteriler','personeller','personel_yetkileri','urun_kategori_iliskisi'];
+        const insertOrder = ['kategoriler','birimler','urunler','fiyat_gecmisi','musteriler','personeller','personel_yetkileri','urun_kategori_iliskisi','site_settings'];
         insertOrder.forEach(tbl => {
           const rows = results[tbl] || [];
           const fields = tableConfigs[tbl].fields;
