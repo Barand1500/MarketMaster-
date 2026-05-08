@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -157,7 +157,143 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     return sorted;
   };
 
-  const fmtPrice = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+  const fmtNum = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+  const fmtPrice = (n, sembol) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ' + (sembol || '₺');
+  const fmtTL = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+
+  // Sayıyı büyük, kuruş kısmını ve sembolü küçük gösterir
+  const Pr = ({ n, sembol, numStyle, symRatio = 0.62 }) => {
+    const s = sembol || '₺';
+    const formatted = Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+    const commaIdx = formatted.lastIndexOf(',');
+    const intPart = commaIdx >= 0 ? formatted.slice(0, commaIdx) : formatted;
+    const decPart = commaIdx >= 0 ? formatted.slice(commaIdx) : '';
+    const fontSize = numStyle?.fontSize;
+    const smallSize = fontSize ? `calc(${typeof fontSize === 'number' ? fontSize + 'px' : fontSize} * ${symRatio})` : undefined;
+    return (
+      <span style={numStyle}>
+        {intPart}<span style={{ fontSize: smallSize, fontWeight: '700', opacity: 0.7, letterSpacing: 0 }}>{decPart} {s}</span>
+      </span>
+    );
+  };
+
+  // Fiyat gösterimi: hover'da aynı stil ile TL değerine geçer
+  const PriceSwitch = ({ price, sembol, kisaAd, kur, style }) => {
+    const isTRY = !kisaAd || kisaAd === 'TRY';
+    const [hovered, setHovered] = useState(false);
+    const timerRef = useRef(null);
+    const displayPrice = (!isTRY && hovered) ? price * (kur || 1) : price;
+    const displaySembol = (!isTRY && hovered) ? '₺' : (sembol || '₺');
+    if (isTRY) return <span style={style}>{fmtPrice(price, sembol)}</span>;
+    return (
+      <span
+        style={{ ...style, cursor: 'default', transition: 'opacity 0.12s' }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onTouchStart={() => { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); }}
+      >
+        {fmtPrice(displayPrice, displaySembol)}
+      </span>
+    );
+  };
+
+  // Grid card fiyat bölümü — hover'da iki fiyat birlikte TL'ye geçer
+  const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur }) => {
+    const isTRY = !kisaAd || kisaAd === 'TRY';
+    const [hovered, setHovered] = useState(false);
+    const timerRef = useRef(null);
+    const showTL = hovered && !isTRY;
+    const dispN = (n) => showTL ? n * (kur || 1) : n;
+    const dispS = showTL ? '₺' : (sembol || '₺');
+    return (
+      <div
+        onMouseEnter={() => !isTRY && setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onTouchStart={() => { if (!isTRY) { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); } }}
+        style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}
+      >
+        {discount > 0 ? (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+              <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+                <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }} symRatio={0.75} />
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+              <span className="card-indirim-badge">
+                <span className="card-indirim-pct">Sana Özel</span>
+                <span className="card-indirim-label">%{discount} İndirim</span>
+              </span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span key={showTL ? 'tl-disc' : 'orig-disc'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+                <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+              </span>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center' }}>
+            <span key={showTL ? 'tl-only' : 'orig-only'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Liste görünümü fiyat satırı — tüm fiyat TD'leri birlikte hover'da TL'ye geçer
+  const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur }) => {
+    const isTRY = !kisaAd || kisaAd === 'TRY';
+    const [hovered, setHovered] = useState(false);
+    const timerRef = useRef(null);
+    const showTL = hovered && !isTRY;
+    const dispN = (n) => showTL ? n * (kur || 1) : n;
+    const dispS = showTL ? '₺' : (sembol || '₺');
+    const handlers = isTRY ? {} : {
+      onMouseEnter: () => setHovered(true),
+      onMouseLeave: () => setHovered(false),
+      onTouchStart: () => { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); },
+    };
+    return (
+      <>
+        <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} {...handlers}>
+          <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            {discount > 0
+              ? <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
+              : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
+          </span>
+
+        </td>
+        {discount > 0 && (
+          <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+            <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
+              <span className="card-indirim-pct">Sana Özel</span>
+              <span className="card-indirim-label">%{discount} İndirim</span>
+            </span>
+          </td>
+        )}
+        {discount > 0 && (
+          <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} {...handlers}>
+            <div className="cp-mobile-price-stack">
+              <span className="cp-mobile-base-price">
+                <span key={showTL ? 'tl-mob' : 'orig-mob'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+                  <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }} symRatio={0.8} />
+                </span>
+              </span>
+              <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
+                <span className="card-indirim-pct">Sana Özel</span>
+                <span className="card-indirim-label">%{discount} İndirim</span>
+              </span>
+            </div>
+            <span key={showTL ? 'tl-final' : 'orig-final'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+            </span>
+          </td>
+        )}
+      </>
+    );
+  };
 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
@@ -201,42 +337,14 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
             <div><span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span></div>
           </td>
-          {/* Fiyat */}
-          <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-            {discount > 0
-              ? <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }}>{fmtPrice(p.price)}</span>
-              : <span style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', cursor: 'default' }}>{fmtPrice(p.price)}</span>
-            }
-          </td>
-          {/* İndirim Oranı */}
-          {discount > 0 && (
-            <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-              <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
-                <span className="card-indirim-pct">Sana Özel</span>
-                <span className="card-indirim-label">%{discount} İndirim</span>
-              </span>
-            </td>
-          )}
-          {/* Sana Özel Fiyat */}
-          {discount > 0 && (
-            <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {/* Mobilde badge + ana fiyat üstte */}
-              <div className="cp-mobile-price-stack">
-                <span className="cp-mobile-base-price">{fmtPrice(p.price)}</span>
-                <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
-                  <span className="card-indirim-pct">Sana Özel</span>
-                  <span className="card-indirim-label">%{discount} İndirim</span>
-                </span>
-              </div>
-              <span style={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }}>
-                {(() => {
-                  const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                  const parts = str.split(',');
-                  return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px' }}>,{parts[1]} ₺</span></>);
-                })()}
-              </span>
-            </td>
-          )}
+          <ListPriceSection
+            price={p.price}
+            discountedPrice={discountedPrice}
+            discount={discount}
+            sembol={p.pbSembol}
+            kisaAd={p.pbKisaAd}
+            kur={p.pbKur}
+          />
           {/* Son Fiyat Güncelleme */}
           <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {fmtDate(p.lastPriceChange)
@@ -274,34 +382,14 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
         <div className="card-body">
           <strong className="card-name">{p.name}</strong>
-          <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
-            {discount > 0 ? (
-              <>
-                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }}>
-                    {fmtPrice(p.price)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-                  <span className="card-indirim-badge">
-                    <span className="card-indirim-pct">Sana Özel</span>
-                    <span className="card-indirim-label">%{discount} İndirim</span>
-                  </span>
-                </div>
-                <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                  {(() => {
-                    const str = Number(discountedPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-                    const parts = str.split(',');
-                    return (<>{parts[0]}<span style={{ fontSize: '0.55em', fontWeight: '700', marginLeft: '1px', opacity: 0.8 }}>,{parts[1]} ₺</span></>);
-                  })()}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', textAlign: 'center' }}>
-                {fmtPrice(p.price)}
-              </div>
-            )}
-          </div>
+          <GridPriceSection
+            price={p.price}
+            discountedPrice={discountedPrice}
+            discount={discount}
+            sembol={p.pbSembol}
+            kisaAd={p.pbKisaAd}
+            kur={p.pbKur}
+          />
           <div className="card-footer">
             <div className="card-footer-row">
               <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>

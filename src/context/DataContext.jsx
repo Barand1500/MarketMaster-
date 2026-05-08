@@ -25,20 +25,17 @@ export function DataProvider({ children }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [catsRes, prodsRes, unitsRes, custsRes, staffRes, settingsRes] = await Promise.all([
+        // --- Kritik veri: bunlar bitince loading kalkar ---
+        const [catsRes, prodsRes, unitsRes, settingsRes] = await Promise.all([
           fetch(`${API_URL}/kategoriler`),
           fetch(`${API_URL}/urunler`),
           fetch(`${API_URL}/birimler`),
-          fetch(`${API_URL}/musteriler`),
-          fetch(`${API_URL}/personeller`),
           fetch(`${API_URL}/ayarlar`)
         ]);
 
         const cats = await catsRes.json();
         const prods = await prodsRes.json();
         const brm = await unitsRes.json();
-        const cust = await custsRes.json();
-        const staff = await staffRes.json();
         const settings = settingsRes.ok ? await settingsRes.json() : {};
         if (settings && typeof settings === 'object') {
           const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
@@ -46,7 +43,6 @@ export function DataProvider({ children }) {
           try { localStorage.setItem('siteSettings', JSON.stringify(merged)); } catch {}
         }
 
-        // Veritabani alanlarini frontend alanlarina maple
         setCategories(Array.isArray(cats) ? cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })) : []);
         setProducts(Array.isArray(prods) ? prods.map(p => ({ 
           id: p.id, 
@@ -58,29 +54,45 @@ export function DataProvider({ children }) {
           inStock: p.stok_durumu === 1 || p.stok_durumu === true,
           updatedAt: p.guncelleme_tarihi,
           lastInfoChange: p.bilgi_guncelleme_tarihi || null,
-          lastPriceChange: p.son_fiyat_degisimi || null
+          lastPriceChange: p.son_fiyat_degisimi || null,
+          para_birimi_id: p.para_birimi_id || 1,
+          pbKisaAd: p.pb_kisa_ad || 'TRY',
+          pbSembol: p.pb_sembol || '₺',
+          pbKur: parseFloat(p.pb_kur) || 1,
+          pbKurTuru: p.pb_kur_turu || null
         })) : []);
         setUnits(Array.isArray(brm) ? brm.map(b => ({ id: b.id, name: b.birim_adi })) : []);
-        setCustomers(Array.isArray(cust) ? cust.map(c => ({ 
-          id: c.id, 
-          name: c.ad_soyad, 
-          taxId: c.vkn_tc, 
-          phone: c.telefon, 
-          email: c.eposta, 
-          password: c.sifre,
-          discount: c.iskonto_orani || '0', 
-          address: c.adres,
-          createdAt: c.kayit_tarihi
-        })) : []);
-        setUsers(Array.isArray(staff) ? staff.map(s => ({ 
-          id: s.id, 
-          contact: s.ad_soyad, 
-          username: s.kullanici_adi,
-          password: s.sifre,
-          allowedPages: s.yetkiler || []
-        })) : []);
-        
+
+        // Loading bitti — kullanıcı artık sayfayı görebilir
         setLoading(false);
+
+        // --- İkincil veri: arkaplanda yükle (admin panel için) ---
+        Promise.all([
+          fetch(`${API_URL}/musteriler`),
+          fetch(`${API_URL}/personeller`)
+        ]).then(async ([custsRes, staffRes]) => {
+          const cust = await custsRes.json();
+          const staff = await staffRes.json();
+          setCustomers(Array.isArray(cust) ? cust.map(c => ({ 
+            id: c.id, 
+            name: c.ad_soyad, 
+            taxId: c.vkn_tc, 
+            phone: c.telefon, 
+            email: c.eposta, 
+            password: c.sifre,
+            discount: c.iskonto_orani || '0', 
+            address: c.adres,
+            createdAt: c.kayit_tarihi
+          })) : []);
+          setUsers(Array.isArray(staff) ? staff.map(s => ({ 
+            id: s.id, 
+            contact: s.ad_soyad, 
+            username: s.kullanici_adi,
+            password: s.sifre,
+            allowedPages: s.yetkiler || []
+          })) : []);
+        }).catch(() => {});
+
       } catch (error) {
         console.error("Veri yukleme hatasi:", error);
         setApiError('Sunucuya bağlanılamadı. Backend\'in çalıştığından ve .env dosyasının doğru ayarlandığından emin olun.');
@@ -106,8 +118,13 @@ export function DataProvider({ children }) {
         inStock: p.stok_durumu === 1 || p.stok_durumu === true,
         updatedAt: p.guncelleme_tarihi,
         lastInfoChange: p.bilgi_guncelleme_tarihi || null,
-        lastPriceChange: p.son_fiyat_degisimi || p.fiyat_guncelleme_tarihi || null
-      })));
+        lastPriceChange: p.son_fiyat_degisimi || p.fiyat_guncelleme_tarihi || null,
+        para_birimi_id: p.para_birimi_id || 1,
+        pbKisaAd: p.pb_kisa_ad || 'TRY',
+        pbSembol: p.pb_sembol || '₺',
+        pbKur: parseFloat(p.pb_kur) || 1,
+        pbKurTuru: p.pb_kur_turu || null
+      })))
     } catch { /* sessizce hata yut, mevcut veri kalsin */ }
   };
 
@@ -254,7 +271,8 @@ export function DataProvider({ children }) {
           birim_adi: product.unit,
           gorsel_yolu: product.image,
           kategori_ids: product.categoryIds,
-          stok_durumu: product.inStock
+          stok_durumu: product.inStock,
+          para_birimi_id: product.para_birimi_id || 1
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -266,7 +284,11 @@ export function DataProvider({ children }) {
         unit: product.unit, 
         categoryIds: data.kategori_ids || [], 
         image: data.gorsel_yolu, 
-        inStock: data.stok_durumu === 1 || data.stok_durumu === true || data.stok_durumu === 'true'
+        inStock: data.stok_durumu === 1 || data.stok_durumu === true || data.stok_durumu === 'true',
+        para_birimi_id: data.para_birimi_id || 1,
+        pbKisaAd: product.pbKisaAd || 'TRY',
+        pbSembol: product.pbSembol || '₺',
+        pbKur: product.pbKur || 1
       }]);
     } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -278,7 +300,8 @@ export function DataProvider({ children }) {
       birim_adi: updates.unit || current.unit,
       gorsel_yolu: updates.image !== undefined ? updates.image : current.image,
       stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
-      kategori_ids: updates.categoryIds || current.categoryIds
+      kategori_ids: updates.categoryIds || current.categoryIds,
+      para_birimi_id: updates.para_birimi_id !== undefined ? updates.para_birimi_id : (current.para_birimi_id || 1)
     };
     // Yerel durumu aninda guncelle (Sayfa yenilemeden tarihlerin degismesi icin)
     const now = new Date().toISOString();
@@ -290,7 +313,8 @@ export function DataProvider({ children }) {
       ...updates, 
       updatedAt: now,
       lastInfoChange: isInfoUpdate ? now : p.lastInfoChange,
-      lastPriceChange: isPriceUpdate ? now : p.lastPriceChange
+      lastPriceChange: isPriceUpdate ? now : p.lastPriceChange,
+      ...(updates.para_birimi_id !== undefined ? { pbSembol: updates.pbSembol || p.pbSembol } : {})
     } : p));
     try {
       const res = await fetch(`${API_URL}/urunler/${id}`, {

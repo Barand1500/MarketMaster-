@@ -236,9 +236,11 @@ app.get('/api/urunler', (req, res) => {
   const sql = `
     SELECT u.*, b.birim_adi, 
     (SELECT GROUP_CONCAT(kategori_id) FROM urun_kategori_iliskisi WHERE urun_id = u.id) as kategori_ids,
-    (SELECT degisim_tarihi FROM fiyat_gecmisi WHERE urun_id = u.id ORDER BY degisim_tarihi DESC LIMIT 1) as son_fiyat_degisimi
+    (SELECT degisim_tarihi FROM fiyat_gecmisi WHERE urun_id = u.id ORDER BY degisim_tarihi DESC LIMIT 1) as son_fiyat_degisimi,
+    pb.kisa_ad as pb_kisa_ad, pb.sembol as pb_sembol, pb.kur as pb_kur, pb.kur_turu as pb_kur_turu
     FROM urunler u
     LEFT JOIN birimler b ON u.birim_id = b.id
+    LEFT JOIN para_birimleri pb ON u.para_birimi_id = pb.id
   `;
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -250,23 +252,24 @@ app.get('/api/urunler', (req, res) => {
 });
 
 app.post('/api/urunler', (req, res) => {
-  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu } = req.body;
+  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu, para_birimi_id } = req.body;
 
   if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
   const price = parseFloat(fiyat);
   if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
   const stok = stok_durumu !== undefined ? stok_durumu : true;
+  const pbId = para_birimi_id || 1;
   
   const insertProduct = (bId) => {
-    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu) VALUES (?, ?, ?, ?, ?)',
-      [urun_adi, price, bId, gorsel_yolu, stok], (err, result) => {
+    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, para_birimi_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [urun_adi, price, bId, gorsel_yolu, stok, pbId], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const urunId = result.insertId;
       if (Array.isArray(kategori_ids) && kategori_ids.length > 0) {
         const values = kategori_ids.map(kid => [urunId, kid]);
         db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
       }
-      res.json({ id: urunId, urun_adi, fiyat: price, birim_id: bId, gorsel_yolu, kategori_ids, stok_durumu: stok });
+      res.json({ id: urunId, urun_adi, fiyat: price, birim_id: bId, gorsel_yolu, kategori_ids, stok_durumu: stok, para_birimi_id: pbId });
     });
   };
 
@@ -280,10 +283,11 @@ app.post('/api/urunler', (req, res) => {
 });
 
 app.put('/api/urunler/:id', (req, res) => {
-  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, stok_durumu, kategori_ids } = req.body;
+  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, stok_durumu, kategori_ids, para_birimi_id } = req.body;
   if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
   const price = parseFloat(fiyat);
   if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
+  const pbId = para_birimi_id || 1;
 
   const updateProd = (bId) => {
     // Once mevcut fiyati al, degistiyse gecmise kaydet
@@ -298,11 +302,12 @@ app.put('/api/urunler/:id', (req, res) => {
         current.urun_adi !== urun_adi ||
         current.birim_id !== bId ||
         String(current.gorsel_yolu || '') !== String(gorsel_yolu || '') ||
-        Number(current.stok_durumu) !== Number(stok_durumu ? 1 : 0)
+        Number(current.stok_durumu) !== Number(stok_durumu ? 1 : 0) ||
+        (current.para_birimi_id || 1) !== pbId
       );
 
-      let updateSql = 'UPDATE urunler SET urun_adi = ?, fiyat = ?, birim_id = ?, gorsel_yolu = ?, stok_durumu = ?';
-      const updateParams = [urun_adi, price, bId, gorsel_yolu, stok_durumu];
+      let updateSql = 'UPDATE urunler SET urun_adi = ?, fiyat = ?, birim_id = ?, gorsel_yolu = ?, stok_durumu = ?, para_birimi_id = ?';
+      const updateParams = [urun_adi, price, bId, gorsel_yolu, stok_durumu, pbId];
 
       if (bilgiDegisti) updateSql += ', bilgi_guncelleme_tarihi = NOW()';
       updateSql += ' WHERE id = ?';
@@ -745,7 +750,8 @@ app.post('/api/reset-password', (req, res) => {
 
 app.get('/api/backup', (req, res) => {
   const queries = {
-    urunler: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi FROM urunler',
+    para_birimleri: 'SELECT id, ad, kisa_ad, sembol, kur_tipi, kur, kur_turu FROM para_birimleri WHERE id != 1',
+    urunler: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi, para_birimi_id FROM urunler',
     kategoriler: 'SELECT * FROM kategoriler',
     birimler: 'SELECT * FROM birimler',
     musteriler: 'SELECT id, ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres FROM musteriler',
@@ -771,9 +777,10 @@ app.get('/api/backup', (req, res) => {
 // ── SQL Backup ────────────────────────────────────────────────────────────────
 app.get('/api/backup-sql', (req, res) => {
   const tableConfigs = {
+    para_birimleri:         { sql: 'SELECT id, ad, kisa_ad, sembol, kur_tipi, kur, kur_turu FROM para_birimleri WHERE id != 1',                                                              fields: ['id','ad','kisa_ad','sembol','kur_tipi','kur','kur_turu'] },
     kategoriler:            { sql: 'SELECT id, kategori_adi, ust_kategori_id FROM kategoriler',                                                                                             fields: ['id','kategori_adi','ust_kategori_id'] },
     birimler:               { sql: 'SELECT id, birim_adi FROM birimler',                                                                                                                    fields: ['id','birim_adi'] },
-    urunler:                { sql: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi FROM urunler',                                                  fields: ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'] },
+    urunler:                { sql: 'SELECT id, urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, bilgi_guncelleme_tarihi, para_birimi_id FROM urunler',                                   fields: ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi','para_birimi_id'] },
     musteriler:             { sql: 'SELECT id, ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres FROM musteriler',                                                             fields: ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'] },
     personeller:            { sql: 'SELECT id, ad_soyad, kullanici_adi, sifre FROM personeller WHERE kullanici_adi != "admin"',                                                            fields: ['id','ad_soyad','kullanici_adi','sifre'] },
     personel_yetkileri:     { sql: 'SELECT personel_id, sayfa_adi FROM personel_yetkileri',                                                                                                 fields: ['personel_id','sayfa_adi'] },
@@ -824,9 +831,10 @@ app.get('/api/backup-sql', (req, res) => {
         out += `TRUNCATE TABLE \`kategoriler\`;\n`;
         out += `TRUNCATE TABLE \`birimler\`;\n`;
         out += `TRUNCATE TABLE \`musteriler\`;\n`;
+        out += `DELETE FROM \`para_birimleri\` WHERE id != 1;\n`;
         out += `DELETE FROM \`personeller\` WHERE \`kullanici_adi\` != 'admin';\n\n`;
 
-        const insertOrder = ['kategoriler','birimler','urunler','fiyat_gecmisi','musteriler','personeller','personel_yetkileri','urun_kategori_iliskisi','site_settings'];
+        const insertOrder = ['para_birimleri','kategoriler','birimler','urunler','fiyat_gecmisi','musteriler','personeller','personel_yetkileri','urun_kategori_iliskisi','site_settings'];
         insertOrder.forEach(tbl => {
           const rows = results[tbl] || [];
           const fields = tableConfigs[tbl].fields;
@@ -919,6 +927,7 @@ app.post('/api/restore', (req, res) => {
     return res.status(400).json({ error: 'Geçersiz yedek dosyası.' });
   }
   const { urunler, kategoriler, birimler, musteriler, personeller, personel_yetkileri } = backup.data;
+  const para_birimleri = backup.data.para_birimleri || [];
   // Hem eski (urun_kategoriler) hem yeni (urun_kategori_iliskisi) key adını kabul et
   const urun_kategori_iliskisi = backup.data.urun_kategori_iliskisi || backup.data.urun_kategoriler || [];
 
@@ -968,6 +977,7 @@ app.post('/api/restore', (req, res) => {
       'DELETE FROM kategoriler',
       'DELETE FROM birimler',
       'DELETE FROM musteriler',
+      'DELETE FROM para_birimleri WHERE id != 1',
       'DELETE FROM personeller WHERE kullanici_adi != "admin"',
     ];
     let di = 0;
@@ -976,20 +986,23 @@ app.post('/api/restore', (req, res) => {
       db.query(deletes[di++], (e) => { if (e) console.warn('Delete uyarı:', e.message); runDeletes(); });
     };
     const runInserts = () => {
-      insertRows('kategoriler', kategoriler, ['id','kategori_adi','ust_kategori_id'], err => {
+      insertRows('para_birimleri', para_birimleri, ['id','ad','kisa_ad','sembol','kur_tipi','kur','kur_turu'], err => {
         if (err) return finish(err);
-        insertRows('birimler', birimler, ['id','birim_adi'], err => {
+        insertRows('kategoriler', kategoriler, ['id','kategori_adi','ust_kategori_id'], err => {
           if (err) return finish(err);
-          insertRows('urunler', urunlerMerged, ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi'], err => {
+          insertRows('birimler', birimler, ['id','birim_adi'], err => {
             if (err) return finish(err);
-            insertRows('musteriler', musteriler, ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'], err => {
+            insertRows('urunler', urunlerMerged, ['id','urun_adi','fiyat','birim_id','gorsel_yolu','stok_durumu','bilgi_guncelleme_tarihi','para_birimi_id'], err => {
               if (err) return finish(err);
-              insertRows('personeller', safePersoneller, ['id','ad_soyad','kullanici_adi','sifre'], err => {
+              insertRows('musteriler', musteriler, ['id','ad_soyad','vkn_tc','telefon','eposta','sifre','iskonto_orani','adres'], err => {
                 if (err) return finish(err);
-                insertRows('personel_yetkileri', personel_yetkileri || [], ['personel_id','sayfa_adi'], err => {
+                insertRows('personeller', safePersoneller, ['id','ad_soyad','kullanici_adi','sifre'], err => {
                   if (err) return finish(err);
-                  insertRows('urun_kategori_iliskisi', urun_kategori_iliskisi || [], ['urun_id','kategori_id'], err => {
-                    finish(err);
+                  insertRows('personel_yetkileri', personel_yetkileri || [], ['personel_id','sayfa_adi'], err => {
+                    if (err) return finish(err);
+                    insertRows('urun_kategori_iliskisi', urun_kategori_iliskisi || [], ['urun_id','kategori_id'], err => {
+                      finish(err);
+                    });
                   });
                 });
               });
@@ -1007,6 +1020,169 @@ app.post('/api/restore', (req, res) => {
     runDeletes();
   });
   }); // SELECT gorsel_yolu
+});
+
+// ==================== PARA BİRİMİ ====================
+
+// Startup migration: para_birimleri tablosu
+db.query(`CREATE TABLE IF NOT EXISTS para_birimleri (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ad VARCHAR(100) NOT NULL,
+  kisa_ad VARCHAR(20) NOT NULL,
+  sembol VARCHAR(10) NOT NULL,
+  kur_tipi ENUM('manuel','api') NOT NULL DEFAULT 'manuel',
+  kur DECIMAL(15,6) NOT NULL DEFAULT 1.000000,
+  son_guncelleme TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) { console.warn('para_birimleri tablo olusturma hatasi:', err.message); return; }
+  // Varsayılan: Türk Lirası
+  db.query(`INSERT IGNORE INTO para_birimleri (id, ad, kisa_ad, sembol, kur_tipi, kur) VALUES (1, 'Türk Lirası', 'TRY', '₺', 'manuel', 1.000000)`, (e) => {
+    if (!e) console.log('✅ Migration: para_birimleri tablosu ve varsayılan TRY hazır');
+    // para_birimi_id kolonu urunler tablosuna ekle
+    db.query(`ALTER TABLE urunler ADD COLUMN para_birimi_id INT NULL DEFAULT 1`, (e2) => {
+      if (e2 && e2.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (urunler.para_birimi_id):', e2.message);
+      else if (!e2) console.log('✅ Migration: urunler.para_birimi_id kolonu eklendi');
+    });
+    // kur_turu kolonu para_birimleri tablosuna ekle
+    db.query(`ALTER TABLE para_birimleri ADD COLUMN kur_turu ENUM('doviz_alis','doviz_satis','efektif_alis','efektif_satis') NOT NULL DEFAULT 'doviz_satis'`, (e3) => {
+      if (e3 && e3.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (para_birimleri.kur_turu):', e3.message);
+      else if (!e3) console.log('✅ Migration: para_birimleri.kur_turu kolonu eklendi');
+    });
+  });
+});
+
+// TCMB kur XML'ini çek ve parse et
+const https = require('https');
+const http = require('http');
+function tcmbKurlariCek(callback) {
+  const url = 'https://www.tcmb.gov.tr/kurlar/today.xml';
+  https.get(url, (res) => {
+    let data = '';
+    res.on('data', chunk => { data += chunk; });
+    res.on('end', () => {
+      try {
+        // Her Currency blogu için dört kur tipini parse et
+        const kurlar = {};
+        const blocks = data.matchAll(/<Currency[^>]*CurrencyCode="([^"]+)"[^>]*>([\s\S]*?)<\/Currency>/g);
+        const getVal = (block, tag) => {
+          const m = block.match(new RegExp(`<${tag}>\\s*([\\d,.]+)\\s*<\\/${tag}>`));
+          if (!m) return null;
+          const v = parseFloat(m[1].replace(',', '.'));
+          return (!isNaN(v) && v > 0) ? v : null;
+        };
+        for (const m of blocks) {
+          const kod = m[1];
+          const block = m[2];
+          const entry = {
+            doviz_alis: getVal(block, 'ForexBuying'),
+            doviz_satis: getVal(block, 'ForexSelling'),
+            efektif_alis: getVal(block, 'BanknoteBuying'),
+            efektif_satis: getVal(block, 'BanknoteSelling')
+          };
+          if (entry.doviz_satis || entry.efektif_satis) kurlar[kod] = entry;
+        }
+        callback(null, kurlar);
+      } catch (e) {
+        callback(e, null);
+      }
+    });
+  }).on('error', (e) => callback(e, null));
+}
+
+// GET /api/tcmb-kur — Güncel TCMB kurlarını döndür
+app.get('/api/tcmb-kur', (req, res) => {
+  tcmbKurlariCek((err, kurlar) => {
+    if (err || !kurlar) return res.status(500).json({ error: 'TCMB kurları çekilemedi.' });
+    res.json(kurlar);
+  });
+});
+
+// GET /api/para-birimleri
+app.get('/api/para-birimleri', (req, res) => {
+  db.query('SELECT * FROM para_birimleri ORDER BY id', (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// POST /api/para-birimleri
+app.post('/api/para-birimleri', (req, res) => {
+  const { ad, kisa_ad, sembol, kur_tipi, kur, kur_turu } = req.body;
+  if (!ad || !kisa_ad || !sembol) return res.status(400).json({ error: 'Ad, kısa ad ve sembol zorunludur.' });
+  const kurDegeri = parseFloat(kur) || 1;
+  const validKurTuru = ['doviz_alis','doviz_satis','efektif_alis','efektif_satis'].includes(kur_turu) ? kur_turu : 'doviz_satis';
+  db.query(
+    'INSERT INTO para_birimleri (ad, kisa_ad, sembol, kur_tipi, kur, kur_turu) VALUES (?, ?, ?, ?, ?, ?)',
+    [ad.trim(), kisa_ad.trim().toUpperCase(), sembol.trim(), kur_tipi || 'manuel', kurDegeri, validKurTuru],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      db.query('SELECT * FROM para_birimleri WHERE id = ?', [result.insertId], (e, rows) => {
+        res.json(rows ? rows[0] : { id: result.insertId });
+      });
+    }
+  );
+});
+
+// PUT /api/para-birimleri/:id
+app.put('/api/para-birimleri/:id', (req, res) => {
+  const { ad, kisa_ad, sembol, kur_tipi, kur, kur_turu } = req.body;
+  if (!ad || !kisa_ad || !sembol) return res.status(400).json({ error: 'Ad, kısa ad ve sembol zorunludur.' });
+  const kurDegeri = parseFloat(kur) || 1;
+  const validKurTuru = ['doviz_alis','doviz_satis','efektif_alis','efektif_satis'].includes(kur_turu) ? kur_turu : 'doviz_satis';
+  db.query(
+    'UPDATE para_birimleri SET ad=?, kisa_ad=?, sembol=?, kur_tipi=?, kur=?, kur_turu=?, son_guncelleme=NOW() WHERE id=?',
+    [ad.trim(), kisa_ad.trim().toUpperCase(), sembol.trim(), kur_tipi || 'manuel', kurDegeri, validKurTuru, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      db.query('SELECT * FROM para_birimleri WHERE id = ?', [req.params.id], (e, rows) => {
+        res.json(rows ? rows[0] : { success: true });
+      });
+    }
+  );
+});
+
+// DELETE /api/para-birimleri/:id
+app.delete('/api/para-birimleri/:id', (req, res) => {
+  if (req.params.id === '1') return res.status(403).json({ error: 'Varsayılan Türk Lirası silinemez.' });
+  // Önce bu para biriminin kurunu al
+  db.query('SELECT kur FROM para_birimleri WHERE id = ?', [req.params.id], (err, rows) => {
+    if (err || !rows.length) return res.status(404).json({ error: 'Para birimi bulunamadı.' });
+    const kur = parseFloat(rows[0].kur) || 1;
+    // Bu para birimini kullanan ürünlerin fiyatını TL'ye çevir, para_birimi_id'yi 1 yap
+    db.query(
+      'UPDATE urunler SET fiyat = ROUND(fiyat * ?, 2), para_birimi_id = 1 WHERE para_birimi_id = ?',
+      [kur, req.params.id],
+      (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        db.query('DELETE FROM para_birimleri WHERE id = ?', [req.params.id], (err3) => {
+          if (err3) return res.status(500).json({ error: err3.message });
+          res.json({ success: true });
+        });
+      }
+    );
+  });
+});
+
+// PUT /api/para-birimleri/:id/guncelle-api — TCMB'den kur güncelle
+app.put('/api/para-birimleri/:id/guncelle-api', (req, res) => {
+  db.query('SELECT * FROM para_birimleri WHERE id = ?', [req.params.id], (err, rows) => {
+    if (err || !rows.length) return res.status(404).json({ error: 'Para birimi bulunamadı.' });
+    const pb = rows[0];
+    if (pb.kur_tipi !== 'api') return res.status(400).json({ error: 'Bu para birimi manuel kur kullanıyor.' });
+    tcmbKurlariCek((tcmbErr, kurlar) => {
+      if (tcmbErr || !kurlar) return res.status(500).json({ error: 'TCMB kurları çekilemedi.' });
+      const kurEntry = kurlar[pb.kisa_ad];
+      const kurTuru = pb.kur_turu || 'doviz_satis';
+      const yeniKur = kurEntry ? kurEntry[kurTuru] : null;
+      if (!yeniKur) return res.status(404).json({ error: `${pb.kisa_ad} için TCMB ${kurTuru} kuru bulunamadı.` });
+      db.query('UPDATE para_birimleri SET kur=?, son_guncelleme=NOW() WHERE id=?', [yeniKur, req.params.id], (e) => {
+        if (e) return res.status(500).json({ error: e.message });
+        db.query('SELECT * FROM para_birimleri WHERE id = ?', [req.params.id], (e2, r2) => {
+          res.json(r2 ? r2[0] : { success: true });
+        });
+      });
+    });
+  });
 });
 
 const PORT = process.env.PORT || 5000;

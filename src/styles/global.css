@@ -1,5 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes priceFadeIn {
+  from { opacity: 0; transform: translateY(-5px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── Para Birimi Custom Select ────────────────────────────────────────────── */
+.pb-select { position: relative; display: inline-block; width: 100%; }
+.pb-select-trigger {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; padding: 4px 8px; border-radius: 8px;
+  border: 1px solid #e2e8f0; background: #fff; cursor: pointer;
+  font-size: 11px; font-family: inherit; color: #0f172a;
+  transition: border-color 0.15s;
+}
+.pb-select-trigger:hover { border-color: var(--primary); }
+.pb-select-trigger .pb-symbol { font-size: 12px; }
+.pb-select-trigger .pb-kisaad { font-weight: 600; }
+.pb-select-trigger .pb-arrow  { margin-left: auto; color: #94a3b8; font-size: 9px; }
+.pb-select-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+  min-width: 160px; background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 10px; box-shadow: 0 8px 20px -4px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+.pb-select-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; cursor: pointer; transition: background 0.12s;
+}
+.pb-select-option:hover  { background: var(--primary-light); }
+.pb-select-option.active { background: rgba(5,150,105,0.08); }
+.pb-select-option .pb-symbol  { font-size: 13px; width: 16px; flex-shrink: 0; }
+.pb-select-option .pb-main    { font-size: 12px; font-weight: 600; color: #0f172a; }
+.pb-select-option .pb-sub     { font-size: 10px; color: #94a3b8; margin-left: 2px; }
+
+/* Mobile variant */
+.pb-select.mobile .pb-select-trigger {
+  padding: 10px 12px; font-size: 13px; border-radius: 10px;
+}
+.pb-select.mobile .pb-select-trigger .pb-kisaad { font-size: 13px; }
+.pb-select.mobile .pb-select-panel { min-width: 200px; }
+
 :root {
   --primary: #059669;
   --primary-dark: #065f46;
@@ -43,10 +89,10 @@ body {
 }
 
 .app-layout { display: flex; min-height: 100vh; }
-.main-content { flex: 1; margin-left: var(--sidebar-w); padding: 40px; }
+.main-content { flex: 1; margin-left: var(--sidebar-w); padding: 24px 32px; }
 
 /* Headers */
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .header-left { flex: 1; }
 .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .header-actions { display: flex; align-items: center; gap: 8px; }
@@ -58,7 +104,7 @@ body {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   padding: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
   transition: transform 0.2s, box-shadow 0.2s;

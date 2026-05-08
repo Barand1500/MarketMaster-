@@ -62,13 +62,56 @@ function pBtn(disabled, active = false) {
   };
 }
 
+function PbSelect({ value, onChange, options, mobile }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = options.find(o => o.id === value) || options[0];
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className={`pb-select${mobile ? ' mobile' : ''}`} ref={ref}>
+      <button type="button" className="pb-select-trigger" onMouseDown={e => e.preventDefault()} onClick={() => setOpen(o => !o)}>
+        <span className="pb-symbol">{selected?.sembol}</span>
+        <span className="pb-kisaad">{selected?.kisa_ad}</span>
+        <span className="pb-arrow">▾</span>
+      </button>
+      {open && (
+        <div className="pb-select-panel" onMouseDown={e => e.preventDefault()}>
+          {options.map(pb => (
+            <div key={pb.id} className={`pb-select-option${pb.id === value ? ' active' : ''}`}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(pb.id); setOpen(false); }}>
+              <span className="pb-symbol">{pb.sembol}</span>
+              <span className="pb-main">{pb.kisa_ad}</span>
+              {pb.kur_turu && pb.id !== 1 && <span className="pb-sub">{pb.kur_turu}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Products() {
   const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, siteSettings } = useData();
+
+  // Para birimleri
+  const [paraBirimleri, setParaBirimleri] = useState([{ id: 1, ad: 'Türk Lirası', kisa_ad: 'TRY', sembol: '₺' }]);
+  useEffect(() => {
+    fetch('/api/para-birimleri').then(r => r.ok ? r.json() : null).then(data => {
+      if (Array.isArray(data) && data.length > 0) setParaBirimleri(data);
+    }).catch(() => {});
+  }, []);
 
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true });
+  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -153,8 +196,9 @@ export default function Products() {
 
   const handleAdd = () => {
     if (!newRow.name.trim() || !newRow.price) return;
-    addProduct({ ...newRow, price: parseFloat(newRow.price) });
-    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true });
+    const pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
+    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1 });
+    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 });
     setCatDrop(false);
   };
 
@@ -180,7 +224,7 @@ export default function Products() {
     return parent ? `${getCategoryPath(parent)} › ${cat.name}` : cat.name;
   };
 
-  const fmtPrice = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+  const fmtPrice = (n, sembol) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ' + (sembol || '₺');
 
   // Sayfalama hesaplama
   const filteredProducts = products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()));
@@ -233,7 +277,6 @@ export default function Products() {
                   setModalEditValue(u.name);
                 }}
                 style={{ cursor: 'pointer' }}
-                title="Düzenlemek için çift tıklayın"
               >
                 {u.name}
               </span>
@@ -257,9 +300,9 @@ export default function Products() {
       }
       if (list.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
       return list.map(c => (
-        <div key={c.id} className="pm-item">
+        <div key={c.id} className="pm-item" style={{ padding: '6px 10px' }}>
           <div className="pm-item-left">
-            <span className="pm-item-icon">{c.parentId ? '↳' : '📁'}</span>
+            <span className="pm-item-icon" style={{ fontSize: '12px' }}>{c.parentId ? '↳' : '📁'}</span>
             <div>
               {modalEditing.id === c.id && modalEditing.type === 'category' ? (
                 <input
@@ -284,8 +327,7 @@ export default function Products() {
                     setModalEditing({ id: c.id, type: 'category' });
                     setModalEditValue(c.name);
                   }}
-                  style={{ cursor: 'pointer' }}
-                  title="Düzenlemek için çift tıklayın"
+                  style={{ cursor: 'pointer', fontSize: '12px' }}
                 >
                   {c.name}
                 </div>
@@ -306,7 +348,7 @@ export default function Products() {
   return (
     <div className="page-container wide">
       <PageHeader 
-        title="Ürün ve Stok Yönetimi"
+        title="📦 Ürün ve Stok Yönetimi"
         sub="Ürün Veritabanı ve Stok Yönetimi"
         actions={
           <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
@@ -392,7 +434,7 @@ export default function Products() {
               <tr className="th-row">
                 <th style={{ width: '80px' }}>Görsel</th>
                 <th>Ürün Adı</th>
-                <th style={{ width: '130px' }}>Fiyat (₺)</th>
+                <th style={{ width: '130px' }}>Fiyat</th>
                 <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => openModal('units')}>+</button></th>
                 <th style={{ width: '230px' }}>Kategoriler <button className="mini-add-btn" onClick={() => openModal('categories')}>+</button></th>
                 <th style={{ width: '90px', textAlign: 'center' }}>Stok</th>
@@ -416,7 +458,12 @@ export default function Products() {
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
                   setNewRow({...newRow, price: val});
-                }} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
+                }} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+                {paraBirimleri.length > 1 && (
+                  <div style={{ marginTop: '3px' }}>
+                    <PbSelect value={newRow.para_birimi_id} onChange={id => setNewRow({...newRow, para_birimi_id: id})} options={paraBirimleri} />
+                  </div>
+                )}</td>
                 <td>
                   <select className="lite-select" value={newRow.unit} onChange={e => setNewRow({...newRow, unit: e.target.value})}>
                     {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
@@ -480,13 +527,31 @@ export default function Products() {
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'price' })}>
                       {editing?.id === p.id && editing?.field === 'price' ? (
-                        <input autoFocus type="text" className="inline-edit" defaultValue={p.price} onFocus={e => e.target.select()} onInput={e => {
-                          let val = e.target.value.replace(/[^0-9.]/g, '');
-                          if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
-                          e.target.value = val;
-                        }} onBlur={(e) => handleBlur(p.id, 'price', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                        <div>
+                          <input autoFocus type="text" className="inline-edit" defaultValue={p.price} onFocus={e => e.target.select()} onInput={e => {
+                            let val = e.target.value.replace(/[^0-9.]/g, '');
+                            if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
+                            e.target.value = val;
+                          }} onBlur={(e) => {
+                            if (e.relatedTarget && (e.relatedTarget.tagName === 'SELECT' || e.relatedTarget.closest?.('.pb-select'))) return;
+                            handleBlur(p.id, 'price', e.target.value);
+                          }} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
+                          {paraBirimleri.length > 1 && (
+                            <div style={{ marginTop: '3px' }}>
+                              <PbSelect value={p.para_birimi_id || 1} onChange={id => {
+                                const pb = paraBirimleri.find(x => x.id === id);
+                                updateProduct(p.id, { para_birimi_id: id, pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY' });
+                              }} options={paraBirimleri} />
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <span className="edit-txt price">{fmtPrice(p.price)}</span>
+                        <div>
+                          <span className="edit-txt price">{fmtPrice(p.price, p.pbSembol)}</span>
+                          {p.pbKisaAd && p.pbKisaAd !== 'TRY' && p.pbKurTuru && (
+                            <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '500', marginTop: '2px' }}>{{'doviz_alis':'Döviz Alış','doviz_satis':'Döviz Satış','efektif_alis':'Efektif Alış','efektif_satis':'Efektif Satış'}[p.pbKurTuru] || p.pbKurTuru}</div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'unit' })}>
@@ -598,7 +663,7 @@ export default function Products() {
             <div className="mobile-card-info">
               <div className="mobile-card-name">{p.name}</div>
               <div className="mobile-card-meta">
-                <span className="mobile-card-price">{fmtPrice(p.price)}</span>
+                <span className="mobile-card-price">{fmtPrice(p.price, p.pbSembol)}</span>
                 <span className="mobile-card-unit">{p.unit}</span>
               </div>
               {p.categoryIds.length > 0 && (
@@ -617,7 +682,7 @@ export default function Products() {
                 onClick={() => updateProduct(p.id, { inStock: !p.inStock })}
               >{p.inStock ? 'VAR' : 'YOK'}</button>
               <button className="mobile-edit-btn" onClick={() => {
-                setMobileEdit({ id: p.id, name: p.name, price: String(p.price), unit: p.unit || 'Kg', categoryIds: [...p.categoryIds], image: p.image || '', inStock: p.inStock });
+                setMobileEdit({ id: p.id, name: p.name, price: String(p.price), unit: p.unit || 'Kg', categoryIds: [...p.categoryIds], image: p.image || '', inStock: p.inStock, para_birimi_id: p.para_birimi_id || 1 });
                 setMobileEditCatSearch('');
               }}>✏️</button>
               <button className="mobile-del-btn" onClick={() => setConfirm(p.id)}>🗑</button>
@@ -637,7 +702,7 @@ export default function Products() {
         />
 
         {/* FAB - Yeni Ürün Ekle */}
-        <button className="mobile-fab" onClick={() => { setShowMobileAdd(true); setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true }); setMobileAddCatSearch(''); }}>＋</button>
+        <button className="mobile-fab" onClick={() => { setShowMobileAdd(true); setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 }); setMobileAddCatSearch(''); }}>＋</button>
       </div>
 
       {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
@@ -668,15 +733,20 @@ export default function Products() {
               <label className="mobile-label">Ürün Adı</label>
               <input className="mobile-input" value={mobileEdit.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setMobileEdit(prev=>({...prev, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Ürün adı..." />
 
-              {/* Fiyat + Birim */}
+              {/* Fiyat + Birim + Para Birimi */}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label className="mobile-label">Fiyat (₺)</label>
+                  <label className="mobile-label">Fiyat</label>
                   <input className="mobile-input" value={mobileEdit.price} onChange={e => {
                     let val = e.target.value.replace(/[^0-9.]/g, '');
                     if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
                     setMobileEdit(prev => ({ ...prev, price: val }));
                   }} placeholder="0.00" />
+                  {paraBirimleri.length > 1 && (
+                    <div style={{ marginTop: '4px' }}>
+                      <PbSelect value={mobileEdit.para_birimi_id || 1} onChange={id => setMobileEdit(prev => ({ ...prev, para_birimi_id: id }))} options={paraBirimleri} mobile />
+                    </div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="mobile-label">Birim</label>
@@ -721,7 +791,8 @@ export default function Products() {
                   unit: mobileEdit.unit,
                   categoryIds: mobileEdit.categoryIds,
                   image: mobileEdit.image,
-                  inStock: mobileEdit.inStock
+                  inStock: mobileEdit.inStock,
+                  para_birimi_id: mobileEdit.para_birimi_id || 1
                 });
                 setMobileEdit(null);
               }}>Kaydet</button>
@@ -758,15 +829,20 @@ export default function Products() {
               <label className="mobile-label">Ürün Adı</label>
               <input className="mobile-input" value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow(prev=>({...prev, name:v})); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} placeholder="Ürün adı..." />
 
-              {/* Fiyat + Birim */}
+              {/* Fiyat + Birim + Para Birimi */}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label className="mobile-label">Fiyat (₺)</label>
+                  <label className="mobile-label">Fiyat</label>
                   <input className="mobile-input" value={newRow.price} onChange={e => {
                     let val = e.target.value.replace(/[^0-9.]/g, '');
                     if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
                     setNewRow(prev => ({ ...prev, price: val }));
                   }} placeholder="0.00" />
+                  {paraBirimleri.length > 1 && (
+                    <div style={{ marginTop: '4px' }}>
+                      <PbSelect value={newRow.para_birimi_id || 1} onChange={id => setNewRow(prev => ({ ...prev, para_birimi_id: id }))} options={paraBirimleri} mobile />
+                    </div>
+                  )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="mobile-label">Birim</label>
@@ -805,8 +881,9 @@ export default function Products() {
               <button className="mobile-btn-cancel" onClick={() => setShowMobileAdd(false)}>Vazgeç</button>
               <button className="mobile-btn-save" onClick={() => {
                 if (!newRow.name.trim() || !newRow.price) return;
-                addProduct({ ...newRow, price: parseFloat(newRow.price) });
-                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true });
+                const _pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
+                addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: _pb?.sembol || '₺', pbKisaAd: _pb?.kisa_ad || 'TRY', pbKur: parseFloat(_pb?.kur) || 1 });
+                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 });
                 setShowMobileAdd(false);
               }}>Ekle</button>
             </div>
@@ -825,7 +902,6 @@ export default function Products() {
             <div className="pm-body">
               
               <div className="pm-add-form">
-                <div className="pm-form-title">YENİ {showModal === 'categories' ? 'KATEGORİ' : 'BİRİM'} EKLE</div>
                 {showModal === 'categories' && (
                   <select className="lite-select" value={modalParent} onChange={e => setModalParent(e.target.value)}>
                     <option value="">— Ana Kategori (İsteğe Bağlı) —</option>
@@ -833,19 +909,12 @@ export default function Products() {
                   </select>
                 )}
                 <div className="pm-row">
-                  <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : 'Birim'} adı...`} value={modalInput} onChange={e => setModalInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                  <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : 'Birim'} adı ekle veya ara...`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
                   <button className="pm-btn" onClick={handleAddModal}>Ekle</button>
                 </div>
               </div>
 
                 <div className="pm-list-section">
-                  <div className="pm-search-box">
-                    <span className="icon">🔍</span>
-                    <input type="text" placeholder="Mevcutlar içinde ara..." value={modalSearch} onChange={e => setModalSearch(e.target.value)} />
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 8px 0', textAlign: 'right' }}>
-                    Düzenlemek için çift tıklayın
-                  </div>
                   <div className="pm-list">
                     {renderModalList()}
                   </div>
