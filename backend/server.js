@@ -167,6 +167,123 @@ db.query(`CREATE TABLE IF NOT EXISTS fiyat_gecmisi (
   else console.log('✅ Migration: fiyat_gecmisi tablosu hazir');
 });
 
+// Startup migration: markalar tablosu
+db.query(`CREATE TABLE IF NOT EXISTS markalar (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ad VARCHAR(100) NOT NULL,
+  gorsel LONGTEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.warn('markalar tablo olusturma hatasi:', err.message);
+  else console.log('✅ Migration: markalar tablosu hazir');
+});
+
+// Startup migration: markalar.gorsel kolonunu LONGTEXT'e yükselt (base64 görseller için)
+db.query("ALTER TABLE markalar MODIFY COLUMN gorsel LONGTEXT DEFAULT NULL", (err) => {
+  if (err && err.code !== 'ER_BAD_FIELD_ERROR') { /* zaten dogru tip */ }
+  else if (!err) console.log('✅ Migration: markalar.gorsel LONGTEXT yapıldı');
+});
+
+// Startup migration: urunler.marka_id kolonu
+db.query('ALTER TABLE urunler ADD COLUMN marka_id INT NULL DEFAULT NULL', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') {
+    console.warn('Migration uyarisi (urunler.marka_id):', err.message);
+  } else if (!err) {
+    console.log('✅ Migration: urunler.marka_id kolonu eklendi');
+  }
+});
+
+// Startup migration: urunler.kdv_orani + kdv_dahil
+db.query('ALTER TABLE urunler ADD COLUMN kdv_orani DECIMAL(5,2) NULL DEFAULT NULL', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (urunler.kdv_orani):', err.message);
+  else if (!err) console.log('✅ Migration: urunler.kdv_orani kolonu eklendi');
+});
+db.query('ALTER TABLE urunler ADD COLUMN kdv_dahil TINYINT(1) NULL DEFAULT NULL', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (urunler.kdv_dahil):', err.message);
+  else if (!err) console.log('✅ Migration: urunler.kdv_dahil kolonu eklendi');
+});
+
+// Startup migration: kdv_oranlari tablosu (önceden tanımlı oranlar)
+db.query(`CREATE TABLE IF NOT EXISTS kdv_oranlari (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  oran DECIMAL(5,2) NOT NULL,
+  dahil TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.warn('kdv_oranlari tablo olusturma hatasi:', err.message);
+  else console.log('✅ Migration: kdv_oranlari tablosu hazir');
+});
+
+// --- MARKALAR API ---
+app.get('/api/markalar', (req, res) => {
+  db.query('SELECT * FROM markalar ORDER BY ad', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/markalar', (req, res) => {
+  const { ad, gorsel } = req.body;
+  if (!ad || !ad.trim()) return res.status(400).json({ error: 'Marka adı zorunludur.' });
+  db.query('INSERT INTO markalar (ad, gorsel) VALUES (?, ?)', [ad.trim(), gorsel || null], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: result.insertId, ad: ad.trim(), gorsel: gorsel || null });
+  });
+});
+
+app.put('/api/markalar/:id', (req, res) => {
+  const { ad, gorsel } = req.body;
+  if (!ad || !ad.trim()) return res.status(400).json({ error: 'Marka adı zorunludur.' });
+  db.query('UPDATE markalar SET ad=?, gorsel=? WHERE id=?', [ad.trim(), gorsel || null, req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, ad: ad.trim(), gorsel: gorsel || null });
+  });
+});
+
+app.delete('/api/markalar/:id', (req, res) => {
+  db.query('DELETE FROM markalar WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// --- KDV ORANLARI API ---
+app.get('/api/kdv-oranlari', (req, res) => {
+  db.query('SELECT * FROM kdv_oranlari ORDER BY oran, dahil DESC', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/kdv-oranlari', (req, res) => {
+  const { oran, dahil } = req.body;
+  const oranVal = parseFloat(oran);
+  if (isNaN(oranVal) || oranVal < 0) return res.status(400).json({ error: 'Geçerli bir oran giriniz.' });
+  const dahilVal = dahil ? 1 : 0;
+  db.query('INSERT INTO kdv_oranlari (oran, dahil) VALUES (?, ?)', [oranVal, dahilVal], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: result.insertId, oran: oranVal, dahil: dahilVal });
+  });
+});
+
+app.put('/api/kdv-oranlari/:id', (req, res) => {
+  const { oran, dahil } = req.body;
+  const oranVal = parseFloat(oran);
+  if (isNaN(oranVal) || oranVal < 0) return res.status(400).json({ error: 'Geçerli bir oran giriniz.' });
+  const dahilVal = dahil ? 1 : 0;
+  db.query('UPDATE kdv_oranlari SET oran = ?, dahil = ? WHERE id = ?', [oranVal, dahilVal, req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: parseInt(req.params.id), oran: oranVal, dahil: dahilVal });
+  });
+});
+
+app.delete('/api/kdv-oranlari/:id', (req, res) => {
+  db.query('DELETE FROM kdv_oranlari WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 // --- BIRIMLER API ---
 app.get('/api/birimler', (req, res) => {
   db.query('SELECT * FROM birimler', (err, results) => {
@@ -237,10 +354,12 @@ app.get('/api/urunler', (req, res) => {
     SELECT u.*, b.birim_adi, 
     (SELECT GROUP_CONCAT(kategori_id) FROM urun_kategori_iliskisi WHERE urun_id = u.id) as kategori_ids,
     (SELECT degisim_tarihi FROM fiyat_gecmisi WHERE urun_id = u.id ORDER BY degisim_tarihi DESC LIMIT 1) as son_fiyat_degisimi,
-    pb.kisa_ad as pb_kisa_ad, pb.sembol as pb_sembol, pb.kur as pb_kur, pb.kur_turu as pb_kur_turu
+    pb.kisa_ad as pb_kisa_ad, pb.sembol as pb_sembol, pb.kur as pb_kur, pb.kur_turu as pb_kur_turu,
+    m.ad as marka_ad, m.gorsel as marka_gorsel
     FROM urunler u
     LEFT JOIN birimler b ON u.birim_id = b.id
     LEFT JOIN para_birimleri pb ON u.para_birimi_id = pb.id
+    LEFT JOIN markalar m ON u.marka_id = m.id
   `;
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -252,17 +371,20 @@ app.get('/api/urunler', (req, res) => {
 });
 
 app.post('/api/urunler', (req, res) => {
-  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu, para_birimi_id } = req.body;
+  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil } = req.body;
 
   if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
   const price = parseFloat(fiyat);
   if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
   const stok = stok_durumu !== undefined ? stok_durumu : true;
   const pbId = para_birimi_id || 1;
+  const markaId = marka_id || null;
+  const kdvOrani = (kdv_orani !== undefined && kdv_orani !== null && kdv_orani !== '') ? parseFloat(kdv_orani) : null;
+  const kdvDahil = (kdv_dahil !== undefined && kdv_dahil !== null) ? (kdv_dahil ? 1 : 0) : null;
   
   const insertProduct = (bId) => {
-    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, para_birimi_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [urun_adi, price, bId, gorsel_yolu, stok, pbId], (err, result) => {
+    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [urun_adi, price, bId, gorsel_yolu, stok, pbId, markaId, kdvOrani, kdvDahil], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const urunId = result.insertId;
       if (Array.isArray(kategori_ids) && kategori_ids.length > 0) {
@@ -283,11 +405,14 @@ app.post('/api/urunler', (req, res) => {
 });
 
 app.put('/api/urunler/:id', (req, res) => {
-  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, stok_durumu, kategori_ids, para_birimi_id } = req.body;
+  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, stok_durumu, kategori_ids, para_birimi_id, marka_id, kdv_orani, kdv_dahil } = req.body;
   if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
   const price = parseFloat(fiyat);
   if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Fiyat geçerli ve sıfır veya pozitif bir sayı olmalıdır.' });
   const pbId = para_birimi_id || 1;
+  const markaId = marka_id !== undefined ? (marka_id || null) : undefined;
+  const kdvOrani = kdv_orani !== undefined ? ((kdv_orani !== null && kdv_orani !== '') ? parseFloat(kdv_orani) : null) : undefined;
+  const kdvDahil = kdv_dahil !== undefined ? (kdv_dahil !== null ? (kdv_dahil ? 1 : 0) : null) : undefined;
 
   const updateProd = (bId) => {
     // Once mevcut fiyati al, degistiyse gecmise kaydet
@@ -309,6 +434,9 @@ app.put('/api/urunler/:id', (req, res) => {
       let updateSql = 'UPDATE urunler SET urun_adi = ?, fiyat = ?, birim_id = ?, gorsel_yolu = ?, stok_durumu = ?, para_birimi_id = ?';
       const updateParams = [urun_adi, price, bId, gorsel_yolu, stok_durumu, pbId];
 
+      if (markaId !== undefined) { updateSql += ', marka_id = ?'; updateParams.push(markaId); }
+      if (kdvOrani !== undefined) { updateSql += ', kdv_orani = ?'; updateParams.push(kdvOrani); }
+      if (kdvDahil !== undefined) { updateSql += ', kdv_dahil = ?'; updateParams.push(kdvDahil); }
       if (bilgiDegisti) updateSql += ', bilgi_guncelleme_tarihi = NOW()';
       updateSql += ' WHERE id = ?';
       updateParams.push(req.params.id);
@@ -1111,16 +1239,22 @@ app.post('/api/para-birimleri', (req, res) => {
   if (!ad || !kisa_ad || !sembol) return res.status(400).json({ error: 'Ad, kısa ad ve sembol zorunludur.' });
   const kurDegeri = parseFloat(kur) || 1;
   const validKurTuru = ['doviz_alis','doviz_satis','efektif_alis','efektif_satis'].includes(kur_turu) ? kur_turu : 'doviz_satis';
-  db.query(
-    'INSERT INTO para_birimleri (ad, kisa_ad, sembol, kur_tipi, kur, kur_turu) VALUES (?, ?, ?, ?, ?, ?)',
-    [ad.trim(), kisa_ad.trim().toUpperCase(), sembol.trim(), kur_tipi || 'manuel', kurDegeri, validKurTuru],
-    (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      db.query('SELECT * FROM para_birimleri WHERE id = ?', [result.insertId], (e, rows) => {
-        res.json(rows ? rows[0] : { id: result.insertId });
-      });
-    }
-  );
+  const kisaAdNorm = kisa_ad.trim().toUpperCase();
+  // Aynı kisa_ad'dan sadece bir tane olabilir
+  db.query('SELECT id FROM para_birimleri WHERE kisa_ad = ?', [kisaAdNorm], (checkErr, checkRows) => {
+    if (checkErr) return res.status(500).json({ error: checkErr.message });
+    if (checkRows && checkRows.length > 0) return res.status(400).json({ error: `"${kisaAdNorm}" zaten ekli. Aynı döviz kodu birden fazla eklenemez.` });
+    db.query(
+      'INSERT INTO para_birimleri (ad, kisa_ad, sembol, kur_tipi, kur, kur_turu) VALUES (?, ?, ?, ?, ?, ?)',
+      [ad.trim(), kisaAdNorm, sembol.trim(), kur_tipi || 'manuel', kurDegeri, validKurTuru],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.query('SELECT * FROM para_birimleri WHERE id = ?', [result.insertId], (e, rows) => {
+          res.json(rows ? rows[0] : { id: result.insertId });
+        });
+      }
+    );
+  });
 });
 
 // PUT /api/para-birimleri/:id

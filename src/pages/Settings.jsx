@@ -107,6 +107,11 @@ export default function Settings() {
     if (yeniPb.kur_tipi === 'manuel' && (!yeniPb.kur || isNaN(parseFloat(yeniPb.kur)))) {
       return setPbMsg({ ok: false, text: 'Geçerli bir kur değeri girin.' });
     }
+    // Aynı kisa_ad zaten ekliyse engelle
+    const mevcutKisaAd = yeniPb.kisa_ad.trim().toUpperCase();
+    if (paraBirimleri.some(p => p.kisa_ad.toUpperCase() === mevcutKisaAd)) {
+      return setPbMsg({ ok: false, text: `"${mevcutKisaAd}" zaten ekli. Aynı döviz kodu birden fazla eklenemez.` });
+    }
     setPbLoading(true); setPbMsg(null);
     try {
       let kurDegeri = yeniPb.kur;
@@ -150,8 +155,10 @@ export default function Settings() {
 
   const handleTumunuGuncelle = async () => {
     const apiPbList = paraBirimleri.filter(p => p.kur_tipi === 'api');
-    if (apiPbList.length === 0) return setPbMsg({ ok: false, text: 'Güncellenecek API tipi para birimi yok.' });
+    if (apiPbList.length === 0) return setPbMsg({ ok: false, text: 'Güncellenecek TCMB tipi para birimi yok.' });
     setTumunuGuncelleYukleniyor(true);
+    // Önce TCMB'den güncel kurları çek (form preview için de kullanılır)
+    await tcmbKurlariCek();
     let hatalar = 0;
     for (const pb of apiPbList) {
       try {
@@ -400,7 +407,7 @@ export default function Settings() {
           <span style={{ background: '#eff6ff', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', flexShrink: 0 }}>➕</span>
           <div>
             <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '2px' }}>Para Birimi Ekle</div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>Ad, kısa ad (örn. USD) ve sembol girerek yeni para birimi tanımlayın. Kur tipini <strong>Manuel</strong> yaparsanız kuru kendiniz girersiniz; <strong>API (TCMB)</strong> seçerseniz kur otomatik güncellenir.</div>
+            <div style={{ fontSize: '12px', color: '#64748b' }}>Ad, kısa ad (örn. USD) ve sembol girerek yeni para birimi tanımlayın. Kur tipini <strong>Manuel</strong> yaparsanız kuru kendiniz girersiniz; <strong>TCMB</strong> seçerseniz kur otomatik güncellenir.</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -649,14 +656,7 @@ export default function Settings() {
               disabled={tumunuGuncelleYukleniyor || paraBirimleri.filter(p => p.kur_tipi === 'api').length === 0}
               style={{ padding: '6px 14px', borderRadius: '8px', border: '1.5px solid #86efac', background: '#f0fdf4', color: '#15803d', fontWeight: '700', fontSize: '12px', cursor: 'pointer', opacity: (tumunuGuncelleYukleniyor || paraBirimleri.filter(p => p.kur_tipi === 'api').length === 0) ? 0.5 : 1 }}
             >
-              {tumunuGuncelleYukleniyor ? '⏳' : '🔄'} Tümünü Güncelle
-            </button>
-            <button
-              onClick={tcmbKurlariCek}
-              disabled={tcmbYukleniyor}
-              style={{ padding: '6px 14px', borderRadius: '8px', border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontWeight: '700', fontSize: '12px', cursor: 'pointer', opacity: tcmbYukleniyor ? 0.6 : 1 }}
-            >
-              {tcmbYukleniyor ? '⏳' : '📡'} TCMB Kurlarını Getir
+              {tumunuGuncelleYukleniyor ? '⏳ Güncelleniyor...' : '🔄 Tümünü Güncelle'}
             </button>
           </div>
         </div>
@@ -683,7 +683,7 @@ export default function Settings() {
                   <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '3px', fontWeight: '600' }}>Kur Tipi</div>
                   <select style={{ width: '100%', padding: '6px 10px', borderRadius: '7px', border: '1.5px solid #e2e8f0', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} value={duzenlenenPb.kur_tipi} onChange={e => setDuzenlenenPb(p => ({ ...p, kur_tipi: e.target.value }))}>
                     <option value="manuel">✋ Manuel</option>
-                    <option value="api">📡 API (TCMB)</option>
+                    <option value="api">📡 TCMB</option>
                   </select>
                 </div>
                 <div style={{ flex: '1 1 150px' }}>
@@ -707,7 +707,7 @@ export default function Settings() {
                 <div style={{ fontWeight: '700', fontSize: '20px', width: '32px', textAlign: 'center', flexShrink: 0 }}>{pb.sembol}</div>
                 <div style={{ flex: '1 1 0', minWidth: 0 }}>
                   <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a' }}>{pb.ad}</div>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>{pb.kisa_ad} · {pb.kur_tipi === 'api' ? '📡 API (TCMB)' : '✋ Manuel'} · {KUR_TURU_LABEL[pb.kur_turu] || 'Döviz Satış'}</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>{pb.kisa_ad} · {pb.kur_tipi === 'api' ? '📡 TCMB' : '✋ Manuel'} · {KUR_TURU_LABEL[pb.kur_turu] || 'Döviz Satış'}</div>
                 </div>
                 {/* Güncelle önce, sonra fiyat */}
                 {/* Güncelle butonu kaldırıldı — yukarıdaki Tümünü Güncelle kullanılır */}
@@ -768,7 +768,7 @@ export default function Settings() {
                 onChange={e => handleYeniPbDegisim('kur_tipi', e.target.value)}
               >
                 <option value="manuel">✋ Manuel</option>
-                <option value="api">📡 API (TCMB)</option>
+                <option value="api">📡 TCMB</option>
               </select>
             </div>
             <div style={{ flex: '1 1 150px' }}>
@@ -804,7 +804,7 @@ export default function Settings() {
           </div>
           {yeniPb.kur_tipi === 'api' && Object.keys(tcmbKurlar).length === 0 && (
             <div style={{ marginTop: '8px', fontSize: '12px', color: '#f59e0b' }}>
-              {tcmbYukleniyor ? '⏳ TCMB kurları çekiliyor...' : '⚠️ TCMB kurları henüz yüklenmedi. Yukarıdaki "🔄 Tümünü Güncelle" butonuna basın.'}
+              {tcmbYukleniyor ? '⏳ TCMB kurları çekiliyor...' : '⚠️ TCMB kurları henüz yüklenmedi. Yukarıdaki "🔄 Tümünü Güncelle" butonuna basarak kurları çekin.'}
             </div>
           )}
           {yeniPb.kur_tipi === 'api' && yeniPb.kisa_ad && !tcmbKurlar[yeniPb.kisa_ad.toUpperCase()] && Object.keys(tcmbKurlar).length > 0 && (

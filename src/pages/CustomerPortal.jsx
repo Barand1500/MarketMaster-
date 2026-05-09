@@ -1,9 +1,233 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
 
 const API_URL = "/api"; // Production: Aynı domain üzerinden
+
+const fmtPrice = (n, sembol) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ' + (sembol || '₺');
+
+// Sayıyı büyük, kuruş kısmını ve sembolü küçük gösterir
+const Pr = ({ n, sembol, numStyle, symRatio = 0.62 }) => {
+  const s = sembol || '₺';
+  const formatted = Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+  const commaIdx = formatted.lastIndexOf(',');
+  const intPart = commaIdx >= 0 ? formatted.slice(0, commaIdx) : formatted;
+  const decPart = commaIdx >= 0 ? formatted.slice(commaIdx) : '';
+  const fontSize = numStyle?.fontSize;
+  const smallSize = fontSize ? `calc(${typeof fontSize === 'number' ? fontSize + 'px' : fontSize} * ${symRatio})` : undefined;
+  return (
+    <span style={numStyle}>
+      {intPart}<span style={{ fontSize: smallSize, fontWeight: '700', opacity: 0.7, letterSpacing: 0 }}>{decPart} {s}</span>
+    </span>
+  );
+};
+
+// Grid card fiyat bölümü — hover tüm kartı kapsar, hovered dışardan gelir
+const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered }) => {
+  const isTRY = !kisaAd || kisaAd === 'TRY';
+  const showTL = hovered && !isTRY;
+  const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
+  const dispS = showTL ? '₺' : (sembol || '₺');
+  return (
+    <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
+      {discount > 0 ? (
+        <>
+          <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+            <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }} symRatio={0.75} />
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+            <span className="card-indirim-badge">
+              <span className="card-indirim-pct">Sana Özel</span>
+              <span className="card-indirim-label">%{discount} İndirim</span>
+            </span>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <span key={showTL ? 'tl-disc' : 'orig-disc'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+            </span>
+          </div>
+        </>
+      ) : (
+        <div style={{ textAlign: 'center' }}>
+          <span key={showTL ? 'tl-only' : 'orig-only'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Liste görünümü fiyat satırı — hover tüm satırı kapsar, hovered dışardan gelir
+const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered }) => {
+  const isTRY = !kisaAd || kisaAd === 'TRY';
+  const showTL = hovered && !isTRY;
+  const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
+  const dispS = showTL ? '₺' : (sembol || '₺');
+  return (
+    <>
+      <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+          {discount > 0
+            ? <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
+            : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
+        </span>
+      </td>
+      {discount > 0 && (
+        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+          <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
+            <span className="card-indirim-pct">Sana Özel</span>
+            <span className="card-indirim-label">%{discount} İndirim</span>
+          </span>
+        </td>
+      )}
+      {discount > 0 && (
+        <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <div className="cp-mobile-price-stack">
+            <span className="cp-mobile-base-price">
+              <span key={showTL ? 'tl-mob' : 'orig-mob'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+                <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }} symRatio={0.8} />
+              </span>
+            </span>
+            <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
+              <span className="card-indirim-pct">Sana Özel</span>
+              <span className="card-indirim-label">%{discount} İndirim</span>
+            </span>
+          </div>
+          <span key={showTL ? 'tl-final' : 'orig-final'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+          </span>
+        </td>
+      )}
+    </>
+  );
+};
+
+// Ürün bileşeni — memo ile gereksiz re-render önlenir
+const ProductItem = memo(({ p, viewMode, discount }) => {
+  const isTRY = !p.pbKisaAd || p.pbKisaAd === 'TRY';
+  const [hovered, setHovered] = useState(false);
+  const hoverTimerRef = useRef(null);
+  const discountedPrice = p.price * (1 - discount / 100);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+  const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
+  const lastPriceUpdate = p.lastPriceChange
+    ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+  const hoverHandlers = isTRY ? {} : {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    onTouchStart: () => { setHovered(true); clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => setHovered(false), 2000); },
+  };
+
+  if (viewMode === 'list') {
+    return (
+      <tr className="cp-list-row" {...hoverHandlers}>
+        {/* Görsel */}
+        <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
+          <div className="thumb-box">
+            {p.image
+              ? <div className="thumb-container"><img src={p.image} alt={p.name} /></div>
+              : <span style={{ fontSize: '20px' }}>🍎</span>}
+          </div>
+        </td>
+        {/* Ürün Adı */}
+        <td className="cp-col-name" style={{ padding: '10px 10px' }}>
+          <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+            <span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span>
+            {p.kdvOrani != null && (
+              <span style={{
+                fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px',
+                background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
+                color: p.kdvDahil ? '#16a34a' : '#dc2626',
+                border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
+              }}>
+                KDV %{p.kdvOrani} {p.kdvDahil ? 'Dahil' : 'Hariç'}
+              </span>
+            )}
+          </div>
+        </td>
+        <ListPriceSection
+          price={p.price}
+          discountedPrice={discountedPrice}
+          discount={discount}
+          sembol={p.pbSembol}
+          kisaAd={p.pbKisaAd}
+          kur={p.pbKur}
+          hovered={hovered}
+        />
+        {/* Son Fiyat Güncelleme */}
+        <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          {fmtDate(p.lastPriceChange)
+            ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastPriceChange)}</span>
+              </div>
+            : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
+          }
+        </td>
+        {/* Son Bilgi Güncelleme */}
+        <td className="cp-date-col" style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+          {fmtDate(p.lastInfoChange)
+            ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastInfoChange)}</span>
+              </div>
+            : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
+          }
+        </td>
+      </tr>
+    );
+  }
+
+  // ---- GRID CARD ----
+  return (
+    <div className="product-card" {...hoverHandlers}>
+      <div className="product-image-container">
+        <div className="card-unit-corner">{p.unit || 'Kg'}</div>
+        {p.image ? (
+          <img src={p.image} alt={p.name} className="product-image" />
+        ) : (
+          <span style={{ fontSize: '60px' }}>🍎</span>
+        )}
+      </div>
+      <div className="card-body">
+        <strong className="card-name">{p.name}</strong>
+        <GridPriceSection
+          price={p.price}
+          discountedPrice={discountedPrice}
+          discount={discount}
+          sembol={p.pbSembol}
+          kisaAd={p.pbKisaAd}
+          kur={p.pbKur}
+          hovered={hovered}
+        />
+        <div className="card-footer">
+          {p.kdvOrani != null && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2px' }}>
+              <span style={{
+                fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '5px',
+                background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
+                color: p.kdvDahil ? '#16a34a' : '#dc2626',
+                border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
+              }}>
+                KDV %{p.kdvOrani} {p.kdvDahil ? 'Dahil' : 'Hariç'}
+              </span>
+            </div>
+          )}
+          <div className="card-footer-row">
+            <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
+            <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const formatPhoneDynamic = (val) => {
   let digits = val.replace(/\D/g, '');
@@ -50,11 +274,15 @@ const parseDiscount = (text) => {
 };
 
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
-  const { categories, products, updateCustomer, refetchProducts, siteSettings } = useData();
+  const { categories, products, markalar, updateCustomer, refetchProducts, siteSettings } = useData();
   const [search, setSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [showCatDrop, setShowCatDrop] = useState(false);
+  const [selectedMarkalar, setSelectedMarkalar] = useState([]);
+  const [showMarkaDrop, setShowMarkaDrop] = useState(false);
   const [categoryOrder, setCategoryOrder] = useState(null); // null = doğal sıra
   const [pendingOrder, setPendingOrder] = useState(null);   // dropdown'da düzenlenen geçici sıra
   const [sortBy, setSortBy] = useState('default');
@@ -91,15 +319,38 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [resetStep, setResetStep] = useState('none'); // 'none', 'sending', 'verify', 'newpass'
   const [resetData, setResetData] = useState({ code: '', newPass: '', confirmNewPass: '' });
   const [resetTimer, setResetTimer] = useState(0);
+  const [showKurPanel, setShowKurPanel] = useState(false);
+  const [paraBirimleri, setParaBirimleri] = useState([]);
+  const kurPanelRef = useRef(null);
 
-  // 20 Saniyede bir urunleri yeniden cek
+  // Para birimlerini çek
+  useEffect(() => {
+    fetch(`${API_URL}/para-birimleri`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setParaBirimleri(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  // Kur paneli dışına tıklayınca kapat
+  useEffect(() => {
+    if (!showKurPanel) return;
+    const handler = (e) => {
+      if (kurPanelRef.current && !kurPanelRef.current.contains(e.target)) {
+        setShowKurPanel(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showKurPanel]);
+
+  // 60 Saniyede bir urunleri yeniden cek
   useEffect(() => {
     const interval = setInterval(async () => {
       await refetchProducts();
       setLastRefreshed(new Date());
-    }, 20000);
+    }, 60000);
     return () => clearInterval(interval);
-  }, [refetchProducts]);
+  }, []);
 
   const refreshProducts = async () => {
     await refetchProducts();
@@ -132,7 +383,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     const matchCat = selectedCategories.length > 0
       ? selectedCategories.some(cid => p.categoryIds.includes(cid))
       : true;
-    return matchSearch && matchCat;
+    const matchMarka = selectedMarkalar.length > 0
+      ? selectedMarkalar.includes(p.markaId)
+      : true;
+    return matchSearch && matchCat && matchMarka;
   });
 
   const sortOptions = [
@@ -148,152 +402,18 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const applySorting = (arr) => {
     if (sortBy === 'default') return arr;
     const sorted = [...arr];
+    const tlPrice = (p) => p.price * (p.pbKur || 1);
     if (sortBy === 'a-z') sorted.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
     else if (sortBy === 'z-a') sorted.sort((a, b) => b.name.localeCompare(a.name, 'tr'));
-    else if (sortBy === 'price-asc') sorted.sort((a, b) => a.price - b.price);
-    else if (sortBy === 'price-desc') sorted.sort((a, b) => b.price - a.price);
+    else if (sortBy === 'price-asc') sorted.sort((a, b) => tlPrice(a) - tlPrice(b));
+    else if (sortBy === 'price-desc') sorted.sort((a, b) => tlPrice(b) - tlPrice(a));
     else if (sortBy === 'newest') sorted.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     else if (sortBy === 'updated') sorted.sort((a, b) => new Date(b.lastPriceChange || b.updatedAt || 0) - new Date(a.lastPriceChange || a.updatedAt || 0));
     return sorted;
   };
 
   const fmtNum = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  const fmtPrice = (n, sembol) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ' + (sembol || '₺');
   const fmtTL = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
-
-  // Sayıyı büyük, kuruş kısmını ve sembolü küçük gösterir
-  const Pr = ({ n, sembol, numStyle, symRatio = 0.62 }) => {
-    const s = sembol || '₺';
-    const formatted = Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-    const commaIdx = formatted.lastIndexOf(',');
-    const intPart = commaIdx >= 0 ? formatted.slice(0, commaIdx) : formatted;
-    const decPart = commaIdx >= 0 ? formatted.slice(commaIdx) : '';
-    const fontSize = numStyle?.fontSize;
-    const smallSize = fontSize ? `calc(${typeof fontSize === 'number' ? fontSize + 'px' : fontSize} * ${symRatio})` : undefined;
-    return (
-      <span style={numStyle}>
-        {intPart}<span style={{ fontSize: smallSize, fontWeight: '700', opacity: 0.7, letterSpacing: 0 }}>{decPart} {s}</span>
-      </span>
-    );
-  };
-
-  // Fiyat gösterimi: hover'da aynı stil ile TL değerine geçer
-  const PriceSwitch = ({ price, sembol, kisaAd, kur, style }) => {
-    const isTRY = !kisaAd || kisaAd === 'TRY';
-    const [hovered, setHovered] = useState(false);
-    const timerRef = useRef(null);
-    const displayPrice = (!isTRY && hovered) ? price * (kur || 1) : price;
-    const displaySembol = (!isTRY && hovered) ? '₺' : (sembol || '₺');
-    if (isTRY) return <span style={style}>{fmtPrice(price, sembol)}</span>;
-    return (
-      <span
-        style={{ ...style, cursor: 'default', transition: 'opacity 0.12s' }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onTouchStart={() => { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); }}
-      >
-        {fmtPrice(displayPrice, displaySembol)}
-      </span>
-    );
-  };
-
-  // Grid card fiyat bölümü — hover'da iki fiyat birlikte TL'ye geçer
-  const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur }) => {
-    const isTRY = !kisaAd || kisaAd === 'TRY';
-    const [hovered, setHovered] = useState(false);
-    const timerRef = useRef(null);
-    const showTL = hovered && !isTRY;
-    const dispN = (n) => showTL ? n * (kur || 1) : n;
-    const dispS = showTL ? '₺' : (sembol || '₺');
-    return (
-      <div
-        onMouseEnter={() => !isTRY && setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onTouchStart={() => { if (!isTRY) { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); } }}
-        style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}
-      >
-        {discount > 0 ? (
-          <>
-            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-              <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-                <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }} symRatio={0.75} />
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-              <span className="card-indirim-badge">
-                <span className="card-indirim-pct">Sana Özel</span>
-                <span className="card-indirim-label">%{discount} İndirim</span>
-              </span>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <span key={showTL ? 'tl-disc' : 'orig-disc'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-                <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
-              </span>
-            </div>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center' }}>
-            <span key={showTL ? 'tl-only' : 'orig-only'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-              <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />
-            </span>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Liste görünümü fiyat satırı — tüm fiyat TD'leri birlikte hover'da TL'ye geçer
-  const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur }) => {
-    const isTRY = !kisaAd || kisaAd === 'TRY';
-    const [hovered, setHovered] = useState(false);
-    const timerRef = useRef(null);
-    const showTL = hovered && !isTRY;
-    const dispN = (n) => showTL ? n * (kur || 1) : n;
-    const dispS = showTL ? '₺' : (sembol || '₺');
-    const handlers = isTRY ? {} : {
-      onMouseEnter: () => setHovered(true),
-      onMouseLeave: () => setHovered(false),
-      onTouchStart: () => { setHovered(true); clearTimeout(timerRef.current); timerRef.current = setTimeout(() => setHovered(false), 2000); },
-    };
-    return (
-      <>
-        <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} {...handlers}>
-          <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-            {discount > 0
-              ? <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
-              : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
-          </span>
-
-        </td>
-        {discount > 0 && (
-          <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-            <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
-              <span className="card-indirim-pct">Sana Özel</span>
-              <span className="card-indirim-label">%{discount} İndirim</span>
-            </span>
-          </td>
-        )}
-        {discount > 0 && (
-          <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} {...handlers}>
-            <div className="cp-mobile-price-stack">
-              <span className="cp-mobile-base-price">
-                <span key={showTL ? 'tl-mob' : 'orig-mob'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-                  <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }} symRatio={0.8} />
-                </span>
-              </span>
-              <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
-                <span className="card-indirim-pct">Sana Özel</span>
-                <span className="card-indirim-label">%{discount} İndirim</span>
-              </span>
-            </div>
-            <span key={showTL ? 'tl-final' : 'orig-final'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-              <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
-            </span>
-          </td>
-        )}
-      </>
-    );
-  };
 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
@@ -312,95 +432,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
   const hasNoCategoryRelations = filteredProducts.length > 0 && filteredProducts.every(p => !p.categoryIds || p.categoryIds.length === 0);
 
-  // Ürün render helper — grid veya list moduna göre
-  const renderProductItem = (p) => {
-    const discountedPrice = p.price * (1 - discount / 100);
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
-    const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
-    const lastPriceUpdate = p.lastPriceChange
-      ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : null;
-
-    if (viewMode === 'list') {
-      return (
-        <tr key={p.id} className="cp-list-row">
-          {/* Görsel */}
-          <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
-            <div className="thumb-box">
-              {p.image
-                ? <div className="thumb-container"><img src={p.image} alt={p.name} /></div>
-                : <span style={{ fontSize: '20px' }}>🍎</span>}
-            </div>
-          </td>
-          {/* Ürün Adı */}
-          <td className="cp-col-name" style={{ padding: '10px 10px' }}>
-            <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
-            <div><span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span></div>
-          </td>
-          <ListPriceSection
-            price={p.price}
-            discountedPrice={discountedPrice}
-            discount={discount}
-            sembol={p.pbSembol}
-            kisaAd={p.pbKisaAd}
-            kur={p.pbKur}
-          />
-          {/* Son Fiyat Güncelleme */}
-          <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-            {fmtDate(p.lastPriceChange)
-              ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
-                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastPriceChange)}</span>
-                </div>
-              : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
-            }
-          </td>
-          {/* Son Bilgi Güncelleme */}
-          <td className="cp-date-col" style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
-            {fmtDate(p.lastInfoChange)
-              ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
-                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastInfoChange)}</span>
-                </div>
-              : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
-            }
-          </td>
-        </tr>
-      );
-    }
-
-    // ---- GRID CARD (mevcut tasarım) ----
-    return (
-      <div key={p.id} className="product-card">
-        <div className="product-image-container">
-          <div className="card-unit-corner">{p.unit || 'Kg'}</div>
-          {p.image ? (
-            <img src={p.image} alt={p.name} className="product-image" />
-          ) : (
-            <span style={{ fontSize: '60px' }}>🍎</span>
-          )}
-        </div>
-        <div className="card-body">
-          <strong className="card-name">{p.name}</strong>
-          <GridPriceSection
-            price={p.price}
-            discountedPrice={discountedPrice}
-            discount={discount}
-            sembol={p.pbSembol}
-            kisaAd={p.pbKisaAd}
-            kur={p.pbKur}
-          />
-          <div className="card-footer">
-            <div className="card-footer-row">
-              <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
-              <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="page-container wide" style={{ paddingTop: 0 }}>
       {/* COMPACT RESPONSIVE HEADER */}
@@ -415,23 +446,33 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           </div>
           <div className="header-divider"></div>
           <div className="customer-name-display">{customer.name}</div>
+          {/* Arama ikonu + animasyonlu input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+            <button
+              onClick={() => { setShowSearch(v => !v); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 50); else setSearch(''); }}
+              style={{ width: '30px', height: '30px', border: 'none', borderRadius: '50%', background: showSearch ? 'var(--primary)' : '#f1f5f9', color: showSearch ? '#fff' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, transition: 'all 0.2s' }}
+              title="Ürün ara"
+            >🔍</button>
+            <div style={{ overflow: 'hidden', width: showSearch ? '180px' : '0', transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)', opacity: showSearch ? 1 : 0 }}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Ürün ara..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setSearch(''); } }}
+                style={{ border: 'none', background: '#f1f5f9', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', width: '100%', outline: 'none', fontWeight: '500' }}
+              />
+            </div>
+          </div>
         </div>
 
-        {/* SEARCH & FILTER AREA */}
+        {/* FILTER AREA */}
         <div className="header-center">
-          <div className="search-wrapper">
-            <span style={{ fontSize: '14px', opacity: 0.5 }}>🔍</span>
-            <input
-              type="text" placeholder="Ürün ara..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="header-search-input"
-            />
-          </div>
 
           <div style={{ position: 'relative' }}>
             <button onClick={() => {
               setShowCatDrop(!showCatDrop);
-              // Dropdown açılırken pending'i mevcut sırayla başlat
               if (!showCatDrop) setPendingOrder(categoryOrder || roots.map(c => c.id));
             }} className="header-filter-btn">
               📂 {selectedCategories.length > 0 ? `${selectedCategories.length}` : 'Kategoriler'}
@@ -527,6 +568,49 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           <div style={{ position: 'relative' }}>
             <button
+              onClick={() => setShowMarkaDrop(!showMarkaDrop)}
+              className="header-filter-btn"
+              style={selectedMarkalar.length > 0 ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
+            >
+              🏷️ {selectedMarkalar.length > 0 ? `${selectedMarkalar.length} Marka` : 'Marka'}
+            </button>
+            {showMarkaDrop && (
+              <>
+                <div className="dropdown-overlay" onClick={() => setShowMarkaDrop(false)} />
+                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '200px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 8px 4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Markaya Göre Filtrele</div>
+                    {markalar.length === 0 && (
+                      <div style={{ padding: '8px 10px', fontSize: '12px', color: '#94a3b8' }}>Henüz marka yok</div>
+                    )}
+                    {markalar.map(m => {
+                      const checked = selectedMarkalar.includes(m.id);
+                      return (
+                        <button key={m.id}
+                          onClick={() => setSelectedMarkalar(prev => prev.includes(m.id) ? prev.filter(i => i !== m.id) : [...prev, m.id])}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '7px 10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: checked ? 'rgba(34,197,94,0.07)' : 'transparent', color: checked ? 'var(--primary)' : '#374151', fontWeight: checked ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
+                          onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${checked ? 'var(--primary)' : '#cbd5e1'}`, background: checked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                            {checked && <span style={{ color: '#fff', fontSize: '10px', fontWeight: '900', lineHeight: 1 }}>✓</span>}
+                          </span>
+                          {m.gorsel && <img src={m.gorsel} alt={m.ad} style={{ width: 18, height: 18, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />}
+                          {m.ad}
+                        </button>
+                      );
+                    })}
+                    {selectedMarkalar.length > 0 && (
+                      <button onClick={() => setSelectedMarkalar([])} style={{ width: '100%', marginTop: '4px', padding: '6px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>✕ Markayı Temizle</button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <button
               onClick={() => setShowSortDrop(!showSortDrop)}
               className="header-filter-btn"
               style={sortBy !== 'default' ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
@@ -606,16 +690,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               </span>
             </div>
           )}
-          {selectedCategories.length > 0 && (
-            <div className="selected-cats-list">
-              {selectedCategories.slice(0, 2).map(cid => (
-                <span key={cid} className="cat-chip-small">
-                  {categories.find(c => c.id === cid)?.name}
-                </span>
-              ))}
-              {selectedCategories.length > 2 && <span className="cat-more-count">+{selectedCategories.length - 2}</span>}
-            </div>
-          )}
         </div>
 
         <div className="info-right">
@@ -628,27 +702,48 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span className="pulse-dot"></span>
             Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
           </button>
-          <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
-            <button
-              onClick={() => setViewMode('grid')}
-              title="Kart Görünümü"
-              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
-                background: viewMode === 'grid' ? '#fff' : 'transparent',
-                boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
-            >
-              ⊞
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              title="Liste Görünümü"
-              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
-                background: viewMode === 'list' ? '#fff' : 'transparent',
-                boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
-            >
-              ☰
-            </button>
+          <div className="kur-panel-wrap" ref={kurPanelRef} style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '0', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
+              <button
+                onClick={() => setViewMode('grid')}
+                title="Kart Görünümü"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px 0 0 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                  background: viewMode === 'grid' ? '#fff' : 'transparent',
+                  boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
+              >⊞</button>
+              <button
+                onClick={() => setViewMode('list')}
+                title="Liste Görünümü"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                  background: viewMode === 'list' ? '#fff' : 'transparent',
+                  boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
+              >☰</button>
+              <button
+                type="button"
+                onClick={() => setShowKurPanel(v => !v)}
+                title="Döviz kurları"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0 7px 7px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', transition: 'all 0.15s',
+                  background: showKurPanel ? '#fff' : 'transparent',
+                  boxShadow: showKurPanel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: showKurPanel ? 'var(--primary)' : '#94a3b8' }}
+              >₺</button>
+            </div>
+            {showKurPanel && (
+              <div className="kur-panel-dropdown">
+                <div className="kur-panel-title">Döviz Kurları</div>
+                {paraBirimleri.filter(pb => pb.id !== 1).map(pb => (
+                  <div key={pb.id} className="kur-panel-row">
+                    <span className="kur-panel-sym">{pb.sembol} {pb.kisa_ad}</span>
+                    <span className="kur-panel-val">{Number(pb.kur).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ₺</span>
+                  </div>
+                ))}
+                {paraBirimleri.filter(pb => pb.id !== 1).length === 0 && (
+                  <div className="kur-panel-empty">Döviz yok</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -672,7 +767,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           top: 0;
           z-index: 100;
         }
-        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-left { display: flex; align-items: center; gap: 12px; flex: 1; }
         .header-divider { height: 24px; width: 1px; background: #e2e8f0; }
         .customer-name-display { font-size: 14px; font-weight: 700; color: #1e293b; }
         
@@ -680,8 +775,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           display: flex; 
           align-items: center; 
           gap: 8px; 
-          flex: 1; 
-          max-width: 600px; 
+          flex: none; 
         }
         .search-wrapper {
           flex: 1;
@@ -767,6 +861,16 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           100% { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0); }
         }
         .refresh-btn-link { background: transparent; border: none; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+        .kur-panel-wrap { position: relative; }
+        .kur-panel-btn { background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 700; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
+        .kur-panel-btn:hover { background: #e2e8f0; border-color: #cbd5e1; }
+        .kur-panel-dropdown { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 4px 16px rgba(15,23,42,0.10); min-width: 180px; z-index: 200; padding: 8px 0; }
+        .kur-panel-title { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 14px 6px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
+        .kur-panel-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 14px; gap: 12px; }
+        .kur-panel-row:hover { background: #f8fafc; }
+        .kur-panel-sym { font-size: 12px; font-weight: 600; color: #334155; }
+        .kur-panel-val { font-size: 12px; color: #059669; font-weight: 700; white-space: nowrap; }
+        .kur-panel-empty { font-size: 12px; color: #94a3b8; padding: 6px 14px; }
         .customer-category-section { padding-bottom: 0; margin-bottom: 0; }
         .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 36px 0; border-radius: 2px; }
 
@@ -1002,22 +1106,30 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         }
       `}</style>
 
-      {/* DEBUG: Ürün/Kategori durum bilgisi */}
-      {(products.length === 0 || categories.length === 0 || (!hasNoCategoryRelations && displayCategories.every(cat => filteredProducts.filter(p => p.categoryIds.includes(cat.id)).length === 0))) && !hasNoCategoryRelations && (
-        <div style={{ margin: '40px auto', maxWidth: '480px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '12px', padding: '20px 24px' }}>
-          <div style={{ fontWeight: '700', color: '#856404', marginBottom: '8px', fontSize: '15px' }}>⚠️ Ürün Listesi Boş</div>
-          <div style={{ fontSize: '13px', color: '#664d03', lineHeight: '1.8' }}>
-            <div>• Toplam ürün sayısı: <b>{products.length}</b></div>
-            <div>• Toplam kategori sayısı: <b>{categories.length}</b></div>
-            <div>• Gösterilen kategori sayısı: <b>{displayCategories.length}</b></div>
-            <div>• Kategori-ürün ilişkisi olan ürün: <b>{products.filter(p => p.categoryIds && p.categoryIds.length > 0).length}</b></div>
-            <div>• Stokta olan ürün: <b>{products.filter(p => p.inStock !== false).length}</b></div>
+      {/* Arama/filtre sonucu boş ise */}
+      {filteredProducts.length === 0 && (search || selectedCategories.length > 0 || selectedMarkalar.length > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.25 }}>🔍</div>
+          <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>Sonuç bulunamadı</div>
+          <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px', maxWidth: '320px', lineHeight: '1.6' }}>
+            {search ? <><b>"{search}"</b> için ürün bulunamadı.</> : 'Seçili filtrelerle eşleşen ürün yok.'}
+            {(selectedCategories.length > 0 || selectedMarkalar.length > 0) && <> Filtreleri değiştirmeyi deneyin.</>}
           </div>
-          {products.length === 0 && (
-            <div style={{ marginTop: '10px', fontSize: '13px', color: '#664d03' }}>
-              ⚠️ Veritabanında ürün bulunamadı. Backend'e bağlanılamıyor ya da urunler tablosu boş.
-            </div>
-          )}
+          <button
+            onClick={() => { setSearch(''); setSelectedCategories([]); setSelectedMarkalar([]); }}
+            style={{ padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
+          >
+            ✕ Filtreleri Temizle
+          </button>
+        </div>
+      )}
+
+      {/* DEBUG kaldırıldı — ürün/kategori ilişki sorunu yoksa gösterme */}
+      {(products.length === 0 || categories.length === 0 || (!hasNoCategoryRelations && displayCategories.every(cat => filteredProducts.filter(p => p.categoryIds.includes(cat.id)).length === 0))) && !hasNoCategoryRelations && filteredProducts.length === 0 && !search && selectedCategories.length === 0 && selectedMarkalar.length === 0 && products.length === 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.2 }}>📦</div>
+          <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>Henüz ürün eklenmemiş</div>
+          <div style={{ fontSize: '14px', color: '#94a3b8' }}>Ürünler yüklenince burada görünecek.</div>
         </div>
       )}
 
@@ -1030,7 +1142,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => renderProductItem(p))}</div>
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1043,7 +1155,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => renderProductItem(p))}</tbody>
+                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</tbody>
                 </table>
               </div>
             )
@@ -1064,7 +1176,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => renderProductItem(p))}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1077,7 +1189,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => renderProductItem(p))}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</tbody>
                   </table>
                 </div>
               )

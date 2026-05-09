@@ -10,6 +10,8 @@ export function DataProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [units, setUnits] = useState([]);
+  const [markalar, setMarkalar] = useState([]);
+  const [kdvOranlari, setKdvOranlari] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
   const [siteSettings, setSiteSettings] = useState(() => {
@@ -26,17 +28,23 @@ export function DataProvider({ children }) {
     const fetchData = async () => {
       try {
         // --- Kritik veri: bunlar bitince loading kalkar ---
-        const [catsRes, prodsRes, unitsRes, settingsRes] = await Promise.all([
+        const [catsRes, prodsRes, unitsRes, settingsRes, markalarRes, kdvRes] = await Promise.all([
           fetch(`${API_URL}/kategoriler`),
           fetch(`${API_URL}/urunler`),
           fetch(`${API_URL}/birimler`),
-          fetch(`${API_URL}/ayarlar`)
+          fetch(`${API_URL}/ayarlar`),
+          fetch(`${API_URL}/markalar`),
+          fetch(`${API_URL}/kdv-oranlari`)
         ]);
 
         const cats = await catsRes.json();
         const prods = await prodsRes.json();
         const brm = await unitsRes.json();
         const settings = settingsRes.ok ? await settingsRes.json() : {};
+        const mrk = markalarRes.ok ? await markalarRes.json() : [];
+        const kdv = kdvRes.ok ? await kdvRes.json() : [];
+        setMarkalar(Array.isArray(mrk) ? mrk : []);
+        setKdvOranlari(Array.isArray(kdv) ? kdv : []);
         if (settings && typeof settings === 'object') {
           const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
           setSiteSettings(merged);
@@ -55,11 +63,17 @@ export function DataProvider({ children }) {
           updatedAt: p.guncelleme_tarihi,
           lastInfoChange: p.bilgi_guncelleme_tarihi || null,
           lastPriceChange: p.son_fiyat_degisimi || null,
+          createdAt: p.created_at || null,
           para_birimi_id: p.para_birimi_id || 1,
           pbKisaAd: p.pb_kisa_ad || 'TRY',
           pbSembol: p.pb_sembol || '₺',
           pbKur: parseFloat(p.pb_kur) || 1,
-          pbKurTuru: p.pb_kur_turu || null
+          pbKurTuru: p.pb_kur_turu || null,
+          markaId: p.marka_id || null,
+          markaAd: p.marka_ad || null,
+          markaGorsel: p.marka_gorsel || null,
+          kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
+          kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null
         })) : []);
         setUnits(Array.isArray(brm) ? brm.map(b => ({ id: b.id, name: b.birim_adi })) : []);
 
@@ -119,11 +133,17 @@ export function DataProvider({ children }) {
         updatedAt: p.guncelleme_tarihi,
         lastInfoChange: p.bilgi_guncelleme_tarihi || null,
         lastPriceChange: p.son_fiyat_degisimi || p.fiyat_guncelleme_tarihi || null,
+        createdAt: p.created_at || null,
         para_birimi_id: p.para_birimi_id || 1,
         pbKisaAd: p.pb_kisa_ad || 'TRY',
         pbSembol: p.pb_sembol || '₺',
         pbKur: parseFloat(p.pb_kur) || 1,
-        pbKurTuru: p.pb_kur_turu || null
+        pbKurTuru: p.pb_kur_turu || null,
+        markaId: p.marka_id || null,
+        markaAd: p.marka_ad || null,
+        markaGorsel: p.marka_gorsel || null,
+        kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
+        kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null
       })))
     } catch { /* sessizce hata yut, mevcut veri kalsin */ }
   };
@@ -259,6 +279,86 @@ export function DataProvider({ children }) {
     } catch { setApiError('Birim silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
+  // MARKALAR
+  const addMarka = async (ad, gorsel = null) => {
+    try {
+      const res = await fetch(`${API_URL}/markalar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad, gorsel })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMarkalar(prev => [...prev, { id: data.id, ad: data.ad, gorsel: data.gorsel }]);
+      return { ok: true, id: data.id };
+    } catch { setApiError('Marka eklenemedi. Sunucu bağlantısını kontrol edin.'); return { ok: false }; }
+  };
+  const updateMarka = async (id, ad, gorsel) => {
+    try {
+      const res = await fetch(`${API_URL}/markalar/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad, gorsel })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMarkalar(prev => prev.map(m => m.id === id ? { ...m, ad, gorsel } : m));
+    } catch { setApiError('Marka güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
+  };
+  const deleteMarka = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/markalar/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMarkalar(prev => prev.filter(m => m.id !== id));
+    } catch { setApiError('Marka silinemedi. Sunucu bağlantısını kontrol edin.'); }
+  };
+
+  // KDV ORANLARI
+  const refetchKdvOranlari = async () => {
+    try {
+      const res = await fetch(`${API_URL}/kdv-oranlari`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setKdvOranlari(data);
+    } catch {}
+  };
+  const addKdvOrani = async (oran, dahil) => {
+    try {
+      const res = await fetch(`${API_URL}/kdv-oranlari`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oran, dahil })
+      });
+      if (!res.ok) {
+        let errMsg = 'KDV oranı eklenemedi.';
+        try { const e = await res.json(); if (e?.error || e?.message) errMsg = e.error || e.message; } catch {}
+        return { ok: false, error: errMsg };
+      }
+      const data = await res.json();
+      setKdvOranlari(prev => [...prev, data]);
+      return { ok: true };
+    } catch { return { ok: false, error: 'Sunucuya bağlanılamadı. İnternet veya sunucu bağlantınızı kontrol edin.' }; }
+  };
+  const updateKdvOrani = async (id, oran, dahil) => {
+    try {
+      const res = await fetch(`${API_URL}/kdv-oranlari/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oran, dahil })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setKdvOranlari(prev => prev.map(k => k.id === id ? data : k));
+      return { ok: true };
+    } catch { setApiError('KDV oranı güncellenemedi. Sunucu bağlantısını kontrol edin.'); return { ok: false }; }
+  };
+  const deleteKdvOrani = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/kdv-oranlari/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setKdvOranlari(prev => prev.filter(k => k.id !== id));
+    } catch { setApiError('KDV oranı silinemedi. Sunucu bağlantısını kontrol edin.'); }
+  };
+
   // PRODUCTS
   const addProduct = async (product) => {
     try {
@@ -272,11 +372,15 @@ export function DataProvider({ children }) {
           gorsel_yolu: product.image,
           kategori_ids: product.categoryIds,
           stok_durumu: product.inStock,
-          para_birimi_id: product.para_birimi_id || 1
+          para_birimi_id: product.para_birimi_id || 1,
+          marka_id: product.marka_id || null,
+          kdv_orani: product.kdv_orani !== undefined ? product.kdv_orani : null,
+          kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      const marka = markalar.find(m => m.id === (product.marka_id || null));
       setProducts(prev => [...prev, { 
         id: data.id, 
         name: data.urun_adi, 
@@ -288,7 +392,12 @@ export function DataProvider({ children }) {
         para_birimi_id: data.para_birimi_id || 1,
         pbKisaAd: product.pbKisaAd || 'TRY',
         pbSembol: product.pbSembol || '₺',
-        pbKur: product.pbKur || 1
+        pbKur: product.pbKur || 1,
+        markaId: product.marka_id || null,
+        markaAd: marka?.ad || null,
+        markaGorsel: marka?.gorsel || null,
+        kdvOrani: product.kdv_orani ?? null,
+        kdvDahil: product.kdv_dahil ?? null,
       }]);
     } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -301,16 +410,30 @@ export function DataProvider({ children }) {
       gorsel_yolu: updates.image !== undefined ? updates.image : current.image,
       stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
       kategori_ids: updates.categoryIds || current.categoryIds,
-      para_birimi_id: updates.para_birimi_id !== undefined ? updates.para_birimi_id : (current.para_birimi_id || 1)
+      para_birimi_id: updates.para_birimi_id !== undefined ? updates.para_birimi_id : (current.para_birimi_id || 1),
+      marka_id: updates.marka_id !== undefined ? updates.marka_id : current.markaId,
+      kdv_orani: updates.kdv_orani !== undefined ? updates.kdv_orani : current.kdvOrani,
+      kdv_dahil: updates.kdv_dahil !== undefined ? updates.kdv_dahil : current.kdvDahil
     };
     // Yerel durumu aninda guncelle (Sayfa yenilemeden tarihlerin degismesi icin)
     const now = new Date().toISOString();
     const infoFields = ['name', 'unit', 'image', 'inStock', 'categoryIds'];
     const isInfoUpdate = infoFields.some(f => updates[f] !== undefined);
     const isPriceUpdate = updates.price !== undefined;
-    setProducts(prev => prev.map(p => p.id === id ? { 
-      ...p, 
-      ...updates, 
+    // snake_case → camelCase mapping (local state uses camelCase)
+    const localMapped = {};
+    if (updates.marka_id !== undefined) {
+      localMapped.markaId = updates.marka_id;
+      const marka = markalar.find(m => m.id === updates.marka_id);
+      localMapped.markaAd = marka?.ad || null;
+      localMapped.markaGorsel = marka?.gorsel || null;
+    }
+    if (updates.kdv_orani !== undefined) localMapped.kdvOrani = updates.kdv_orani;
+    if (updates.kdv_dahil !== undefined) localMapped.kdvDahil = updates.kdv_dahil;
+    setProducts(prev => prev.map(p => p.id === id ? {
+      ...p,
+      ...updates,
+      ...localMapped,
       updatedAt: now,
       lastInfoChange: isInfoUpdate ? now : p.lastInfoChange,
       lastPriceChange: isPriceUpdate ? now : p.lastPriceChange,
@@ -437,6 +560,8 @@ export function DataProvider({ children }) {
       users, addUser, updateUser, updateUserState, deleteUser,
       customers, addCustomer, updateCustomer, deleteCustomer,
       units, addUnit, updateUnit, deleteUnit,
+      markalar, addMarka, updateMarka, deleteMarka,
+      kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari,
       loading, apiError, clearApiError: () => setApiError(null), refetchProducts,
       siteSettings, updateSiteSettings
     }}>
