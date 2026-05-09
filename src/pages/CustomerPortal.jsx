@@ -141,12 +141,12 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
             <span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span>
             {p.kdvOrani != null && (
               <span style={{
-                fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px',
+                fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '4px',
                 background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
                 color: p.kdvDahil ? '#16a34a' : '#dc2626',
                 border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
               }}>
-                KDV %{p.kdvOrani} {p.kdvDahil ? 'Dahil' : 'Hariç'}
+                %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
               </span>
             )}
           </div>
@@ -206,19 +206,19 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
           kur={p.pbKur}
           hovered={hovered}
         />
+        {p.kdvOrani != null && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+            <span style={{
+              fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '5px',
+              background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
+              color: p.kdvDahil ? '#16a34a' : '#dc2626',
+              border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
+            }}>
+              %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
+            </span>
+          </div>
+        )}
         <div className="card-footer">
-          {p.kdvOrani != null && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2px' }}>
-              <span style={{
-                fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '5px',
-                background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
-                color: p.kdvDahil ? '#16a34a' : '#dc2626',
-                border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
-              }}>
-                KDV %{p.kdvOrani} {p.kdvDahil ? 'Dahil' : 'Hariç'}
-              </span>
-            </div>
-          )}
           <div className="card-footer-row">
             <span className="card-footer-label fiyat">Son Fiyat Güncellemesi</span>
             <span className="card-footer-date">{lastPriceUpdate || 'Henüz yok'}</span>
