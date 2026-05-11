@@ -440,31 +440,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           <div className="nav-logo" style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
             {siteSettings?.logo
               ? <img src={siteSettings.logo} alt="logo" style={{ height: '26px', width: '26px', objectFit: 'contain', borderRadius: '4px' }} />
-              : <span>🍉</span>
+              : siteSettings !== null ? <span>🍉</span> : null
             }
-            {siteSettings?.site_adi || 'Bostan'}
+            {siteSettings?.site_adi ?? ''}
           </div>
           <div className="header-divider"></div>
           <div className="customer-name-display">{customer.name}</div>
-          {/* Arama ikonu + animasyonlu input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
-            <button
-              onClick={() => { setShowSearch(v => !v); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 50); else setSearch(''); }}
-              style={{ width: '30px', height: '30px', border: 'none', borderRadius: '50%', background: showSearch ? 'var(--primary)' : '#f1f5f9', color: showSearch ? '#fff' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0, transition: 'all 0.2s' }}
-              title="Ürün ara"
-            >🔍</button>
-            <div style={{ overflow: 'hidden', width: showSearch ? '180px' : '0', transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)', opacity: showSearch ? 1 : 0 }}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Ürün ara..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setSearch(''); } }}
-                style={{ border: 'none', background: '#f1f5f9', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', width: '100%', outline: 'none', fontWeight: '500' }}
-              />
-            </div>
-          </div>
         </div>
 
         {/* FILTER AREA */}
@@ -475,7 +456,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               setShowCatDrop(!showCatDrop);
               if (!showCatDrop) setPendingOrder(categoryOrder || roots.map(c => c.id));
             }} className="header-filter-btn">
-              📂 {selectedCategories.length > 0 ? `${selectedCategories.length}` : 'Kategoriler'}
+              📂 Kategoriler
             </button>
             {showCatDrop && (
               <>
@@ -484,7 +465,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
                   {/* FİLTRE BÖLÜMÜ */}
                   <div style={{ padding: '8px 8px 4px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Filtrele</div>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Kategoriler</div>
                     {(pendingOrder || roots.map(c => c.id)).map(id => {
                       const c = categories.find(cat => cat.id === id);
                       if (!c) return null;
@@ -572,14 +553,14 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               className="header-filter-btn"
               style={selectedMarkalar.length > 0 ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
             >
-              🏷️ {selectedMarkalar.length > 0 ? `${selectedMarkalar.length} Marka` : 'Marka'}
+              🏷️ Markalar
             </button>
             {showMarkaDrop && (
               <>
                 <div className="dropdown-overlay" onClick={() => setShowMarkaDrop(false)} />
                 <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '200px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
                   <div style={{ padding: '8px 8px 4px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Markaya Göre Filtrele</div>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Markalar</div>
                     {markalar.length === 0 && (
                       <div style={{ padding: '8px 10px', fontSize: '12px', color: '#94a3b8' }}>Henüz marka yok</div>
                     )}
@@ -682,14 +663,37 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       {/* REFRESH & INFO STRIP */}
       <div className="info-strip">
         <div className="info-left">
-          {discount > 0 && (
-            <div className="discount-badge-premium">
-              <span className="badge-icon">✨</span>
-              <span className="badge-text">
-                Hesabınıza Özel <strong className="discount-value">%{discount}</strong> İndirim Uygulanıyor
-              </span>
+          {/* İndirim badge + Arama — tek blok */}
+          <div className="search-discount-bar">
+            {/* Arama butonu — her zaman solda */}
+            <button
+              onClick={() => { setShowSearch(v => !v); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 50); else setSearch(''); }}
+              className="strip-search-btn"
+              style={{ background: showSearch ? 'var(--primary)' : '#f1f5f9', color: showSearch ? '#fff' : '#64748b' }}
+              title="Ürün ara"
+            >🔍</button>
+            {/* İndirim badge: arama açıkken gizle */}
+            {discount > 0 && !showSearch && (
+              <div className="discount-badge-premium">
+                <span className="badge-icon">✨</span>
+                <span className="badge-text">
+                  Hesabınıza Özel <strong className="discount-value">%{discount}</strong> İndirim Uygulanıyor
+                </span>
+              </div>
+            )}
+            {/* Animasyonlu input */}
+            <div style={{ overflow: 'hidden', width: showSearch ? 'min(240px, 50vw)' : '0', transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)', opacity: showSearch ? 1 : 0, flexShrink: 0 }}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Ürün ara..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setSearch(''); } }}
+                style={{ border: 'none', background: '#f1f5f9', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', width: '100%', outline: 'none', fontWeight: '500' }}
+              />
             </div>
-          )}
+          </div>
         </div>
 
         <div className="info-right">
@@ -836,8 +840,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
         .info-strip { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 4px; flex-wrap: wrap; gap: 12px; }
         .info-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .discount-badge-premium { display: flex; align-items: center; gap: 8px; background: rgba(0, 184, 148, 0.06); padding: 5px 14px; border-radius: 30px; border: 1px solid rgba(0, 184, 148, 0.2); }
+        .search-discount-bar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+        .discount-badge-premium { display: flex; align-items: center; gap: 8px; background: rgba(0, 184, 148, 0.06); padding: 5px 14px; border-radius: 30px; border: 1px solid rgba(0, 184, 148, 0.2); white-space: nowrap; }
         .badge-icon { font-size: 14px; }
+        .strip-search-btn { width: 32px; height: 32px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; transition: all 0.2s; }
         .badge-text { font-size: 12px; font-weight: 600; color: var(--primary); letter-spacing: -0.1px; }
         .discount-value { background: var(--primary); color: #fff; padding: 1px 6px; border-radius: 6px; font-size: 11px; margin: 0 2px; }
         .selected-cats-list { display: flex; gap: 4px; align-items: center; }
@@ -925,6 +931,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           .info-strip { flex-direction: column; align-items: flex-start; gap: 10px; }
           .info-left { width: 100%; flex-direction: column; align-items: flex-start; gap: 6px; }
+          .search-discount-bar { width: 100%; }
           .info-right { width: 100%; justify-content: space-between; }
           .discount-badge-premium { padding: 4px 10px; }
           .badge-text { font-size: 11px; }
@@ -968,8 +975,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           }
 
           .discount-badge-premium {
-            align-self: center;
-            margin: 0 auto;
+            width: 100%;
           }
           .badge-text {
             text-align: center;

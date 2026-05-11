@@ -301,7 +301,7 @@ export default function Customers() {
                 <td><input className="lite-input" type="password" placeholder="••••••" value={newRow.password} onChange={e => setNewRow({...newRow, password: e.target.value})} /></td>
                 <td><input className="lite-input" type="text" placeholder="0 veya 20+20" value={newRow.discount} onChange={e => setNewRow({...newRow, discount: e.target.value})} /></td>
                 <td style={{ textAlign: 'center', position: 'relative' }}>
-                  <button className="lite-add-btn" onClick={handleAdd}>EKLE</button>
+                  <button className="lite-add-btn" onClick={handleAdd} title="Müşteri ekle">+</button>
                   {errorMsg && <div style={{ 
                     position: 'absolute', 
                     top: '100%', 

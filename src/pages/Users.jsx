@@ -231,7 +231,7 @@ export default function Users() {
                   </div>
                 </td>
                 <td style={{ textAlign: 'center', position: 'relative' }}>
-                  <button className="lite-add-btn" onClick={handleAdd}>EKLE</button>
+                  <button className="lite-add-btn" onClick={handleAdd} title="Kullanıcı ekle">+</button>
                   {errorMsg && <div style={{ 
                     position: 'absolute', 
                     top: '100%', 

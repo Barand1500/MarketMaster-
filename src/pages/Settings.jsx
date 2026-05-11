@@ -797,9 +797,11 @@ export default function Settings() {
             <button
               onClick={handlePbEkle}
               disabled={pbLoading}
-              style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', opacity: pbLoading ? 0.7 : 1, whiteSpace: 'nowrap' }}
+              className="lite-add-btn"
+              title="Para birimi ekle"
+              style={{ opacity: pbLoading ? 0.7 : 1, flexShrink: 0, alignSelf: 'flex-end', marginBottom: '1px' }}
             >
-              {pbLoading ? '⏳' : '➕ Ekle'}
+              {pbLoading ? '⏳' : '+'}
             </button>
           </div>
           {yeniPb.kur_tipi === 'api' && Object.keys(tcmbKurlar).length === 0 && (

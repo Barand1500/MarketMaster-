@@ -146,9 +146,9 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
           <div className="nav-logo">
             {siteSettings?.logo
               ? <img src={siteSettings.logo} alt="logo" style={{ height: '28px', width: '28px', objectFit: 'contain', borderRadius: '4px' }} />
-              : <span>🍉</span>
+              : siteSettings !== null ? <span>🍉</span> : null
             }
-            <span className="nav-logo-text">{siteSettings?.site_adi || 'Bostan Manav'}</span>
+            <span className="nav-logo-text">{siteSettings?.site_adi ?? ''}</span>
           </div>
           <div className="nav-links">
             {(isSysAdmin || allowed.includes('products')) && (

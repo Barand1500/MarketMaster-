@@ -110,7 +110,7 @@ export default function Products() {
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null });
+  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -129,6 +129,7 @@ export default function Products() {
   const [kdvEditDahil, setKdvEditDahil] = useState(true);
   const [kdvError, setKdvError] = useState('');
   const [imgPreview, setImgPreview] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
 
   // Floating tooltip for pm-item-name (avoids overflow clipping)
   const [pmTooltip, setPmTooltip] = useState(null); // { x, y } or null
@@ -155,9 +156,11 @@ export default function Products() {
   const [modalSearch, setModalSearch] = useState('');
   const [modalInput, setModalInput] = useState('');
   const [modalParent, setModalParent] = useState('');
+  const [modalError, setModalError] = useState('');
 
   const openModal = (type) => {
     setShowModal(type);
+    setModalError('');
     setModalSearch('');
     setModalInput('');
     setModalParent('');
@@ -166,6 +169,7 @@ export default function Products() {
 
   const fileInputRef = useRef(null);
   const editFileRef = useRef(null);
+  const imgClickTimer = useRef(null);
   const mobileFileRef = useRef(null);
   const mobileAddFileRef = useRef(null);
   const excelFileRef = useRef(null);
@@ -182,6 +186,7 @@ export default function Products() {
   const [mobileEditCatSearch, setMobileEditCatSearch] = useState('');
   const [showMobileAdd, setShowMobileAdd] = useState(false);
   const [mobileAddCatSearch, setMobileAddCatSearch] = useState('');
+  const [mobileLightbox, setMobileLightbox] = useState(null); // image src
   const dropRef = useRef(null);
   const editDropRef = useRef(null);
 
@@ -231,8 +236,8 @@ export default function Products() {
     if (!newRow.name.trim() || !newRow.price) return;
     const pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
-    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: kdvItem != null ? kdvItem.dahil : null });
-    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null });
+    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null });
+    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
     setCatDrop(false);
   };
 
@@ -324,17 +329,30 @@ export default function Products() {
         setKdvError('Lütfen 0-100 arasında geçerli bir oran girin.');
         return;
       }
-      const exists = kdvOranlari.some(k => parseFloat(k.oran) === oranVal && Boolean(k.dahil) === kdvModalDahil);
-      if (exists) { setKdvError(`%${oranVal} ${kdvModalDahil ? 'Dahil' : 'Hariç'} oranı zaten mevcut.`); return; }
-      const result = await addKdvOrani(oranVal, kdvModalDahil);
-      if (result?.ok) { await refetchKdvOranlari(); setModalInput(''); setKdvModalDahil(true); }
+      const exists = kdvOranlari.some(k => parseFloat(k.oran) === oranVal);
+      if (exists) { setKdvError(`%${oranVal} oranı zaten mevcut.`); return; }
+      const result = await addKdvOrani(oranVal);
+      if (result?.ok) { await refetchKdvOranlari(); setModalInput(''); }
       else setKdvError(result?.error || 'KDV oranı eklenemedi.');
       return;
     }
+    setModalError('');
     if (!modalInput.trim()) return;
-    if (showModal === 'categories') addCategory(modalInput.trim(), modalParent || null);
-    else if (showModal === 'markalar') { addMarka(modalInput.trim(), modalMarkaGorsel); setModalMarkaGorsel(null); }
-    else addUnit(modalInput.trim());
+    const trimmed = modalInput.trim();
+    if (showModal === 'units') {
+      const dup = units.some(u => u.name.toLowerCase() === trimmed.toLowerCase());
+      if (dup) { setModalError(`"${trimmed}" adlı birim zaten mevcut.`); return; }
+      addUnit(trimmed);
+    } else if (showModal === 'categories') {
+      const dup = categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase() && (c.parentId || null) === (modalParent ? parseInt(modalParent) : null));
+      if (dup) { setModalError(`"${trimmed}" adlı kategori zaten mevcut.`); return; }
+      addCategory(trimmed, modalParent || null);
+    } else if (showModal === 'markalar') {
+      const dup = markalar.some(m => m.ad.toLowerCase() === trimmed.toLowerCase());
+      if (dup) { setModalError(`"${trimmed}" adlı marka zaten mevcut.`); return; }
+      addMarka(trimmed, modalMarkaGorsel);
+      setModalMarkaGorsel(null);
+    }
     setModalInput('');
   };
 
@@ -381,7 +399,7 @@ export default function Products() {
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button className="pm-item-del" onClick={() => {
-              if (window.confirm(`"${u.name}" birimini silmek istediğinize emin misiniz?`)) deleteUnit(u.id);
+              setConfirmModal({ message: `"${u.name}" birimini silmek istiyor musunuz?`, onConfirm: () => deleteUnit(u.id) });
             }}>✕</button>
           </div>
         </div>
@@ -435,7 +453,7 @@ export default function Products() {
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button className="pm-item-del" onClick={() => {
-              if (window.confirm(`"${c.name}" kategorisini kalıcı olarak silmek istediğinize emin misiniz?`)) deleteCategory(c.id);
+              setConfirmModal({ message: `"${c.name}" kategorisini silmek istiyor musunuz?`, onConfirm: () => deleteCategory(c.id) });
             }}>✕</button>
           </div>
         </div>
@@ -445,15 +463,11 @@ export default function Products() {
     if (showModal === 'kdv') {
       if (kdvOranlari.length === 0) return <div className="pm-empty">Henüz KDV oranı eklenmemiş.</div>;
       return kdvOranlari.map(k => {
-        const isDahil = Boolean(k.dahil);
-        const kdvColor = isDahil ? '#16a34a' : '#dc2626';
-        const kdvBg = isDahil ? '#f0fdf4' : '#fef2f2';
-        const kdvBorder = isDahil ? '#bbf7d0' : '#fecaca';
         const isEditing = modalEditing.id === k.id && modalEditing.type === 'kdv';
         return (
           <div key={k.id} className="pm-item">
             <div className="pm-item-left" style={{ flex: 1 }}>
-              <span className="pm-item-icon" style={{ color: kdvColor }}>%</span>
+              <span className="pm-item-icon" style={{ color: '#16a34a' }}>%</span>
               {isEditing ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1 }}>
                   <input
@@ -467,23 +481,17 @@ export default function Products() {
                     onKeyDown={async e => {
                       if (e.key === 'Enter') {
                         const v = parseFloat(modalEditValue);
-                        if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v, kdvEditDahil);
+                        if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v);
                         setModalEditing({ id: null, type: null });
                       }
                       if (e.key === 'Escape') setModalEditing({ id: null, type: null });
                     }}
                   />
                   <button
-                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: `1px solid ${kdvEditDahil ? '#bbf7d0' : '#fecaca'}`, background: kdvEditDahil ? '#f0fdf4' : '#fef2f2', color: kdvEditDahil ? '#16a34a' : '#dc2626', cursor: 'pointer', fontWeight: 700 }}
-                    onClick={() => setKdvEditDahil(p => !p)}
-                  >
-                    {kdvEditDahil ? 'Dahil' : 'Hariç'}
-                  </button>
-                  <button
                     style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '1px solid #10b981', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
                     onClick={async () => {
                       const v = parseFloat(modalEditValue);
-                      if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v, kdvEditDahil);
+                      if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v);
                       setModalEditing({ id: null, type: null });
                     }}
                   >✓</button>
@@ -491,21 +499,20 @@ export default function Products() {
               ) : (
                 <span
                   className="pm-item-name"
-                  style={{ fontWeight: 700, fontSize: 13, color: kdvColor, background: kdvBg, border: `1px solid ${kdvBorder}`, padding: '2px 8px', borderRadius: 6, cursor: 'pointer' }}
+                  style={{ fontWeight: 700, fontSize: 13, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 6, cursor: 'pointer' }}
                   onDoubleClick={() => {
                     setModalEditing({ id: k.id, type: 'kdv' });
                     setModalEditValue(String(parseFloat(k.oran)));
-                    setKdvEditDahil(isDahil);
                   }}
                   {...pmTooltipHandlers}
                 >
-                  %{parseFloat(k.oran)} {isDahil ? 'Dahil' : 'Hariç'}
+                  %{parseFloat(k.oran)}
                 </span>
               )}
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <button className="pm-item-del" onClick={() => {
-                if (window.confirm(`"%${parseFloat(k.oran)} ${isDahil ? 'Dahil' : 'Hariç'}" KDV oranını silmek istediğinize emin misiniz?`)) deleteKdvOrani(k.id);
+                setConfirmModal({ message: `"%${parseFloat(k.oran)}" KDV oranını silmek istiyor musunuz?`, onConfirm: () => deleteKdvOrani(k.id) });
               }}>✕</button>
             </div>
           </div>
@@ -541,6 +548,12 @@ export default function Products() {
                 onMouseLeave={e => e.currentTarget.style.opacity = 0}>
                 <span style={{ fontSize: 12, color: '#fff' }}>✏️</span>
               </div>
+              {m.gorsel && (
+                <button
+                  onClick={e => { e.stopPropagation(); setConfirmModal({ message: `"${m.ad}" markasının görselini silmek istiyor musunuz?`, onConfirm: () => updateMarka(m.id, m.ad, null) }); }}
+                  style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, zIndex: 3 }}
+                >×</button>
+              )}
             </div>
             {modalEditing.id === m.id && modalEditing.type === 'marka' ? (
               <input
@@ -574,7 +587,7 @@ export default function Products() {
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button className="pm-item-del" onClick={() => {
-              if (window.confirm(`"${m.ad}" markasını silmek istediğinize emin misiniz?`)) deleteMarka(m.id);
+              setConfirmModal({ message: `"${m.ad}" markasını silmek istiyor musunuz?`, onConfirm: () => deleteMarka(m.id) });
             }}>✕</button>
           </div>
         </div>
@@ -691,7 +704,10 @@ export default function Products() {
                     <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={e => handleFile(e, setNewRow)} />
                   </div>
                 </td>
-                <td><input type="text" className="lite-input" placeholder="Adı..." value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow({...newRow, name:v}); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} onKeyDown={e => e.key === 'Enter' && handleAdd()} /></td>
+                <td>
+                  <input type="text" className="lite-input" placeholder="Stok Kodu / Barkod..." value={newRow.stok_kodu} onChange={e => setNewRow(p => ({ ...p, stok_kodu: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAdd()} style={{ marginBottom: 4, fontSize: 11, color: '#6b7280' }} />
+                  <input type="text" className="lite-input" placeholder="Ürün Adı..." value={newRow.name} onChange={e => { const el=e.target, s=el.selectionStart, n=el.selectionEnd, v=el.value.toLocaleUpperCase('tr-TR'); setNewRow({...newRow, name:v}); requestAnimationFrame(()=>{ if(document.activeElement===el) el.setSelectionRange(s,n); }); }} onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+                </td>
                 <td><input type="text" className="lite-input" placeholder="0.00" value={newRow.price} onChange={e => {
                   let val = e.target.value.replace(/[^0-9.]/g, '');
                   if ((val.match(/\./g) || []).length > 1) val = val.slice(0, -1);
@@ -710,9 +726,19 @@ export default function Products() {
                   }}>
                     <option value="">KDV Yok</option>
                     {kdvOranlari.map(k => (
-                      <option key={k.id} value={k.id}>%{parseFloat(k.oran)} {k.dahil ? 'Dahil' : 'Hariç'}</option>
+                      <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>
                     ))}
                   </select>
+                  <button
+                    style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                      border: newRow.kdv_id ? `1px solid ${newRow.kdv_dahil ? '#bbf7d0' : '#fecaca'}` : '1px solid #e2e8f0',
+                      background: newRow.kdv_id ? (newRow.kdv_dahil ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
+                      color: newRow.kdv_id ? (newRow.kdv_dahil ? '#16a34a' : '#dc2626') : '#94a3b8',
+                      cursor: newRow.kdv_id ? 'pointer' : 'default', fontWeight: 700 }}
+                    onClick={() => newRow.kdv_id && setNewRow(p => ({ ...p, kdv_dahil: !p.kdv_dahil }))}
+                  >
+                    {newRow.kdv_id ? (newRow.kdv_dahil ? 'Dahil' : 'Hariç') : '—'}
+                  </button>
                 </td>
                 <td>
                   <select className="lite-select" value={newRow.unit} onChange={e => setNewRow({...newRow, unit: e.target.value})}>
@@ -771,7 +797,19 @@ export default function Products() {
                       <div className="thumb-box">
                         {validImg(p.image) ? (
                           <div className="thumb-container">
-                            <img src={p.image} onClick={() => setImgPreview(p.image)} onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }} style={{ cursor: 'zoom-in' }} />
+                            <img src={p.image} onClick={() => {
+                              if (imgClickTimer.current) {
+                                clearTimeout(imgClickTimer.current);
+                                imgClickTimer.current = null;
+                                setEditing({ id: p.id, field: 'image' });
+                                setTimeout(() => editFileRef.current.click(), 50);
+                              } else {
+                                imgClickTimer.current = setTimeout(() => {
+                                  imgClickTimer.current = null;
+                                  setImgPreview(p.image);
+                                }, 220);
+                              }
+                            }} style={{ cursor: 'zoom-in' }} />
                             <button className="img-clear" onClick={() => removeImage(p.id)}>×</button>
                           </div>
                         ) : <span onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }}>🍎</span>}
@@ -779,6 +817,13 @@ export default function Products() {
                       </div>
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'name' })}>
+                      {editing?.id === p.id && editing?.field === 'stok_kodu' ? (
+                        <input autoFocus className="inline-edit" defaultValue={p.stokKodu || ''} placeholder="Stok Kodu / Barkod..." onFocus={e => e.target.select()} onBlur={async (e) => { const result = await updateProduct(p.id, { stok_kodu: e.target.value.trim() || null }); if (result?.status === 409) alert('Bu stok kodu zaten kullanılıyor.'); setEditing(null); }} onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditing(null); }} style={{ marginBottom: 3, fontSize: 11 }} />
+                      ) : (
+                        <div onDoubleClick={e => { e.stopPropagation(); setEditing({ id: p.id, field: 'stok_kodu' }); }} style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2, cursor: 'pointer', minHeight: 14 }} {...pmTooltipHandlers}>
+                          {p.stokKodu ? p.stokKodu : <span style={{ opacity: 0.4 }}>stok kodu yok</span>}
+                        </div>
+                      )}
                       {editing?.id === p.id && editing?.field === 'name' ? (
                         <input autoFocus className="inline-edit" defaultValue={p.name} onFocus={e => e.target.select()} onChange={e => { const s=e.target.selectionStart, n=e.target.selectionEnd; e.target.value=e.target.value.toLocaleUpperCase('tr-TR'); e.target.setSelectionRange(s,n); }} onBlur={(e) => handleBlur(p.id, 'name', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                       ) : (
@@ -811,20 +856,31 @@ export default function Products() {
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'kdv' })}>
                       {editing?.id === p.id && editing?.field === 'kdv' ? (
-                        <select autoFocus className="lite-select"
-                          defaultValue={kdvOranlari.find(k => parseFloat(k.oran) === parseFloat(p.kdvOrani) && k.dahil === p.kdvDahil)?.id || ''}
-                          onBlur={() => setEditing(null)}
-                          onChange={e => {
-                            const id = e.target.value ? parseInt(e.target.value) : null;
-                            const kdvItem = kdvOranlari.find(k => k.id === id);
-                            updateProduct(p.id, { kdv_orani: kdvItem?.oran ?? null, kdv_dahil: kdvItem != null ? kdvItem.dahil : null });
-                            setEditing(null);
-                          }}>
-                          <option value="">KDV Yok</option>
-                          {kdvOranlari.map(k => (
-                            <option key={k.id} value={k.id}>%{parseFloat(k.oran)} {k.dahil ? 'Dahil' : 'Hariç'}</option>
-                          ))}
-                        </select>
+                        <div>
+                          <select autoFocus className="lite-select"
+                            defaultValue={kdvOranlari.find(k => parseFloat(k.oran) === parseFloat(p.kdvOrani))?.id || ''}
+                            onBlur={() => setEditing(null)}
+                            onChange={e => {
+                              const id = e.target.value ? parseInt(e.target.value) : null;
+                              const kdvItem = kdvOranlari.find(k => k.id === id);
+                              updateProduct(p.id, { kdv_orani: kdvItem?.oran ?? null, kdv_dahil: kdvItem != null ? (p.kdvDahil ?? true) : null });
+                              setEditing(null);
+                            }}>
+                            <option value="">KDV Yok</option>
+                            {kdvOranlari.map(k => (
+                              <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>
+                            ))}
+                          </select>
+                          {p.kdvOrani !== null && p.kdvOrani !== undefined && (
+                            <button
+                              style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${p.kdvDahil !== 0 ? '#bbf7d0' : '#fecaca'}`, background: p.kdvDahil !== 0 ? '#f0fdf4' : '#fef2f2', color: p.kdvDahil !== 0 ? '#16a34a' : '#dc2626', cursor: 'pointer', fontWeight: 700 }}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => updateProduct(p.id, { kdv_dahil: p.kdvDahil !== 0 ? 0 : 1 })}
+                            >
+                              {p.kdvDahil !== 0 ? 'Dahil' : 'Hariç'}
+                            </button>
+                          )}
+                        </div>
                       ) : p.kdvOrani !== null && p.kdvOrani !== undefined ? (
                         <span className="badge-unit" style={{
                           background: p.kdvDahil !== 0 ? '#f0fdf4' : '#fef2f2',
@@ -892,10 +948,12 @@ export default function Products() {
                         </select>
                       ) : p.markaId ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          {p.markaGorsel && (
-                            <img src={p.markaGorsel} alt={p.markaAd} style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }} />
-                          )}
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{p.markaAd}</span>
+                          {p.markaAd
+                            ? <span style={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{p.markaAd}</span>
+                            : p.markaGorsel
+                              ? <img src={p.markaGorsel} alt="marka" style={{ width: 20, height: 20, objectFit: 'contain', borderRadius: 4, flexShrink: 0 }} />
+                              : null
+                          }
                         </div>
                       ) : (
                         <span className="no-data">YOK</span>
@@ -961,6 +1019,12 @@ export default function Products() {
           <button className="mobile-manage-btn" onClick={() => openModal('units')}>
             <span>⚖️</span> Birim Yönetimi
           </button>
+          <button className="mobile-manage-btn" onClick={() => openModal('markalar')}>
+            <span>🏷️</span> Marka Yönetimi
+          </button>
+          <button className="mobile-manage-btn" onClick={() => openModal('kdv')}>
+            <span>🧾</span> KDV Yönetimi
+          </button>
         </div>
 
         <div className="mobile-search-bar">
@@ -970,7 +1034,7 @@ export default function Products() {
 
         {pagedProducts.map(p => (
           <div key={p.id} className="mobile-product-card">
-            <div className="mobile-card-img">
+            <div className="mobile-card-img" onClick={() => validImg(p.image) && setMobileLightbox(p.image)} style={{ cursor: validImg(p.image) ? 'zoom-in' : 'default' }}>
               {validImg(p.image) ? <img src={p.image} alt={p.name} /> : <span>🍎</span>}
             </div>
             <div className="mobile-card-info">
@@ -995,7 +1059,7 @@ export default function Products() {
                 onClick={() => updateProduct(p.id, { inStock: !p.inStock })}
               >{p.inStock ? 'VAR' : 'YOK'}</button>
               <button className="mobile-edit-btn" onClick={() => {
-                setMobileEdit({ id: p.id, name: p.name, price: String(p.price), unit: p.unit || 'Kg', categoryIds: [...p.categoryIds], image: p.image || '', inStock: p.inStock, para_birimi_id: p.para_birimi_id || 1 });
+                setMobileEdit({ id: p.id, name: p.name, price: String(p.price), unit: p.unit || 'Kg', categoryIds: [...p.categoryIds], image: p.image || '', inStock: p.inStock, para_birimi_id: p.para_birimi_id || 1, marka_id: p.markaId || null, kdv_id: p.kdvId || null, kdv_dahil: p.kdvDahil ?? true });
                 setMobileEditCatSearch('');
               }}>✏️</button>
               <button className="mobile-del-btn" onClick={() => setConfirm(p.id)}>🗑</button>
@@ -1015,8 +1079,16 @@ export default function Products() {
         />
 
         {/* FAB - Yeni Ürün Ekle */}
-        <button className="mobile-fab" onClick={() => { setShowMobileAdd(true); setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 }); setMobileAddCatSearch(''); }}>＋</button>
+        <button className="mobile-fab" onClick={() => { setShowMobileAdd(true); setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true }); setMobileAddCatSearch(''); }}>＋</button>
       </div>
+
+      {/* ===================== MOBİL RESİM LIGHTBOX ===================== */}
+      {mobileLightbox && (
+        <div onClick={() => setMobileLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <img src={mobileLightbox} alt="Ürün görseli" style={{ maxWidth: '100%', maxHeight: '90dvh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }} />
+          <button onClick={() => setMobileLightbox(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: '36px', height: '36px', borderRadius: '50%', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+      )}
 
       {/* ===================== MOBİL DÜZENLEME MODALI ===================== */}
       {mobileEdit && (
@@ -1075,6 +1147,30 @@ export default function Products() {
                 {mobileEdit.inStock ? '✓ Stokta Var' : '✗ Stokta Yok'}
               </button>
 
+              {/* Marka */}
+              {markalar.length > 0 && (<>
+                <label className="mobile-label">Marka</label>
+                <select className="mobile-input" value={mobileEdit.marka_id || ''} onChange={e => setMobileEdit(prev => ({ ...prev, marka_id: e.target.value ? parseInt(e.target.value) : null }))}>
+                  <option value="">— Marka Yok —</option>
+                  {markalar.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
+                </select>
+              </>)}
+
+              {/* KDV */}
+              {kdvOranlari.length > 0 && (<>
+                <label className="mobile-label">KDV</label>
+                <select className="mobile-input" value={mobileEdit.kdv_id || ''} onChange={e => setMobileEdit(prev => ({ ...prev, kdv_id: e.target.value ? parseInt(e.target.value) : null }))}>
+                  <option value="">— KDV Yok —</option>
+                  {kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran) % 1 === 0 ? parseInt(k.oran) : parseFloat(k.oran)}</option>)}
+                </select>
+                {mobileEdit.kdv_id && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <button onClick={() => setMobileEdit(prev => ({ ...prev, kdv_dahil: true }))} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: `2px solid ${mobileEdit.kdv_dahil ? 'var(--primary)' : '#e2e8f0'}`, background: mobileEdit.kdv_dahil ? 'rgba(5,150,105,0.08)' : '#f8fafc', color: mobileEdit.kdv_dahil ? 'var(--primary)' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Dahil</button>
+                    <button onClick={() => setMobileEdit(prev => ({ ...prev, kdv_dahil: false }))} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: `2px solid ${!mobileEdit.kdv_dahil ? '#dc2626' : '#e2e8f0'}`, background: !mobileEdit.kdv_dahil ? 'rgba(220,38,38,0.06)' : '#f8fafc', color: !mobileEdit.kdv_dahil ? '#dc2626' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Hariç</button>
+                  </div>
+                )}
+              </>)}
+
               {/* Kategoriler */}
               <label className="mobile-label">Kategoriler</label>
               <input className="mobile-input" placeholder="Kategori ara..." value={mobileEditCatSearch} onChange={e => setMobileEditCatSearch(e.target.value)} />
@@ -1098,6 +1194,7 @@ export default function Products() {
               <button className="mobile-btn-cancel" onClick={() => setMobileEdit(null)}>Vazgeç</button>
               <button className="mobile-btn-save" onClick={() => {
                 if (!mobileEdit.name.trim() || !mobileEdit.price) return;
+                const _kdvItem = kdvOranlari.find(k => k.id === mobileEdit.kdv_id);
                 updateProduct(mobileEdit.id, {
                   name: mobileEdit.name.trim(),
                   price: parseFloat(mobileEdit.price),
@@ -1105,7 +1202,11 @@ export default function Products() {
                   categoryIds: mobileEdit.categoryIds,
                   image: mobileEdit.image,
                   inStock: mobileEdit.inStock,
-                  para_birimi_id: mobileEdit.para_birimi_id || 1
+                  para_birimi_id: mobileEdit.para_birimi_id || 1,
+                  marka_id: mobileEdit.marka_id || null,
+                  kdv_id: mobileEdit.kdv_id || null,
+                  kdv_orani: _kdvItem?.oran ?? null,
+                  kdv_dahil: mobileEdit.kdv_id ? (mobileEdit.kdv_dahil ?? true) : null,
                 });
                 setMobileEdit(null);
               }}>Kaydet</button>
@@ -1171,6 +1272,30 @@ export default function Products() {
                 {newRow.inStock ? '✓ Stokta Var' : '✗ Stokta Yok'}
               </button>
 
+              {/* Marka */}
+              {markalar.length > 0 && (<>
+                <label className="mobile-label">Marka</label>
+                <select className="mobile-input" value={newRow.marka_id || ''} onChange={e => setNewRow(prev => ({ ...prev, marka_id: e.target.value ? parseInt(e.target.value) : null }))}>
+                  <option value="">— Marka Yok —</option>
+                  {markalar.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
+                </select>
+              </>)}
+
+              {/* KDV */}
+              {kdvOranlari.length > 0 && (<>
+                <label className="mobile-label">KDV</label>
+                <select className="mobile-input" value={newRow.kdv_id || ''} onChange={e => setNewRow(prev => ({ ...prev, kdv_id: e.target.value ? parseInt(e.target.value) : null }))}>
+                  <option value="">— KDV Yok —</option>
+                  {kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran) % 1 === 0 ? parseInt(k.oran) : parseFloat(k.oran)}</option>)}
+                </select>
+                {newRow.kdv_id && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <button onClick={() => setNewRow(prev => ({ ...prev, kdv_dahil: true }))} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: `2px solid ${newRow.kdv_dahil ? 'var(--primary)' : '#e2e8f0'}`, background: newRow.kdv_dahil ? 'rgba(5,150,105,0.08)' : '#f8fafc', color: newRow.kdv_dahil ? 'var(--primary)' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Dahil</button>
+                    <button onClick={() => setNewRow(prev => ({ ...prev, kdv_dahil: false }))} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: `2px solid ${!newRow.kdv_dahil ? '#dc2626' : '#e2e8f0'}`, background: !newRow.kdv_dahil ? 'rgba(220,38,38,0.06)' : '#f8fafc', color: !newRow.kdv_dahil ? '#dc2626' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Hariç</button>
+                  </div>
+                )}
+              </>)}
+
               {/* Kategoriler */}
               <label className="mobile-label">Kategoriler</label>
               <input className="mobile-input" placeholder="Kategori ara..." value={mobileAddCatSearch} onChange={e => setMobileAddCatSearch(e.target.value)} />
@@ -1195,8 +1320,9 @@ export default function Products() {
               <button className="mobile-btn-save" onClick={() => {
                 if (!newRow.name.trim() || !newRow.price) return;
                 const _pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
-                addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: _pb?.sembol || '₺', pbKisaAd: _pb?.kisa_ad || 'TRY', pbKur: parseFloat(_pb?.kur) || 1 });
-                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1 });
+                const _kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
+                addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: _pb?.sembol || '₺', pbKisaAd: _pb?.kisa_ad || 'TRY', pbKur: parseFloat(_pb?.kur) || 1, kdv_orani: _kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null });
+                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
                 setShowMobileAdd(false);
               }}>Ekle</button>
             </div>
@@ -1221,48 +1347,53 @@ export default function Products() {
                     {categories.map(c => <option key={c.id} value={c.id}>{getCategoryPath(c)}</option>)}
                   </select>
                 )}
-                {showModal === 'markalar' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <input type="file" hidden accept="image/*" ref={modalMarkaGorselRef} onChange={e => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = ev => setModalMarkaGorsel(ev.target.result);
-                      reader.readAsDataURL(file);
-                      e.target.value = '';
-                    }} />
-                    {modalMarkaGorsel ? (
-                      <div style={{ position: 'relative', display: 'inline-flex' }}>
-                        <img src={modalMarkaGorsel} alt="görsel" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8, border: '1.5px solid #d1fae5', background: '#f8fafc' }} />
-                        <button onClick={() => setModalMarkaGorsel(null)} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
-                      </div>
-                    ) : (
-                      <button type="button" onClick={() => modalMarkaGorselRef.current.click()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1.5px dashed #d1d5db', background: '#f9fafb', color: '#6b7280', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                        📷 Görsel Seç
-                      </button>
-                    )}
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>İsteğe bağlı</span>
-                  </div>
-                )}
                 <div className="pm-row">
                   {showModal === 'kdv' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="number" min="0" max="100" step="0.01"
-                          className="lite-input"
-                          placeholder="KDV oranı (%) — ↵ Enter ile ekle"
-                          value={modalInput}
-                          onChange={e => { setModalInput(e.target.value); setKdvError(''); }}
-                          onKeyDown={e => e.key === 'Enter' && handleAddModal()}
-                          style={{ flex: 1, minWidth: 0 }}
-                        />
-                        <button type="button" onClick={() => setKdvModalDahil(d => !d)} style={{ padding: '4px 9px', borderRadius: '7px', border: '1.5px solid', borderColor: kdvModalDahil ? '#16a34a' : '#dc2626', background: kdvModalDahil ? '#f0fdf4' : '#fef2f2', color: kdvModalDahil ? '#16a34a' : '#dc2626', fontWeight: '700', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{kdvModalDahil ? 'Dahil' : 'Hariç'}</button>
-                      </div>
+                      <input
+                        type="number" min="0" max="100" step="0.01"
+                        className="lite-input"
+                        placeholder="KDV oranı (%) — ↵ Enter ile ekle"
+                        value={modalInput}
+                        onChange={e => { setModalInput(e.target.value); setKdvError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && handleAddModal()}
+                        style={{ width: '100%' }}
+                      />
                       {kdvError && <div style={{ color: '#dc2626', fontSize: '11px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', padding: '5px 10px', textAlign: 'right' }}>⚠ {kdvError}</div>}
                     </div>
+                  ) : showModal === 'markalar' ? (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}>
+                      <input type="file" hidden accept="image/*" ref={modalMarkaGorselRef} onChange={e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = ev => setModalMarkaGorsel(ev.target.result);
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }} />
+                      <div
+                        style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 8, border: modalMarkaGorsel ? '1.5px solid #d1fae5' : '1.5px dashed #d1d5db', background: '#f9fafb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' }}
+                        onClick={() => !modalMarkaGorsel && modalMarkaGorselRef.current.click()}
+                      >
+                        {modalMarkaGorsel ? (
+                          <>
+                            <img src={modalMarkaGorsel} alt="görsel" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6 }} />
+                            <button onClick={e => { e.stopPropagation(); setModalMarkaGorsel(null); }} style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, zIndex: 2 }}>×</button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 22 }}>📷</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 6 }}>
+                        <input type="text" className="lite-input" placeholder="Marka adı — ↵ Enter ile ekle" value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); setModalError(''); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                        {modalError && <div style={{ color: '#dc2626', fontSize: '11px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', padding: '5px 10px' }}>⚠ {modalError}</div>}
+                      </div>
+                    </div>
                   ) : (
-                    <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : showModal === 'markalar' ? 'Marka' : 'Birim'} adı — ↵ Enter ile ekle`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 6 }}>
+                      <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : 'Birim'} adı — ↵ Enter ile ekle`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); setModalError(''); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                      {modalError && <div style={{ color: '#dc2626', fontSize: '11px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', padding: '5px 10px' }}>⚠ {modalError}</div>}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1507,6 +1638,29 @@ export default function Products() {
             onClick={() => setImgPreview(null)}
             style={{ position: 'fixed', top: 18, right: 22, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 22, width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >✕</button>
+        </div>
+      )}
+      {confirmModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setConfirmModal(null)}
+        >
+          <div style={{ background: '#fff', borderRadius: '18px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', padding: '28px 28px 22px', maxWidth: '340px', width: '100%', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🗑️</div>
+            <div style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a', marginBottom: '8px', lineHeight: 1.4 }}>{confirmModal.message}</div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>Bu işlem geri alınamaz.</div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setConfirmModal(null)}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#374151', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+              >İptal</button>
+              <button
+                onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+              >🗑️ Sil</button>
+            </div>
+          </div>
         </div>
       )}
       {pmTooltip && (

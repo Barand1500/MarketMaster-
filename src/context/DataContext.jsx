@@ -17,10 +17,10 @@ export function DataProvider({ children }) {
   const [siteSettings, setSiteSettings] = useState(() => {
     try {
       const saved = localStorage.getItem('siteSettings');
-      if (!saved) return { site_adi: 'Bostan Manav', logo: '', favicon: '' };
+      if (!saved) return null;
       const parsed = JSON.parse(saved);
-      return (parsed && typeof parsed === 'object') ? parsed : { site_adi: 'Bostan Manav', logo: '', favicon: '' };
-    } catch { return { site_adi: 'Bostan Manav', logo: '', favicon: '' }; }
+      return (parsed && typeof parsed === 'object') ? parsed : null;
+    } catch { return null; }
   });
 
   // VERILERI API'DEN CEK
@@ -73,7 +73,8 @@ export function DataProvider({ children }) {
           markaAd: p.marka_ad || null,
           markaGorsel: p.marka_gorsel || null,
           kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
-          kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null
+          kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
+          stokKodu: p.stok_kodu || null
         })) : []);
         setUnits(Array.isArray(brm) ? brm.map(b => ({ id: b.id, name: b.birim_adi })) : []);
 
@@ -143,7 +144,8 @@ export function DataProvider({ children }) {
         markaAd: p.marka_ad || null,
         markaGorsel: p.marka_gorsel || null,
         kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
-        kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null
+        kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
+        stokKodu: p.stok_kodu || null
       })))
     } catch { /* sessizce hata yut, mevcut veri kalsin */ }
   };
@@ -321,12 +323,12 @@ export function DataProvider({ children }) {
       setKdvOranlari(data);
     } catch {}
   };
-  const addKdvOrani = async (oran, dahil) => {
+  const addKdvOrani = async (oran) => {
     try {
       const res = await fetch(`${API_URL}/kdv-oranlari`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oran, dahil })
+        body: JSON.stringify({ oran })
       });
       if (!res.ok) {
         let errMsg = 'KDV oranı eklenemedi.';
@@ -338,12 +340,12 @@ export function DataProvider({ children }) {
       return { ok: true };
     } catch { return { ok: false, error: 'Sunucuya bağlanılamadı. İnternet veya sunucu bağlantınızı kontrol edin.' }; }
   };
-  const updateKdvOrani = async (id, oran, dahil) => {
+  const updateKdvOrani = async (id, oran) => {
     try {
       const res = await fetch(`${API_URL}/kdv-oranlari/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oran, dahil })
+        body: JSON.stringify({ oran })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -375,7 +377,8 @@ export function DataProvider({ children }) {
           para_birimi_id: product.para_birimi_id || 1,
           marka_id: product.marka_id || null,
           kdv_orani: product.kdv_orani !== undefined ? product.kdv_orani : null,
-          kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null
+          kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null,
+          stok_kodu: product.stok_kodu || null
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -398,6 +401,7 @@ export function DataProvider({ children }) {
         markaGorsel: marka?.gorsel || null,
         kdvOrani: product.kdv_orani ?? null,
         kdvDahil: product.kdv_dahil ?? null,
+        stokKodu: data.stok_kodu || null,
       }]);
     } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -413,7 +417,8 @@ export function DataProvider({ children }) {
       para_birimi_id: updates.para_birimi_id !== undefined ? updates.para_birimi_id : (current.para_birimi_id || 1),
       marka_id: updates.marka_id !== undefined ? updates.marka_id : current.markaId,
       kdv_orani: updates.kdv_orani !== undefined ? updates.kdv_orani : current.kdvOrani,
-      kdv_dahil: updates.kdv_dahil !== undefined ? updates.kdv_dahil : current.kdvDahil
+      kdv_dahil: updates.kdv_dahil !== undefined ? updates.kdv_dahil : current.kdvDahil,
+      stok_kodu: updates.stok_kodu !== undefined ? updates.stok_kodu : current.stokKodu
     };
     // Yerel durumu aninda guncelle (Sayfa yenilemeden tarihlerin degismesi icin)
     const now = new Date().toISOString();
@@ -430,6 +435,7 @@ export function DataProvider({ children }) {
     }
     if (updates.kdv_orani !== undefined) localMapped.kdvOrani = updates.kdv_orani;
     if (updates.kdv_dahil !== undefined) localMapped.kdvDahil = updates.kdv_dahil;
+    if (updates.stok_kodu !== undefined) localMapped.stokKodu = updates.stok_kodu;
     setProducts(prev => prev.map(p => p.id === id ? {
       ...p,
       ...updates,
@@ -445,7 +451,14 @@ export function DataProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fullData)
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 409) {
+          // Optimistic update'i geri al — eski stok_kodu'na dön
+          setProducts(prev => prev.map(p => p.id === id ? { ...p, stokKodu: current.stokKodu } : p));
+          return { status: 409 };
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
     } catch { setApiError('Ürün güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const deleteProduct = async (id) => {
