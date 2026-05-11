@@ -71,8 +71,19 @@ export default function App() {
   }, [siteSettings]);
 
   if (loading) {
+    const cachedSettings = (() => { try { const s = localStorage.getItem('siteSettings'); return s ? JSON.parse(s) : null; } catch { return null; } })();
+    const hasCache = cachedSettings && cachedSettings.site_adi;
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)', flexDirection: 'column', gap: '16px' }}>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        {hasCache ? (
+          <>
+            {cachedSettings.logo
+              ? <img src={cachedSettings.logo} alt={cachedSettings.site_adi} style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+              : <div style={{ fontSize: '56px' }}>🍉</div>}
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{cachedSettings.site_adi}</div>
+          </>
+        ) : null}
         <div style={{
           width: '48px', height: '48px',
           border: '4px solid var(--border)',
@@ -80,7 +91,6 @@ export default function App() {
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite'
         }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
