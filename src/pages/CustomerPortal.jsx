@@ -141,9 +141,9 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
             <span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span>
             {p.kdvOrani != null && (
               <span style={{
-                fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '4px',
+                fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
                 background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
-                color: p.kdvDahil ? '#16a34a' : '#dc2626',
+                color: p.kdvDahil ? '#16a34a' : '#b91c1c',
                 border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
               }}>
                 %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
@@ -209,9 +209,9 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
         {p.kdvOrani != null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
             <span style={{
-              fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '5px',
+              fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
               background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
-              color: p.kdvDahil ? '#16a34a' : '#dc2626',
+              color: p.kdvDahil ? '#16a34a' : '#b91c1c',
               border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
             }}>
               %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
@@ -583,7 +583,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     {markalar.length === 0 && (
                       <div style={{ padding: '8px 10px', fontSize: '12px', color: '#94a3b8' }}>Henüz marka yok</div>
                     )}
-                    {markalar.map(m => {
+                    {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(m => {
                       const checked = selectedMarkalar.includes(m.id);
                       return (
                         <button key={m.id}
@@ -675,7 +675,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
         <div className="header-right">
           <button onClick={() => setShowProfile(true)} className="profile-btn-header">👤 <span className="btn-label">Profil</span></button>
-          <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header">🚪 <span className="btn-label">Çıkış</span></button>
+          <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header" title="Çıkış">✕</button>
         </div>
       </div>
 
@@ -825,7 +825,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         }
         .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .profile-btn-header { background: #f1f5f9; color: #475569; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
-        .logout-btn-header { background: #fee2e2; color: #ef4444; border: none; padding: 8px 12px; font-weight: 700; font-size: 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+        .logout-btn-header { background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 50%; font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+        .logout-btn-header:hover { background: #fecaca; }
         
         .header-dropdown { position: absolute; top: calc(100% + 8px); right: 0; background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 50; width: 220px; padding: 12px; border: 1px solid #e2e8f0; }
         .dropdown-scroll { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
@@ -933,7 +934,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           /* Header buton: sadece ikon */
           .btn-label { display: none; }
           .profile-btn-header { padding: 8px 10px; font-size: 15px; }
-          .logout-btn-header  { padding: 8px 10px; font-size: 15px; }
           .customer-name-display { max-width: 110px; }
 
           /* Dropdownlar ekranın altında sabit panel olarak açılsın */

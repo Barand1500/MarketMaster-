@@ -128,17 +128,26 @@ export default function Products() {
   const [kdvModalDahil, setKdvModalDahil] = useState(true);
   const [kdvEditDahil, setKdvEditDahil] = useState(true);
   const [kdvError, setKdvError] = useState('');
+  const [imgPreview, setImgPreview] = useState(null);
 
   // Floating tooltip for pm-item-name (avoids overflow clipping)
   const [pmTooltip, setPmTooltip] = useState(null); // { x, y } or null
+  const [pmTooltipText, setPmTooltipText] = useState('');
   const pmTooltipTimer = useRef(null);
   const pmTooltipHandlers = {
     onMouseEnter: e => {
       const r = e.currentTarget.getBoundingClientRect();
-      pmTooltipTimer.current = setTimeout(() => setPmTooltip({ x: r.left + r.width / 2, y: r.bottom + 6 }), 600);
+      pmTooltipTimer.current = setTimeout(() => { setPmTooltipText(''); setPmTooltip({ x: r.left + r.width / 2, y: r.bottom + 6 }); }, 600);
     },
     onMouseLeave: () => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); },
   };
+  const makeMiniAddHandlers = (text) => ({
+    onMouseEnter: e => {
+      const r = e.currentTarget.getBoundingClientRect();
+      pmTooltipTimer.current = setTimeout(() => { setPmTooltipText(text); setPmTooltip({ x: r.left + r.width / 2, y: r.bottom + 6 }); }, 600);
+    },
+    onMouseLeave: () => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); },
+  });
   // Marka modal görsel state
   const [modalMarkaGorsel, setModalMarkaGorsel] = useState(null);
   const modalMarkaGorselRef = useRef(null);
@@ -663,10 +672,10 @@ export default function Products() {
                 <th style={{ width: '80px' }}>Görsel</th>
                 <th>Ürün Adı</th>
                 <th style={{ width: '130px' }}>Fiyat</th>
-                <th style={{ width: '120px' }}>KDV <button className="mini-add-btn" onClick={() => openModal('kdv')}>+</button></th>
-                <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => openModal('units')}>+</button></th>
-                <th style={{ width: '230px' }}>Kategoriler <button className="mini-add-btn" onClick={() => openModal('categories')}>+</button></th>
-                <th style={{ width: '150px' }}>Marka <button className="mini-add-btn" onClick={() => openModal('markalar')}>+</button></th>
+                <th style={{ width: '120px' }}>KDV <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('kdv'); }} {...makeMiniAddHandlers('KDV oranı ekle')}>+</button></th>
+                <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('units'); }} {...makeMiniAddHandlers('Birim ekle')}>+</button></th>
+                <th style={{ width: '230px' }}>Kategoriler <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('categories'); }} {...makeMiniAddHandlers('Kategori ekle')}>+</button></th>
+                <th style={{ width: '150px' }}>Marka <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('markalar'); }} {...makeMiniAddHandlers('Marka ekle')}>+</button></th>
                 <th style={{ width: '90px', textAlign: 'center' }}>Stok</th>
                 <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
               </tr>
@@ -750,7 +759,7 @@ export default function Products() {
                     {newRow.inStock ? 'VAR' : 'YOK'}
                   </button>
                 </td>
-                <td style={{ textAlign: 'center' }}><button className="lite-add-btn" onClick={handleAdd}>EKLE</button></td>
+                <td style={{ textAlign: 'center' }}><button className="lite-add-btn" onClick={handleAdd} title="Ürün ekle">+</button></td>
               </tr>
             </thead>
             <tbody>
@@ -762,7 +771,7 @@ export default function Products() {
                       <div className="thumb-box">
                         {validImg(p.image) ? (
                           <div className="thumb-container">
-                            <img src={p.image} onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }} />
+                            <img src={p.image} onClick={() => setImgPreview(p.image)} onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }} style={{ cursor: 'zoom-in' }} />
                             <button className="img-clear" onClick={() => removeImage(p.id)}>×</button>
                           </div>
                         ) : <span onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }}>🍎</span>}
@@ -1242,21 +1251,19 @@ export default function Products() {
                         <input
                           type="number" min="0" max="100" step="0.01"
                           className="lite-input"
-                          placeholder="KDV oranı (%)"
+                          placeholder="KDV oranı (%) — ↵ Enter ile ekle"
                           value={modalInput}
                           onChange={e => { setModalInput(e.target.value); setKdvError(''); }}
                           onKeyDown={e => e.key === 'Enter' && handleAddModal()}
                           style={{ flex: 1, minWidth: 0 }}
                         />
                         <button type="button" onClick={() => setKdvModalDahil(d => !d)} style={{ padding: '4px 9px', borderRadius: '7px', border: '1.5px solid', borderColor: kdvModalDahil ? '#16a34a' : '#dc2626', background: kdvModalDahil ? '#f0fdf4' : '#fef2f2', color: kdvModalDahil ? '#16a34a' : '#dc2626', fontWeight: '700', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>{kdvModalDahil ? 'Dahil' : 'Hariç'}</button>
-                        <button className="pm-btn" onClick={handleAddModal} style={{ padding: '4px 12px', fontSize: '12px' }}>Ekle</button>
                       </div>
                       {kdvError && <div style={{ color: '#dc2626', fontSize: '11px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', padding: '5px 10px', textAlign: 'right' }}>⚠ {kdvError}</div>}
                     </div>
                   ) : (
-                    <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : showModal === 'markalar' ? 'Marka' : 'Birim'} adı ekle veya ara...`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                    <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : showModal === 'markalar' ? 'Marka' : 'Birim'} adı — ↵ Enter ile ekle`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
                   )}
-                  {showModal !== 'kdv' && <button className="pm-btn" onClick={handleAddModal}>Ekle</button>}
                 </div>
               </div>
 
@@ -1268,11 +1275,6 @@ export default function Products() {
 
             </div>
           </div>
-          {pmTooltip && (
-            <div className="pm-float-tooltip" style={{ left: pmTooltip.x, top: pmTooltip.y }}>
-              Düzenlemek için çift tıklayınız
-            </div>
-          )}
         </div>
       )}
 
@@ -1489,6 +1491,27 @@ export default function Products() {
               <button className="btn-delete" onClick={() => { deleteProduct(confirm); setConfirm(null); }}>Evet, Sil</button>
             </div>
           </div>
+        </div>
+      )}
+      {imgPreview && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+          onClick={() => setImgPreview(null)}
+        >
+          <img
+            src={imgPreview}
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '12px', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+          />
+          <button
+            onClick={() => setImgPreview(null)}
+            style={{ position: 'fixed', top: 18, right: 22, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 22, width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >✕</button>
+        </div>
+      )}
+      {pmTooltip && (
+        <div className="pm-float-tooltip" style={{ left: pmTooltip.x, top: pmTooltip.y }}>
+          {pmTooltipText || 'Düzenlemek için çift tıklayınız'}
         </div>
       )}
     </div>
