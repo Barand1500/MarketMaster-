@@ -71,15 +71,16 @@ export default function App() {
   }, [siteSettings]);
 
   if (loading) {
-    const siteName = siteSettings?.site_adi || 'Bostan Manav';
-    const logoSrc = siteSettings?.logo || '';
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)', flexDirection: 'column', gap: '12px' }}>
-        {logoSrc
-          ? <img src={logoSrc} alt={siteName} style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
-          : <div style={{ fontSize: '56px' }}>🍉</div>}
-        <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{siteName}</div>
-        <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Sunucuya bağlanılıyor...</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
+        <div style={{
+          width: '48px', height: '48px',
+          border: '4px solid var(--border)',
+          borderTop: '4px solid var(--primary, #00b894)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
