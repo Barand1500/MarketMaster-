@@ -1386,7 +1386,7 @@ app.post('/api/migrate-gorsel', async (req, res) => {
   let urunSayisi = 0, markaSayisi = 0, hata = 0;
   try {
     // Ürünleri migrate et
-    const [urunler] = await pool.promise().query("SELECT id, gorsel_yolu FROM urunler WHERE gorsel_yolu LIKE 'data:%'");
+    const [urunler] = await db.promise().query("SELECT id, gorsel_yolu FROM urunler WHERE gorsel_yolu LIKE 'data:%'");
     for (const urun of urunler) {
       try {
         const match = urun.gorsel_yolu.match(/^data:([^;]+);base64,(.+)$/);
@@ -1397,12 +1397,12 @@ app.post('/api/migrate-gorsel', async (req, res) => {
         const filename = `urun_${urun.id}_migrated.${ext}`;
         const filepath = path.join(uploadsUrunDir, filename);
         fs.writeFileSync(filepath, buffer);
-        await pool.promise().query("UPDATE urunler SET gorsel_yolu = ? WHERE id = ?", [`/uploads/urunler/${filename}`, urun.id]);
+        await db.promise().query("UPDATE urunler SET gorsel_yolu = ? WHERE id = ?", [`/uploads/urunler/${filename}`, urun.id]);
         urunSayisi++;
       } catch (e) { hata++; }
     }
     // Markaları migrate et
-    const [markalar] = await pool.promise().query("SELECT id, gorsel FROM markalar WHERE gorsel LIKE 'data:%'");
+    const [markalar] = await db.promise().query("SELECT id, gorsel FROM markalar WHERE gorsel LIKE 'data:%'");
     for (const marka of markalar) {
       try {
         const match = marka.gorsel.match(/^data:([^;]+);base64,(.+)$/);
@@ -1413,7 +1413,7 @@ app.post('/api/migrate-gorsel', async (req, res) => {
         const filename = `marka_${marka.id}_migrated.${ext}`;
         const filepath = path.join(uploadsMarkaDir, filename);
         fs.writeFileSync(filepath, buffer);
-        await pool.promise().query("UPDATE markalar SET gorsel = ? WHERE id = ?", [`/uploads/markalar/${filename}`, marka.id]);
+        await db.promise().query("UPDATE markalar SET gorsel = ? WHERE id = ?", [`/uploads/markalar/${filename}`, marka.id]);
         markaSayisi++;
       } catch (e) { hata++; }
     }

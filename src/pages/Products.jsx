@@ -368,7 +368,8 @@ export default function Products() {
     }
     setModalInput('');
     setEditingCatId(null);
-  };({ id: null, type: null });
+  };
+  const [modalEditing, setModalEditing] = useState({ id: null, type: null });
   const [modalEditValue, setModalEditValue] = useState('');
 
   const renderModalList = () => {

@@ -51,7 +51,7 @@
 
 ---
 
-## ADIM 5 — Kategori Düzenleme: Üst Kategori Değiştirme (Orta)
+## ADIM 5 — Kategori Düzenleme: Üst Kategori Değiştirme (Orta) YAPILDI
 **Ne yapılacak:**
 - Şu an Kategori Yönetimi modalında bir kategoriye çift tıklayınca sadece ismini değiştirebiliyorsun.
 - Yeni haliyle çift tıklanınca hem "Kategori Adı" hem de "Ana Kategori" (üst kategori) alanları dolacak.
