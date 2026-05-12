@@ -154,6 +154,7 @@ export default function Products() {
   });
   // Marka modal görsel state
   const [modalMarkaGorsel, setModalMarkaGorsel] = useState(null);
+  const [modalMarkaGorselFile, setModalMarkaGorselFile] = useState(null);
   const modalMarkaGorselRef = useRef(null);
   
   const [modalSearch, setModalSearch] = useState('');
@@ -169,6 +170,7 @@ export default function Products() {
     setModalInput('');
     setModalParent('');
     setModalMarkaGorsel(null);
+    setModalMarkaGorselFile(null);
     setEditingCatId(null);
   };
 
@@ -223,12 +225,12 @@ export default function Products() {
   const handleFile = (e, setter, isEdit = false) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (isEdit) updateProduct(editing.id, { image: ev.target.result });
-      else setter(p => ({ ...p, image: ev.target.result }));
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = URL.createObjectURL(file);
+    if (isEdit) {
+      updateProduct(editing.id, { imageFile: file, image: previewUrl });
+    } else {
+      setter(p => ({ ...p, imageFile: file, image: previewUrl }));
+    }
     if (isEdit) setEditing(null);
   };
 
@@ -360,8 +362,9 @@ export default function Products() {
     } else if (showModal === 'markalar') {
       const dup = markalar.some(m => m.ad.toLowerCase() === trimmed.toLowerCase());
       if (dup) { setModalError(`"${trimmed}" adlı marka zaten mevcut.`); return; }
-      addMarka(trimmed, modalMarkaGorsel);
+      addMarka(trimmed, modalMarkaGorsel, modalMarkaGorselFile);
       setModalMarkaGorsel(null);
+      setModalMarkaGorselFile(null);
     }
     setModalInput('');
     setEditingCatId(null);
@@ -520,9 +523,7 @@ export default function Products() {
               input.onchange = e => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = ev => updateMarka(m.id, m.ad, ev.target.result);
-                reader.readAsDataURL(file);
+                updateMarka(m.id, m.ad, URL.createObjectURL(file), file);
               };
               input.click();
             }}>
@@ -531,11 +532,7 @@ export default function Products() {
               ) : (
                 <div style={{ width: 32, height: 32, borderRadius: 6, border: '1.5px dashed #d1d5db', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📷</div>
               )}
-              <div style={{ position: 'absolute', inset: 0, borderRadius: 6, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                onMouseLeave={e => e.currentTarget.style.opacity = 0}>
-                <span style={{ fontSize: 12, color: '#fff' }}>✏️</span>
-              </div>
+
               {m.gorsel && (
                 <button
                   onClick={e => { e.stopPropagation(); setConfirmModal({ message: `"${m.ad}" markasının görselini silmek istiyor musunuz?`, onConfirm: () => updateMarka(m.id, m.ad, null) }); }}
@@ -1092,9 +1089,7 @@ export default function Products() {
                 </div>
                 <input type="file" ref={mobileFileRef} hidden accept="image/*" onChange={e => {
                   const file = e.target.files[0]; if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = ev => setMobileEdit(prev => ({ ...prev, image: ev.target.result }));
-                  reader.readAsDataURL(file);
+                  setMobileEdit(prev => ({ ...prev, imageFile: file, image: URL.createObjectURL(file) }));
                 }} />
                 {mobileEdit.image && <button className="mobile-img-clear" onClick={() => setMobileEdit(prev => ({ ...prev, image: '' }))}>Görseli Kaldır</button>}
               </div>
@@ -1186,6 +1181,7 @@ export default function Products() {
                   unit: mobileEdit.unit,
                   categoryIds: mobileEdit.categoryIds,
                   image: mobileEdit.image,
+                  ...(mobileEdit.imageFile ? { imageFile: mobileEdit.imageFile } : {}),
                   inStock: mobileEdit.inStock,
                   para_birimi_id: mobileEdit.para_birimi_id || 1,
                   marka_id: mobileEdit.marka_id || null,
@@ -1217,9 +1213,7 @@ export default function Products() {
                 </div>
                 <input type="file" ref={mobileAddFileRef} hidden accept="image/*" onChange={e => {
                   const file = e.target.files[0]; if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = ev => setNewRow(prev => ({ ...prev, image: ev.target.result }));
-                  reader.readAsDataURL(file);
+                  setNewRow(prev => ({ ...prev, imageFile: file, image: URL.createObjectURL(file) }));
                 }} />
                 {newRow.image && <button className="mobile-img-clear" onClick={() => setNewRow(prev => ({ ...prev, image: '' }))}>Görseli Kaldır</button>}
               </div>
@@ -1360,9 +1354,8 @@ export default function Products() {
                       <input type="file" hidden accept="image/*" ref={modalMarkaGorselRef} onChange={e => {
                         const file = e.target.files[0];
                         if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = ev => setModalMarkaGorsel(ev.target.result);
-                        reader.readAsDataURL(file);
+                        setModalMarkaGorselFile(file);
+                        setModalMarkaGorsel(URL.createObjectURL(file));
                         e.target.value = '';
                       }} />
                       <div

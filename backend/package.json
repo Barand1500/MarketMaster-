@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "multer": "^2.1.1",
     "mysql2": "^3.9.7",
     "nodemailer": "^8.0.7",
     "resend": "^3.2.0"

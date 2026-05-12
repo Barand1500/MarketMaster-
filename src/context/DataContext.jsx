@@ -282,12 +282,17 @@ export function DataProvider({ children }) {
   };
 
   // MARKALAR
-  const addMarka = async (ad, gorsel = null) => {
+  const addMarka = async (ad, gorsel = null, gorselFile = null) => {
     try {
+      let gorselDeger = gorsel;
+      if (gorselFile instanceof File) {
+        const uploaded = await uploadGorsel(gorselFile, 'marka');
+        if (uploaded) gorselDeger = uploaded;
+      }
       const res = await fetch(`${API_URL}/markalar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ad, gorsel })
+        body: JSON.stringify({ ad, gorsel: gorselDeger })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -295,15 +300,20 @@ export function DataProvider({ children }) {
       return { ok: true, id: data.id };
     } catch { setApiError('Marka eklenemedi. Sunucu bağlantısını kontrol edin.'); return { ok: false }; }
   };
-  const updateMarka = async (id, ad, gorsel) => {
+  const updateMarka = async (id, ad, gorsel, gorselFile = null) => {
     try {
+      let gorselDeger = gorsel;
+      if (gorselFile instanceof File) {
+        const uploaded = await uploadGorsel(gorselFile, 'marka');
+        if (uploaded) gorselDeger = uploaded;
+      }
       const res = await fetch(`${API_URL}/markalar/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ad, gorsel })
+        body: JSON.stringify({ ad, gorsel: gorselDeger })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMarkalar(prev => prev.map(m => m.id === id ? { ...m, ad, gorsel } : m));
+      setMarkalar(prev => prev.map(m => m.id === id ? { ...m, ad, gorsel: gorselDeger } : m));
     } catch { setApiError('Marka güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const deleteMarka = async (id) => {
@@ -361,9 +371,24 @@ export function DataProvider({ children }) {
     } catch { setApiError('KDV oranı silinemedi. Sunucu bağlantısını kontrol edin.'); }
   };
 
+  // Görsel dosya yükleme yardımcısı
+  const uploadGorsel = async (file, tip) => {
+    const form = new FormData();
+    form.append('gorsel', file);
+    const res = await fetch(`${API_URL}/upload/${tip}`, { method: 'POST', body: form });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.url || null;
+  };
+
   // PRODUCTS
   const addProduct = async (product) => {
     try {
+      let gorselYolu = product.image;
+      if (product.imageFile instanceof File) {
+        const uploaded = await uploadGorsel(product.imageFile, 'urun');
+        if (uploaded) gorselYolu = uploaded;
+      }
       const res = await fetch(`${API_URL}/urunler`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -371,7 +396,7 @@ export function DataProvider({ children }) {
           urun_adi: product.name,
           fiyat: product.price,
           birim_adi: product.unit,
-          gorsel_yolu: product.image,
+          gorsel_yolu: gorselYolu,
           kategori_ids: product.categoryIds,
           stok_durumu: product.inStock,
           para_birimi_id: product.para_birimi_id || 1,
@@ -407,11 +432,16 @@ export function DataProvider({ children }) {
   };
   const updateProduct = async (id, updates) => {
     const current = products.find(p => p.id === id);
+    let gorselYolu = updates.image !== undefined ? updates.image : current.image;
+    if (updates.imageFile instanceof File) {
+      const uploaded = await uploadGorsel(updates.imageFile, 'urun');
+      if (uploaded) gorselYolu = uploaded;
+    }
     const fullData = {
       urun_adi: updates.name || current.name,
       fiyat: updates.price !== undefined ? updates.price : current.price,
       birim_adi: updates.unit || current.unit,
-      gorsel_yolu: updates.image !== undefined ? updates.image : current.image,
+      gorsel_yolu: gorselYolu,
       stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
       kategori_ids: updates.categoryIds || current.categoryIds,
       para_birimi_id: updates.para_birimi_id !== undefined ? updates.para_birimi_id : (current.para_birimi_id || 1),

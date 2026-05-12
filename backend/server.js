@@ -53,11 +53,52 @@ function checkDailyLimit() {
   return { allowed: true, remaining: DAILY_EMAIL_LIMIT - dailyEmailCount.count };
 }
 
+const multer = require('multer');
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '50mb', type: 'text/plain' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Uploads klasörleri
+const uploadsUrunDir = path.join(__dirname, 'uploads', 'urunler');
+const uploadsMarkaDir = path.join(__dirname, 'uploads', 'markalar');
+if (!fs.existsSync(uploadsUrunDir)) fs.mkdirSync(uploadsUrunDir, { recursive: true });
+if (!fs.existsSync(uploadsMarkaDir)) fs.mkdirSync(uploadsMarkaDir, { recursive: true });
+
+// Statik dosya sunumu
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Multer yapılandırması
+const urunStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsUrunDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `urun_${Date.now()}${ext}`);
+  }
+});
+const markaStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsMarkaDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `marka_${Date.now()}${ext}`);
+  }
+});
+const uploadUrun = multer({ storage: urunStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadMarka = multer({ storage: markaStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+// Ürün görseli yükleme
+app.post('/api/upload/urun', uploadUrun.single('gorsel'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Dosya yüklenemedi.' });
+  res.json({ url: `/uploads/urunler/${req.file.filename}` });
+});
+
+// Marka görseli yükleme
+app.post('/api/upload/marka', uploadMarka.single('gorsel'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Dosya yüklenemedi.' });
+  res.json({ url: `/uploads/markalar/${req.file.filename}` });
+});
 
 // Veritabani Baglantisi
 const db = mysql.createPool({
@@ -1339,6 +1380,49 @@ app.put('/api/para-birimleri/:id/guncelle-api', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Base64 → dosya sistemi migration (bir kez çalıştırılır)
+app.post('/api/migrate-gorsel', async (req, res) => {
+  let urunSayisi = 0, markaSayisi = 0, hata = 0;
+  try {
+    // Ürünleri migrate et
+    const [urunler] = await pool.promise().query("SELECT id, gorsel_yolu FROM urunler WHERE gorsel_yolu LIKE 'data:%'");
+    for (const urun of urunler) {
+      try {
+        const match = urun.gorsel_yolu.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const mime = match[1];
+        const ext = mime.split('/')[1]?.replace('jpeg', 'jpg').replace('svg+xml', 'svg') || 'jpg';
+        const buffer = Buffer.from(match[2], 'base64');
+        const filename = `urun_${urun.id}_migrated.${ext}`;
+        const filepath = path.join(uploadsUrunDir, filename);
+        fs.writeFileSync(filepath, buffer);
+        await pool.promise().query("UPDATE urunler SET gorsel_yolu = ? WHERE id = ?", [`/uploads/urunler/${filename}`, urun.id]);
+        urunSayisi++;
+      } catch (e) { hata++; }
+    }
+    // Markaları migrate et
+    const [markalar] = await pool.promise().query("SELECT id, gorsel FROM markalar WHERE gorsel LIKE 'data:%'");
+    for (const marka of markalar) {
+      try {
+        const match = marka.gorsel.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const mime = match[1];
+        const ext = mime.split('/')[1]?.replace('jpeg', 'jpg').replace('svg+xml', 'svg') || 'jpg';
+        const buffer = Buffer.from(match[2], 'base64');
+        const filename = `marka_${marka.id}_migrated.${ext}`;
+        const filepath = path.join(uploadsMarkaDir, filename);
+        fs.writeFileSync(filepath, buffer);
+        await pool.promise().query("UPDATE markalar SET gorsel = ? WHERE id = ?", [`/uploads/markalar/${filename}`, marka.id]);
+        markaSayisi++;
+      } catch (e) { hata++; }
+    }
+    res.json({ ok: true, urunSayisi, markaSayisi, hata });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Backend sunucusu port ${PORT} uzerinde calisiyor...`);
 });

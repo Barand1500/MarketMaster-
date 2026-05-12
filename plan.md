@@ -4,7 +4,7 @@
 
 ---
 
-## ADIM 1 — Admin Panel Temizliği (Hızlı, Kolay)
+## ADIM 1 — Admin Panel Temizliği (Hızlı, Kolay) YAPILDI
 **Ne yapılacak:**
 - Ürünler sayfasındaki "📦 Ürün ve Stok Yönetimi / Ürün Veritabanı ve Stok Yönetimi" açıklama yazısı kaldırılacak.
 - Müşteriler sayfasındaki "👥 Müşteri Yönetimi / Müşteri portföyünüzü..." yazısı kaldırılacak.
@@ -40,7 +40,7 @@
 
 ---
 
-## ADIM 4 — Sırala Butonu Taşıma (Kolay)
+## ADIM 4 — Sırala Butonu Taşıma (Kolay) 
 **Ne yapılacak:**
 - Müşteri portalı header'ındaki "Sırala" yazılı butondan yazı kaldırılacak, sadece ikon (⇅ veya benzeri) kalacak.
 - Bu buton header'dan alınacak, ürün listesinin altındaki "Son Güncelleme / Döviz Kurları / Grid / Liste" butonlarının yanına taşınacak.
