@@ -145,7 +145,6 @@ export default function Users() {
     <div className="page-container wide">
       <PageHeader 
         title="🛡️ Kullanıcı Yönetimi" 
-        sub="Sisteme girebilecek kullanıcıları ve erişebilecekleri sayfaları belirleyin."
         helpContent={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>

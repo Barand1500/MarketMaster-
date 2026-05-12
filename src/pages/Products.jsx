@@ -599,16 +599,6 @@ export default function Products() {
     <div className="page-container wide">
       <PageHeader 
         title="📦 Ürün ve Stok Yönetimi"
-        sub="Ürün Veritabanı ve Stok Yönetimi"
-        actions={
-          <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            borderRadius: '10px', border: '1.5px solid #22c55e', background: 'rgba(34,197,94,0.07)',
-            color: '#16a34a', fontWeight: '700', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap'
-          }}>
-            📅 Excel'den Yükle
-          </button>
-        } 
         helpContent={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
@@ -675,6 +665,13 @@ export default function Products() {
               <span className="search-icon">🔍</span>
               <input type="text" placeholder="Hızlı ara..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+            <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px',
+              borderRadius: '10px', border: '1.5px solid #22c55e', background: 'rgba(34,197,94,0.07)',
+              color: '#16a34a', fontWeight: '700', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0
+            }}>
+              📅 Excel'den Yükle
+            </button>
           </div>
         </div>
 

@@ -214,7 +214,6 @@ export default function Customers() {
     <div className="page-container wide">
       <PageHeader 
         title="👥 Müşteri Yönetimi" 
-        sub="Müşteri portföyünüzü ve özel portal erişimlerini hızla yönetin."
         helpContent={
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>

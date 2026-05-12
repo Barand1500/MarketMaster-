@@ -25,8 +25,8 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
       </div>
       <div className="header-right">
         {actions && <div className="header-actions">{actions}</div>}
-        <button className="btn-help" onClick={() => setShowHelp(true)}>
-          <span>💡</span><span className="btn-help-text"> Nasıl Kullanılır?</span>
+        <button className="btn-help" onClick={() => setShowHelp(true)} title="Nasıl Kullanılır?">
+          <span>💡</span>
         </button>
       </div>
 

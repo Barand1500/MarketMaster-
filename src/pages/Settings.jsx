@@ -439,7 +439,6 @@ export default function Settings() {
     <div className="page-container wide">
       <PageHeader
         title="⚙️ Site Ayarları"
-        sub="Sitenin adını, logosunu ve favicon'ını buradan yönetin."
         helpContent={helpContent}
       />
 
