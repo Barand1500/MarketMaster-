@@ -590,68 +590,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             )}
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowSortDrop(!showSortDrop)}
-              className="header-filter-btn"
-              style={sortBy !== 'default' ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
-            >
-              <span style={{ fontSize: '13px' }}>↕</span>
-              <span>{sortBy === 'default' ? 'Sırala' : 'Sıralı'}</span>
-            </button>
-            {showSortDrop && (
-              <>
-                <div className="dropdown-overlay" onClick={() => setShowSortDrop(false)} />
-                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '210px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 8px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 6px 4px' }}>Sıralama</div>
-                  </div>
-                  <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {sortOptions.map(opt => {
-                      const active = sortBy === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => { setSortBy(opt.value); setShowSortDrop(false); }}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '10px',
-                            padding: '8px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%',
-                            background: active ? 'rgba(var(--primary-rgb, 34,197,94), 0.08)' : 'transparent',
-                            color: active ? 'var(--primary)' : '#374151',
-                            fontWeight: active ? '700' : '500', fontSize: '13px',
-                            transition: 'background 0.15s',
-                          }}
-                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f8fafc'; }}
-                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                        >
-                          <span style={{
-                            width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
-                            border: `2px solid ${active ? 'var(--primary)' : '#cbd5e1'}`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: active ? 'var(--primary)' : 'transparent',
-                            transition: 'all 0.15s',
-                          }}>
-                            {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', display: 'block' }} />}
-                          </span>
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {sortBy !== 'default' && (
-                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
-                      <button
-                        onClick={() => { setSortBy('default'); setShowSortDrop(false); }}
-                        style={{ width: '100%', padding: '7px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
-                      >
-                        ✕ Sıralamayı Sıfırla
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
         </div>
 
         <div className="header-right">
@@ -697,6 +635,65 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
 
         <div className="info-right">
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowSortDrop(!showSortDrop)}
+              title="Sırala"
+              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s', background: sortBy !== 'default' ? 'var(--primary)' : '#f1f5f9', color: sortBy !== 'default' ? '#fff' : '#64748b' }}
+            >↕</button>
+            {showSortDrop && (
+              <>
+                <div className="dropdown-overlay" onClick={() => setShowSortDrop(false)} />
+                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '210px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 8px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 6px 4px' }}>Sıralama</div>
+                  </div>
+                  <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {sortOptions.map(opt => {
+                      const active = sortBy === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setSortBy(opt.value); setShowSortDrop(false); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            padding: '8px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%',
+                            background: active ? 'rgba(34,197,94,0.08)' : 'transparent',
+                            color: active ? 'var(--primary)' : '#374151',
+                            fontWeight: active ? '700' : '500', fontSize: '13px',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f8fafc'; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <span style={{
+                            width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                            border: `2px solid ${active ? 'var(--primary)' : '#cbd5e1'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: active ? 'var(--primary)' : 'transparent',
+                            transition: 'all 0.15s',
+                          }}>
+                            {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', display: 'block' }} />}
+                          </span>
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {sortBy !== 'default' && (
+                    <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
+                      <button
+                        onClick={() => { setSortBy('default'); setShowSortDrop(false); }}
+                        style={{ width: '100%', padding: '7px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        ✕ Sıralamayı Sıfırla
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button
             type="button"
             className="update-time-box"
