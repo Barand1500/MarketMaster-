@@ -282,6 +282,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [selectedCatId, setSelectedCatId] = useState(null);
   const [expandedCatIds, setExpandedCatIds] = useState(new Set());
   const [showCatPanel, setShowCatPanel] = useState(false);
+  const [catSearch, setCatSearch] = useState('');
   const [selectedMarkalar, setSelectedMarkalar] = useState([]);
   const [showMarkaDrop, setShowMarkaDrop] = useState(false);
   const [sortBy, setSortBy] = useState('default');
@@ -534,36 +535,72 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       {/* KATEGORİ AĞAÇ PANELİ */}
       {showCatPanel && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowCatPanel(false)} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setShowCatPanel(false); setCatSearch(''); }} />
           <div style={{
             position: 'sticky', top: '64px', zIndex: 99,
-            background: '#fff', borderRadius: '0 0 16px 16px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+            background: '#fff', borderRadius: '0 0 12px 12px', boxShadow: '0 6px 20px rgba(0,0,0,0.09)',
             border: '1px solid #e2e8f0', borderTop: 'none',
-            marginBottom: '8px', maxHeight: '60vh', overflowY: 'auto',
-            padding: '12px 16px 16px'
+            marginBottom: '8px', maxHeight: '52vh', overflowY: 'auto',
+            padding: '8px 12px 10px'
           }}>
-            {/* Panel başlık + kapat */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Kategori Seç</span>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {selectedCatId !== null && (
-                  <button onClick={() => { setSelectedCatId(null); setShowCatPanel(false); }} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', cursor: 'pointer' }}>✕ Filtreyi Temizle</button>
+            {/* Panel başlık: sol «Kategori Seç», orta arama, sağ temizle+kapat */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>Kategori Seç</span>
+              {/* Arama kutusu */}
+              <div style={{ flex: 1, position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Kategori ara…"
+                  value={catSearch}
+                  onChange={e => setCatSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '26px', paddingRight: catSearch ? '24px' : '8px', paddingTop: '5px', paddingBottom: '5px', fontSize: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', outline: 'none', background: '#f8fafc', boxSizing: 'border-box' }}
+                />
+                {catSearch && (
+                  <button onClick={() => setCatSearch('')} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', padding: 0, lineHeight: 1 }}>×</button>
                 )}
-                <button onClick={() => setShowCatPanel(false)} style={{ width: '24px', height: '24px', borderRadius: '50%', border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              </div>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+                {selectedCatId !== null && (
+                  <button onClick={() => { setSelectedCatId(null); setShowCatPanel(false); setCatSearch(''); }} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '7px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>✕ Temizle</button>
+                )}
+                <button onClick={() => { setShowCatPanel(false); setCatSearch(''); }} style={{ width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
               </div>
             </div>
 
             {/* Tümü butonu */}
-            <button
-              onClick={() => { setSelectedCatId(null); setShowCatPanel(false); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', border: 'none', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', background: selectedCatId === null ? 'rgba(34,197,94,0.08)' : 'transparent', color: selectedCatId === null ? 'var(--primary)' : '#374151', fontWeight: selectedCatId === null ? '800' : '500', fontSize: '13px', textAlign: 'left' }}
-            >
-              🏠 Tüm Ürünler
-              {selectedCatId === null && <span style={{ marginLeft: 'auto', fontSize: '10px', background: 'var(--primary)', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>SEÇİLİ</span>}
-            </button>
+            {!catSearch && (
+              <button
+                onClick={() => { setSelectedCatId(null); setShowCatPanel(false); setCatSearch(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '7px', width: '100%', padding: '5px 8px', border: 'none', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px', background: selectedCatId === null ? 'rgba(34,197,94,0.08)' : 'transparent', color: selectedCatId === null ? 'var(--primary)' : '#374151', fontWeight: selectedCatId === null ? '800' : '500', fontSize: '12px', textAlign: 'left' }}
+              >
+                🏠 Tüm Ürünler
+                {selectedCatId === null && <span style={{ marginLeft: 'auto', fontSize: '9px', background: 'var(--primary)', color: '#fff', borderRadius: '5px', padding: '1px 6px', fontWeight: '700' }}>SEÇİLİ</span>}
+              </button>
+            )}
 
             {/* Kategori ağacı */}
             {(() => {
+              const q = catSearch.toLocaleLowerCase('tr');
+
+              // Arama modunda: tüm kategorileri düz liste olarak göster
+              if (q) {
+                const matched = categories.filter(c => c.name.toLocaleLowerCase('tr').includes(q));
+                if (matched.length === 0) return <div style={{ fontSize: '12px', color: '#94a3b8', padding: '8px 10px' }}>Sonuç bulunamadı</div>;
+                return matched.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCatId(cat.id); setShowCatPanel(false); setCatSearch(''); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', padding: '5px 8px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: selectedCatId === cat.id ? 'rgba(34,197,94,0.08)' : 'transparent', color: selectedCatId === cat.id ? 'var(--primary)' : '#374151', fontWeight: selectedCatId === cat.id ? '700' : '400', fontSize: '12px', textAlign: 'left', marginBottom: '1px' }}
+                  >
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: selectedCatId === cat.id ? 'var(--primary)' : '#cbd5e1', flexShrink: 0 }} />
+                    {cat.name}
+                    {cat.parentId && <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: '4px' }}>↳ {categories.find(p => p.id === cat.parentId)?.name}</span>}
+                  </button>
+                ));
+              }
+
+              // Normal ağaç modu
               const renderNode = (catId, depth) => {
                 const cat = categories.find(c => c.id === catId);
                 if (!cat) return null;
@@ -582,29 +619,33 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                 return (
                   <div key={catId}>
                     <div
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: `${depth * 20}px`, borderRadius: '10px', background: isSelected ? 'rgba(34,197,94,0.08)' : 'transparent', marginBottom: '2px' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: `${depth * 16}px`, borderRadius: '8px', background: isSelected ? 'rgba(34,197,94,0.08)' : 'transparent', marginBottom: '1px' }}
                     >
-                      {/* Expand toggle */}
                       <button
                         onClick={toggleExpand}
-                        style={{ width: '22px', height: '22px', flexShrink: 0, border: 'none', borderRadius: '6px', cursor: hasChildren ? 'pointer' : 'default', background: 'transparent', color: hasChildren ? '#94a3b8' : 'transparent', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                        style={{ width: '18px', height: '18px', flexShrink: 0, border: 'none', borderRadius: '5px', cursor: hasChildren ? 'pointer' : 'default', background: 'transparent', color: hasChildren ? '#94a3b8' : 'transparent', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
                         disabled={!hasChildren}
                       >{hasChildren ? '▶' : ''}</button>
-                      {/* Category button */}
                       <button
                         onClick={() => { setSelectedCatId(catId); setShowCatPanel(false); }}
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 8px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', color: isSelected ? 'var(--primary)' : '#374151', fontWeight: isSelected ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 6px', border: 'none', borderRadius: '7px', cursor: 'pointer', background: 'transparent', color: isSelected ? 'var(--primary)' : '#374151', fontWeight: isSelected ? '700' : depth === 0 ? '600' : '400', fontSize: '12px', textAlign: 'left' }}
                       >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isSelected ? 'var(--primary)' : '#cbd5e1', flexShrink: 0 }} />
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: isSelected ? 'var(--primary)' : '#cbd5e1', flexShrink: 0 }} />
                         {cat.name}
-                        {isSelected && <span style={{ marginLeft: 'auto', fontSize: '10px', background: 'var(--primary)', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>SEÇİLİ</span>}
+                        {isSelected && <span style={{ marginLeft: 'auto', fontSize: '9px', background: 'var(--primary)', color: '#fff', borderRadius: '5px', padding: '1px 6px', fontWeight: '700' }}>SEÇİLİ</span>}
                       </button>
                     </div>
                     {isExpanded && hasChildren && children.map(child => renderNode(child.id, depth + 1))}
                   </div>
                 );
               };
-              return orderedRoots.map(r => renderNode(r.id, 0));
+              // Ana kategoriler arası ince çizgi
+              return orderedRoots.map((r, i) => (
+                <div key={r.id}>
+                  {i > 0 && <div style={{ height: '1px', background: '#f1f5f9', margin: '3px 0' }} />}
+                  {renderNode(r.id, 0)}
+                </div>
+              ));
             })()}
           </div>
         </>
