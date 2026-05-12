@@ -19,6 +19,46 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null); // { ok, text }
 
+  // GÖRSEL SAKLAMA
+  const [gorselTipi, setGorselTipi] = useState(siteSettings.gorsel_kayit_tipi || 'veritabani');
+  const [gorselDurum, setGorselDurum] = useState(null); // { urunDb, urunDosya, markaDb, markaDosya }
+  const [gorselOnayModal, setGorselOnayModal] = useState(null); // { hedef: 'veritabani'|'dosya' }
+  const [gorselMigrasyonSonuc, setGorselMigrasyonSonuc] = useState(null);
+  const [gorselMigrasyonYukleniyor, setGorselMigrasyonYukleniyor] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/gorsel-durum').then(r => r.json()).then(setGorselDurum).catch(() => {});
+  }, []);
+
+  const handleGorselTipiDegistir = async (hedef) => {
+    if (hedef === gorselTipi) return;
+    setGorselOnayModal({ hedef });
+  };
+
+  const handleGorselMigrasyon = async () => {
+    const { hedef } = gorselOnayModal;
+    setGorselOnayModal(null);
+    setGorselMigrasyonYukleniyor(true);
+    setGorselMigrasyonSonuc(null);
+    try {
+      const endpoint = hedef === 'dosya' ? '/api/migrate-gorsel' : '/api/migrate-gorsel-geri';
+      const r = await fetch(endpoint, { method: 'POST' });
+      const data = await r.json();
+      if (data.ok) {
+        setGorselTipi(hedef);
+        await fetch('/api/ayarlar', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gorsel_kayit_tipi: hedef }) });
+        const durum = await fetch('/api/gorsel-durum').then(r => r.json());
+        setGorselDurum(durum);
+        setGorselMigrasyonSonuc({ ok: true, urunSayisi: data.urunSayisi, markaSayisi: data.markaSayisi, hata: data.hata });
+      } else {
+        setGorselMigrasyonSonuc({ ok: false, text: data.error || 'Geçiş başarısız.' });
+      }
+    } catch {
+      setGorselMigrasyonSonuc({ ok: false, text: 'Sunucuya bağlanılamadı.' });
+    }
+    setGorselMigrasyonYukleniyor(false);
+  };
+
   // YEDEKLEME
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
@@ -828,6 +868,92 @@ export default function Settings() {
         )}
       </div>
 
+      {/* GÖRSEL SAKLAMA KARTI */}
+      <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
+        <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
+          <h2 className="toolbar-title">🖼️ Görsel Saklama Yöntemi</h2>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '0 4px 8px' }}>
+
+          {/* Açıklama */}
+          <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px', border: '1px solid #e2e8f0', fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>
+            Ürün ve marka görselleri <strong>veritabanında</strong> (base64 metin) veya <strong>sunucu dosya sisteminde</strong> saklanabilir. Dosya sistemi daha hızlıdır ve veritabanını şişirmez.
+          </div>
+
+          {/* Mevcut durum */}
+          {gorselDurum && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: '#1d4ed8', fontWeight: '700', marginBottom: '3px', textTransform: 'uppercase' }}>Veritabanında</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e40af' }}>{gorselDurum.urunDb + gorselDurum.markaDb}</div>
+                <div style={{ fontSize: '11px', color: '#3b82f6' }}>{gorselDurum.urunDb} ürün · {gorselDurum.markaDb} marka</div>
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: '#15803d', fontWeight: '700', marginBottom: '3px', textTransform: 'uppercase' }}>Dosya Sisteminde</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: '#166534' }}>{gorselDurum.urunDosya + gorselDurum.markaDosya}</div>
+                <div style={{ fontSize: '11px', color: '#22c55e' }}>{gorselDurum.urunDosya} ürün · {gorselDurum.markaDosya} marka</div>
+              </div>
+            </div>
+          )}
+
+          {/* Seçenekler */}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {/* Veritabanı seçeneği */}
+            <button
+              onClick={() => handleGorselTipiDegistir('veritabani')}
+              style={{
+                flex: 1, padding: '14px 10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
+                border: gorselTipi === 'veritabani' ? '2px solid #3b82f6' : '2px solid #e2e8f0',
+                background: gorselTipi === 'veritabani' ? '#eff6ff' : '#f8fafc',
+                transition: 'all 0.15s'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '20px' }}>🗄️</span>
+                <span style={{ fontWeight: '700', fontSize: '13px', color: gorselTipi === 'veritabani' ? '#1d4ed8' : '#374151' }}>Veritabanında</span>
+                {gorselTipi === 'veritabani' && <span style={{ marginLeft: 'auto', fontSize: '10px', background: '#3b82f6', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>AKTİF</span>}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.5' }}>Görseller base64 olarak DB'de saklanır. Kurulum gerektirmez, taşınabilir.</div>
+            </button>
+
+            {/* Dosya sistemi seçeneği */}
+            <button
+              onClick={() => handleGorselTipiDegistir('dosya')}
+              style={{
+                flex: 1, padding: '14px 10px', borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
+                border: gorselTipi === 'dosya' ? '2px solid #22c55e' : '2px solid #e2e8f0',
+                background: gorselTipi === 'dosya' ? '#f0fdf4' : '#f8fafc',
+                transition: 'all 0.15s'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '20px' }}>📁</span>
+                <span style={{ fontWeight: '700', fontSize: '13px', color: gorselTipi === 'dosya' ? '#15803d' : '#374151' }}>Dosya Sistemi</span>
+                {gorselTipi === 'dosya' && <span style={{ marginLeft: 'auto', fontSize: '10px', background: '#22c55e', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>AKTİF</span>}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', lineHeight: '1.5' }}>Görseller sunucu diskine kaydedilir. Daha hızlı ve DB daha küçük olur.</div>
+            </button>
+          </div>
+
+          {/* Migrasyon yükleniyor */}
+          {gorselMigrasyonYukleniyor && (
+            <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#854d0e', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>⏳</span> Görseller taşınıyor, lütfen bekleyin...
+            </div>
+          )}
+
+          {/* Sonuç mesajı */}
+          {gorselMigrasyonSonuc && (
+            <div style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', background: gorselMigrasyonSonuc.ok ? '#f0fdf4' : '#fef2f2', color: gorselMigrasyonSonuc.ok ? '#15803d' : '#dc2626', border: `1px solid ${gorselMigrasyonSonuc.ok ? '#86efac' : '#fca5a5'}` }}>
+              {gorselMigrasyonSonuc.ok
+                ? `✅ Geçiş tamamlandı — ${gorselMigrasyonSonuc.urunSayisi} ürün, ${gorselMigrasyonSonuc.markaSayisi} marka taşındı.${gorselMigrasyonSonuc.hata > 0 ? ` (${gorselMigrasyonSonuc.hata} hata)` : ''}`
+                : `❌ ${gorselMigrasyonSonuc.text}`}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Para Birimi Silme Onay Modali */}
       {pbSilOnay && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPbSilOnay(null)}>
@@ -850,6 +976,29 @@ export default function Settings() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handlePbSilOnayla} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Sil</button>
               <button onClick={() => setPbSilOnay(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Görsel Saklama Geçiş Onay Modali */}
+      {gorselOnayModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setGorselOnayModal(null)}>
+          <div style={{ background: '#fff', borderRadius: '18px', padding: '28px 24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '36px', textAlign: 'center', marginBottom: '12px' }}>🔄</div>
+            <div style={{ fontWeight: '800', fontSize: '16px', color: '#0f172a', textAlign: 'center', marginBottom: '8px' }}>
+              {gorselOnayModal.hedef === 'dosya' ? '📁 Dosya Sistemine Geç' : '🗄️ Veritabanına Geç'}
+            </div>
+            {gorselDurum && (
+              <div style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginBottom: '18px', lineHeight: '1.7' }}>
+                {gorselOnayModal.hedef === 'dosya'
+                  ? <>Şu an <strong>{gorselDurum.urunDb} ürün</strong> ve <strong>{gorselDurum.markaDb} marka</strong> görseli veritabanında saklanıyor.<br />Bunlar dosya sistemine taşınacak. <strong>Bu işlem geri alınabilir.</strong></>
+                  : <>Şu an <strong>{gorselDurum.urunDosya} ürün</strong> ve <strong>{gorselDurum.markaDosya} marka</strong> görseli dosya sisteminde saklanıyor.<br />Bunlar veritabanına base64 olarak taşınacak. <strong>Bu işlem geri alınabilir.</strong></>}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleGorselMigrasyon} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: gorselOnayModal.hedef === 'dosya' ? '#22c55e' : '#3b82f6', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Geçiş Yap</button>
+              <button onClick={() => setGorselOnayModal(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
             </div>
           </div>
         </div>

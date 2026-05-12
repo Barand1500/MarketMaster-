@@ -40,7 +40,7 @@
 
 ---
 
-## ADIM 4 — Sırala Butonu Taşıma (Kolay) 
+## ADIM 4 — Sırala Butonu Taşıma (Kolay)  YAPILDI
 **Ne yapılacak:**
 - Müşteri portalı header'ındaki "Sırala" yazılı butondan yazı kaldırılacak, sadece ikon (⇅ veya benzeri) kalacak.
 - Bu buton header'dan alınacak, ürün listesinin altındaki "Son Güncelleme / Döviz Kurları / Grid / Liste" butonlarının yanına taşınacak.

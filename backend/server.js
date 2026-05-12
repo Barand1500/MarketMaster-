@@ -169,11 +169,12 @@ app.get('/api/ayarlar', (req, res) => {
 });
 
 app.put('/api/ayarlar', (req, res) => {
-  const { site_adi, logo, favicon } = req.body;
+  const { site_adi, logo, favicon, gorsel_kayit_tipi } = req.body;
   const updates = [];
   if (site_adi !== undefined) updates.push(['site_adi', site_adi]);
   if (logo !== undefined) updates.push(['logo', logo]);
   if (favicon !== undefined) updates.push(['favicon', favicon]);
+  if (gorsel_kayit_tipi !== undefined) updates.push(['gorsel_kayit_tipi', gorsel_kayit_tipi]);
   if (updates.length === 0) return res.json({ success: true });
   let done = 0;
   let hasError = false;
@@ -1380,6 +1381,55 @@ app.put('/api/para-birimleri/:id/guncelle-api', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Görsel kayıt istatistiği
+app.get('/api/gorsel-durum', async (req, res) => {
+  try {
+    const [[{ urunDb }]] = await db.promise().query("SELECT COUNT(*) as urunDb FROM urunler WHERE gorsel_yolu LIKE 'data:%'");
+    const [[{ urunDosya }]] = await db.promise().query("SELECT COUNT(*) as urunDosya FROM urunler WHERE gorsel_yolu LIKE '/uploads/%'");
+    const [[{ markaDb }]] = await db.promise().query("SELECT COUNT(*) as markaDb FROM markalar WHERE gorsel LIKE 'data:%'");
+    const [[{ markaDosya }]] = await db.promise().query("SELECT COUNT(*) as markaDosya FROM markalar WHERE gorsel LIKE '/uploads/%'");
+    res.json({ urunDb, urunDosya, markaDb, markaDosya });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Dosya sistemi → Base64 geri migration
+app.post('/api/migrate-gorsel-geri', async (req, res) => {
+  let urunSayisi = 0, markaSayisi = 0, hata = 0;
+  try {
+    const [urunler] = await db.promise().query("SELECT id, gorsel_yolu FROM urunler WHERE gorsel_yolu LIKE '/uploads/%'");
+    for (const urun of urunler) {
+      try {
+        const filepath = path.join(__dirname, urun.gorsel_yolu);
+        if (!fs.existsSync(filepath)) continue;
+        const buffer = fs.readFileSync(filepath);
+        const ext = path.extname(urun.gorsel_yolu).replace('.', '').replace('jpg', 'jpeg');
+        const mime = `image/${ext || 'jpeg'}`;
+        const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+        await db.promise().query("UPDATE urunler SET gorsel_yolu = ? WHERE id = ?", [base64, urun.id]);
+        urunSayisi++;
+      } catch (e) { hata++; }
+    }
+    const [markalar] = await db.promise().query("SELECT id, gorsel FROM markalar WHERE gorsel LIKE '/uploads/%'");
+    for (const marka of markalar) {
+      try {
+        const filepath = path.join(__dirname, marka.gorsel);
+        if (!fs.existsSync(filepath)) continue;
+        const buffer = fs.readFileSync(filepath);
+        const ext = path.extname(marka.gorsel).replace('.', '').replace('jpg', 'jpeg');
+        const mime = `image/${ext || 'jpeg'}`;
+        const base64 = `data:${mime};base64,${buffer.toString('base64')}`;
+        await db.promise().query("UPDATE markalar SET gorsel = ? WHERE id = ?", [base64, marka.id]);
+        markaSayisi++;
+      } catch (e) { hata++; }
+    }
+    res.json({ ok: true, urunSayisi, markaSayisi, hata });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // Base64 → dosya sistemi migration (bir kez çalıştırılır)
 app.post('/api/migrate-gorsel', async (req, res) => {
