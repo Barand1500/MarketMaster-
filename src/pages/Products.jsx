@@ -160,6 +160,7 @@ export default function Products() {
   const [modalInput, setModalInput] = useState('');
   const [modalParent, setModalParent] = useState('');
   const [modalError, setModalError] = useState('');
+  const [editingCatId, setEditingCatId] = useState(null);
 
   const openModal = (type) => {
     setShowModal(type);
@@ -168,6 +169,7 @@ export default function Products() {
     setModalInput('');
     setModalParent('');
     setModalMarkaGorsel(null);
+    setEditingCatId(null);
   };
 
   const fileInputRef = useRef(null);
@@ -347,9 +349,14 @@ export default function Products() {
       if (dup) { setModalError(`"${trimmed}" adlı birim zaten mevcut.`); return; }
       addUnit(trimmed);
     } else if (showModal === 'categories') {
-      const dup = categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase() && (c.parentId || null) === (modalParent ? parseInt(modalParent) : null));
-      if (dup) { setModalError(`"${trimmed}" adlı kategori zaten mevcut.`); return; }
-      addCategory(trimmed, modalParent || null);
+      if (editingCatId) {
+        await updateCategory(editingCatId, trimmed, modalParent || null);
+        setEditingCatId(null);
+      } else {
+        const dup = categories.some(c => c.name.toLowerCase() === trimmed.toLowerCase() && (c.parentId || null) === (modalParent ? parseInt(modalParent) : null));
+        if (dup) { setModalError(`"${trimmed}" adlı kategori zaten mevcut.`); return; }
+        addCategory(trimmed, modalParent || null);
+      }
     } else if (showModal === 'markalar') {
       const dup = markalar.some(m => m.ad.toLowerCase() === trimmed.toLowerCase());
       if (dup) { setModalError(`"${trimmed}" adlı marka zaten mevcut.`); return; }
@@ -357,9 +364,8 @@ export default function Products() {
       setModalMarkaGorsel(null);
     }
     setModalInput('');
-  };
-
-  const [modalEditing, setModalEditing] = useState({ id: null, type: null });
+    setEditingCatId(null);
+  };({ id: null, type: null });
   const [modalEditValue, setModalEditValue] = useState('');
 
   const renderModalList = () => {
@@ -417,39 +423,23 @@ export default function Products() {
       }
       if (list.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
       return list.map(c => (
-        <div key={c.id} className="pm-item" style={{ padding: '6px 10px' }}>
+        <div key={c.id} className="pm-item" style={{ padding: '6px 10px', background: editingCatId === c.id ? 'rgba(34,197,94,0.05)' : undefined, borderRadius: editingCatId === c.id ? 8 : undefined }}>
           <div className="pm-item-left">
             <span className="pm-item-icon" style={{ fontSize: '12px' }}>{c.parentId ? '↳' : '📁'}</span>
             <div>
-              {modalEditing.id === c.id && modalEditing.type === 'category' ? (
-                <input
-                  autoFocus
-                  className="inline-edit"
-                  value={modalEditValue}
-                  onChange={e => setModalEditValue(e.target.value)}
-                  onBlur={() => {
-                    if (modalEditValue.trim() && modalEditValue !== c.name) updateCategory(c.id, modalEditValue.trim());
-                    setModalEditing({ id: null, type: null });
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') e.target.blur();
-                    if (e.key === 'Escape') setModalEditing({ id: null, type: null });
-                  }}
-                  style={{ minWidth: 80 }}
-                />
-              ) : (
-                <div
-                  className="pm-item-name"
-                  onDoubleClick={() => {
-                    setModalEditing({ id: c.id, type: 'category' });
-                    setModalEditValue(c.name);
-                  }}
-                  {...pmTooltipHandlers}
-                  style={{ cursor: 'pointer', fontSize: '12px' }}
-                >
-                  {c.name}
-                </div>
-              )}
+              <div
+                className="pm-item-name"
+                onDoubleClick={() => {
+                  setModalInput(c.name);
+                  setModalParent(c.parentId ? String(c.parentId) : '');
+                  setEditingCatId(c.id);
+                  setModalError('');
+                }}
+                title="Düzenlemek için çift tıkla"
+                style={{ cursor: 'pointer', fontSize: '12px', color: editingCatId === c.id ? 'var(--primary)' : undefined, fontWeight: editingCatId === c.id ? 700 : undefined }}
+              >
+                {c.name}
+              </div>
               {c.parentId && <div className="pm-item-path">{c.path}</div>}
             </div>
           </div>
@@ -1337,10 +1327,19 @@ export default function Products() {
               
               <div className="pm-add-form">
                 {showModal === 'categories' && (
-                  <select className="lite-select" value={modalParent} onChange={e => setModalParent(e.target.value)}>
-                    <option value="">— Ana Kategori (İsteğe Bağlı) —</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{getCategoryPath(c)}</option>)}
-                  </select>
+                  <>
+                    {editingCatId && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '5px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12 }}>
+                        <span>✏️</span>
+                        <span style={{ color: '#92400e', fontWeight: 600, flex: 1 }}>Düzenleniyor: <em>{categories.find(c => c.id === editingCatId)?.name}</em></span>
+                        <button onClick={() => { setEditingCatId(null); setModalInput(''); setModalParent(''); setModalError(''); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#92400e', fontWeight: 700, fontSize: 14, lineHeight: 1 }} title="İptal">✕</button>
+                      </div>
+                    )}
+                    <select className="lite-select" value={modalParent} onChange={e => setModalParent(e.target.value)}>
+                      <option value="">— Ana Kategori (İsteğe Bağlı) —</option>
+                      {categories.filter(c => c.id !== editingCatId).map(c => <option key={c.id} value={c.id}>{getCategoryPath(c)}</option>)}
+                    </select>
+                  </>
                 )}
                 <div className="pm-row">
                   {showModal === 'kdv' ? (
@@ -1386,7 +1385,7 @@ export default function Products() {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 6 }}>
-                      <input type="text" className="lite-input" placeholder={`${showModal === 'categories' ? 'Kategori' : 'Birim'} adı — ↵ Enter ile ekle`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); setModalError(''); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
+                      <input type="text" className="lite-input" placeholder={editingCatId ? 'Kategori adını düzenle — ↵ Enter ile kaydet' : `${showModal === 'categories' ? 'Kategori' : 'Birim'} adı — ↵ Enter ile ekle`} value={modalInput} onChange={e => { setModalInput(e.target.value); setModalSearch(e.target.value); setModalError(''); }} onKeyDown={e => e.key === 'Enter' && handleAddModal()} />
                       {modalError && <div style={{ color: '#dc2626', fontSize: '11px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', padding: '5px 10px' }}>⚠ {modalError}</div>}
                     </div>
                   )}

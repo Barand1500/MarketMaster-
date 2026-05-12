@@ -163,15 +163,15 @@ export function DataProvider({ children }) {
       setCategories(prev => [...prev, { id: data.id, name: data.kategori_adi, parentId: data.ust_kategori_id ? parseInt(data.ust_kategori_id) : null }]);
     } catch { setApiError('Kategori eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateCategory = async (id, name) => {
+  const updateCategory = async (id, name, parentId = null) => {
     try {
       const res = await fetch(`${API_URL}/kategoriler/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kategori_adi: name })
+        body: JSON.stringify({ kategori_adi: name, ust_kategori_id: parentId ? parseInt(parentId) : null })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, name } : c));
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, name, parentId: parentId ? parseInt(parentId) : null } : c));
     } catch { setApiError('Kategori güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const deleteCategory = async (id) => {

@@ -343,8 +343,8 @@ app.post('/api/kategoriler', (req, res) => {
 });
 
 app.put('/api/kategoriler/:id', (req, res) => {
-  const { kategori_adi } = req.body;
-  db.query('UPDATE kategoriler SET kategori_adi = ? WHERE id = ?', [kategori_adi, req.params.id], (err) => {
+  const { kategori_adi, ust_kategori_id } = req.body;
+  db.query('UPDATE kategoriler SET kategori_adi = ?, ust_kategori_id = ? WHERE id = ?', [kategori_adi, ust_kategori_id ?? null, req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
