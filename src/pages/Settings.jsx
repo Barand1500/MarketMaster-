@@ -22,17 +22,27 @@ export default function Settings() {
   // GÖRSEL SAKLAMA
   const [gorselTipi, setGorselTipi] = useState(siteSettings?.gorsel_kayit_tipi || 'veritabani');
   const [gorselDurum, setGorselDurum] = useState(null);
-  const [gorselOnayModal, setGorselOnayModal] = useState(null); // { hedef, sadeceTercih }
+  const [gorselOnayModal, setGorselOnayModal] = useState(null); // { hedef }
   const [gorselMigrasyonSonuc, setGorselMigrasyonSonuc] = useState(null);
   const [gorselMigrasyonYukleniyor, setGorselMigrasyonYukleniyor] = useState(false);
 
-  // siteSettings API'den gelince gorselTipi'yi güncelle (sayfa geçişlerinde sync)
+  // Sayfa yüklenince DB'den doğrudan oku (Ctrl+Shift+R sonrası doğru değeri göster)
+  useEffect(() => {
+    fetch('/api/ayarlar').then(r => r.json()).then(data => {
+      if (data.gorsel_kayit_tipi) setGorselTipi(data.gorsel_kayit_tipi);
+    }).catch(() => {});
+  }, []);
+
+  // DataContext siteSettings güncellenince de sync et
   useEffect(() => {
     if (siteSettings?.gorsel_kayit_tipi) setGorselTipi(siteSettings.gorsel_kayit_tipi);
   }, [siteSettings?.gorsel_kayit_tipi]);
 
   const refreshGorselDurum = () =>
-    fetch('/api/gorsel-durum').then(r => r.json()).then(setGorselDurum).catch(() => {});
+    fetch('/api/gorsel-durum')
+      .then(r => r.json())
+      .then(setGorselDurum)
+      .catch(() => setGorselDurum({ urunDb: 0, urunDosya: 0, markaDb: 0, markaDosya: 0 }));
 
   useEffect(() => { refreshGorselDurum(); }, []);
 
@@ -41,8 +51,9 @@ export default function Settings() {
     setGorselTipi(hedef);
   };
 
-  const handleGorselOnay = async () => {
-    const { hedef, sadeceTercih } = gorselOnayModal;
+  // sadeceTercih: true → sadece kaydet, false → migrate et
+  const handleGorselOnay = async (sadeceTercih) => {
+    const { hedef } = gorselOnayModal;
     setGorselOnayModal(null);
     if (sadeceTercih) {
       await kaydetGorselTercih(hedef);
@@ -55,7 +66,6 @@ export default function Settings() {
       const endpoint = hedef === 'dosya' ? '/api/migrate-gorsel' : '/api/migrate-gorsel-geri';
       const r = await fetch(endpoint, { method: 'POST' });
       const data = await r.json();
-      // Migrasyon sonucu ne olursa olsun tercihi kaydet
       await kaydetGorselTercih(hedef);
       await refreshGorselDurum();
       if (data.ok) {
@@ -64,10 +74,9 @@ export default function Settings() {
         setGorselMigrasyonSonuc({ ok: false, text: data.error || 'Geçiş sırasında bir hata oluştu. Tercih yine de kaydedildi.' });
       }
     } catch {
-      // Migration çalışmış olabilir, sadece tercih kaydet ve durumu yenile
       await kaydetGorselTercih(hedef);
       await refreshGorselDurum();
-      setGorselMigrasyonSonuc({ ok: false, text: 'Sunucu yanıt vermedi — mevcut görseller taşınmamış olabilir. Tercih kaydedildi.' });
+      setGorselMigrasyonSonuc({ ok: false, text: 'Sunucu yanıt vermedi — görseller taşınmamış olabilir. Tercih kaydedildi.' });
     }
     setGorselMigrasyonYukleniyor(false);
   };
@@ -889,33 +898,37 @@ export default function Settings() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-          {/* Mevcut dağılım */}
-          {gorselDurum ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '14px' }}>🗄️</span>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', textTransform: 'uppercase' }}>Veritabanında</span>
-                </div>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#1e40af', lineHeight: 1 }}>{gorselDurum.urunDb + gorselDurum.markaDb}</div>
-                <div style={{ fontSize: '11px', color: '#60a5fa', marginTop: '2px' }}>{gorselDurum.urunDb} ürün · {gorselDurum.markaDb} marka</div>
+          {/* Mevcut dağılım sayaçları */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '14px' }}>🗄️</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', textTransform: 'uppercase' }}>Veritabanında</span>
               </div>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '14px' }}>📁</span>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#15803d', textTransform: 'uppercase' }}>Dosyada</span>
-                </div>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#166534', lineHeight: 1 }}>{gorselDurum.urunDosya + gorselDurum.markaDosya}</div>
-                <div style={{ fontSize: '11px', color: '#4ade80', marginTop: '2px' }}>{gorselDurum.urunDosya} ürün · {gorselDurum.markaDosya} marka</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#1e40af', lineHeight: 1 }}>
+                {gorselDurum ? gorselDurum.urunDb + gorselDurum.markaDb : '—'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#60a5fa', marginTop: '2px' }}>
+                {gorselDurum ? `${gorselDurum.urunDb} ürün · ${gorselDurum.markaDb} marka` : 'Yükleniyor…'}
               </div>
             </div>
-          ) : (
-            <div style={{ height: '72px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '12px' }}>Yükleniyor…</div>
-          )}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '14px' }}>📁</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#15803d', textTransform: 'uppercase' }}>Dosyada</span>
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: '#166534', lineHeight: 1 }}>
+                {gorselDurum ? gorselDurum.urunDosya + gorselDurum.markaDosya : '—'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#4ade80', marginTop: '2px' }}>
+                {gorselDurum ? `${gorselDurum.urunDosya} ürün · ${gorselDurum.markaDosya} marka` : 'Yükleniyor…'}
+              </div>
+            </div>
+          </div>
 
-          {/* Tercih seçimi */}
+          {/* Tercih seçimi — tıklanınca modal açılır */}
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '8px' }}>Yeni Görseller İçin Tercih</div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '8px' }}>Saklama Yöntemi</div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {[
                 { val: 'veritabani', icon: '🗄️', label: 'Veritabanı', desc: 'base64, taşınabilir', color: '#3b82f6', bg: '#eff6ff' },
@@ -925,13 +938,13 @@ export default function Settings() {
                 return (
                   <button
                     key={opt.val}
-                    onClick={() => { if (!active) setGorselOnayModal({ hedef: opt.val, sadeceTercih: true }); }}
+                    onClick={() => { if (!active) setGorselOnayModal({ hedef: opt.val }); }}
                     style={{
-                      flex: 1, padding: '10px 8px', borderRadius: '10px', cursor: active ? 'default' : 'pointer', textAlign: 'left',
+                      flex: 1, padding: '10px 8px', borderRadius: '10px',
+                      cursor: active ? 'default' : 'pointer', textAlign: 'left',
                       border: `2px solid ${active ? opt.color : '#e2e8f0'}`,
                       background: active ? opt.bg : '#f8fafc',
-                      transition: 'all 0.15s',
-                      outline: 'none'
+                      transition: 'all 0.15s', outline: 'none'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
@@ -943,23 +956,6 @@ export default function Settings() {
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Taşıma butonları */}
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '8px' }}>Mevcut Görselleri Taşı</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                disabled={gorselMigrasyonYukleniyor || !gorselDurum || gorselDurum.urunDb + gorselDurum.markaDb === 0}
-                onClick={() => setGorselOnayModal({ hedef: 'dosya', sadeceTercih: false })}
-                style={{ flex: 1, padding: '8px 6px', borderRadius: '9px', border: '1.5px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', fontWeight: '700', fontSize: '11px', cursor: 'pointer', opacity: (!gorselDurum || gorselDurum.urunDb + gorselDurum.markaDb === 0) ? 0.4 : 1 }}
-              >DB → 📁 Dosyaya</button>
-              <button
-                disabled={gorselMigrasyonYukleniyor || !gorselDurum || gorselDurum.urunDosya + gorselDurum.markaDosya === 0}
-                onClick={() => setGorselOnayModal({ hedef: 'veritabani', sadeceTercih: false })}
-                style={{ flex: 1, padding: '8px 6px', borderRadius: '9px', border: '1.5px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontWeight: '700', fontSize: '11px', cursor: 'pointer', opacity: (!gorselDurum || gorselDurum.urunDosya + gorselDurum.markaDosya === 0) ? 0.4 : 1 }}
-              >📁 → DB'ye</button>
             </div>
           </div>
 
@@ -982,7 +978,7 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Nginx uyarısı - sadece dosya modundayken */}
+          {/* Nginx uyarısı */}
           {gorselTipi === 'dosya' && (
             <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: '9px', padding: '10px 12px', fontSize: '11px', color: '#92400e', lineHeight: '1.6' }}>
               <strong>⚠️ Nginx Yapılandırması Gerekli:</strong> Görsellerin görünmesi için nginx config'e <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğu eklenmelidir.
@@ -1021,53 +1017,48 @@ export default function Settings() {
       {/* Görsel Saklama Onay Modali */}
       {gorselOnayModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setGorselOnayModal(null)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '380px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '360px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
             {/* İkon + Başlık */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: gorselOnayModal.hedef === 'dosya' ? '#f0fdf4' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
                 {gorselOnayModal.hedef === 'dosya' ? '📁' : '🗄️'}
               </div>
               <div>
-                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>
-                  {gorselOnayModal.sadeceTercih
-                    ? `Tercih: ${gorselOnayModal.hedef === 'dosya' ? 'Dosya Sistemi' : 'Veritabanı'}`
-                    : gorselOnayModal.hedef === 'dosya' ? 'Dosya Sistemine Taşı' : 'Veritabanına Taşı'}
+                <div style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a' }}>
+                  {gorselOnayModal.hedef === 'dosya' ? 'Dosya Sistemine Geç' : 'Veritabanına Geç'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                  {gorselOnayModal.sadeceTercih ? 'Yeni görseller bu yöntemle saklanacak' : 'Mevcut görseller taşınacak'}
-                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Nasıl geçmek istersiniz?</div>
               </div>
             </div>
 
-            {/* İçerik */}
-            {gorselDurum && !gorselOnayModal.sadeceTercih && (
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.7' }}>
-                  {gorselOnayModal.hedef === 'dosya' ? (
-                    <>
-                      <div>🗄️ <strong>{gorselDurum.urunDb} ürün</strong> ve <strong>{gorselDurum.markaDb} marka</strong> görseli DB'den dosyaya taşınacak.</div>
-                      {gorselDurum.urunDb + gorselDurum.markaDb === 0 && <div style={{ color: '#f59e0b', marginTop: '4px' }}>⚠️ DB'de taşınacak görsel yok.</div>}
-                    </>
-                  ) : (
-                    <>
-                      <div>📁 <strong>{gorselDurum.urunDosya} ürün</strong> ve <strong>{gorselDurum.markaDosya} marka</strong> görseli dosyadan DB'ye taşınacak.</div>
-                      {gorselDurum.urunDosya + gorselDurum.markaDosya === 0 && <div style={{ color: '#f59e0b', marginTop: '4px' }}>⚠️ Dosyada taşınacak görsel yok.</div>}
-                    </>
-                  )}
-                  <div style={{ marginTop: '6px', color: '#94a3b8', fontSize: '11px' }}>Bu işlem geri alınabilir.</div>
-                </div>
+            {/* Mevcut sayılar */}
+            {gorselDurum && (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', marginBottom: '14px', fontSize: '12px', color: '#475569', lineHeight: '1.7' }}>
+                {gorselOnayModal.hedef === 'dosya'
+                  ? <><span style={{ fontWeight: '700' }}>{gorselDurum.urunDb} ürün</span> ve <span style={{ fontWeight: '700' }}>{gorselDurum.markaDb} marka</span> görseli DB'de{gorselDurum.urunDb + gorselDurum.markaDb === 0 && <span style={{ color: '#f59e0b' }}> (taşınacak görsel yok)</span>}</>
+                  : <><span style={{ fontWeight: '700' }}>{gorselDurum.urunDosya} ürün</span> ve <span style={{ fontWeight: '700' }}>{gorselDurum.markaDosya} marka</span> görseli dosyada{gorselDurum.urunDosya + gorselDurum.markaDosya === 0 && <span style={{ color: '#f59e0b' }}> (taşınacak görsel yok)</span>}</>
+                }
               </div>
             )}
 
-            {/* Butonlar */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Aksiyon butonları */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Mevcut görseli taşı butonu — sadece taşınacak görsel varsa göster */}
+              {gorselDurum && (gorselOnayModal.hedef === 'dosya' ? gorselDurum.urunDb + gorselDurum.markaDb > 0 : gorselDurum.urunDosya + gorselDurum.markaDosya > 0) && (
+                <button
+                  onClick={() => handleGorselOnay(false)}
+                  style={{ width: '100%', padding: '11px', borderRadius: '10px', border: 'none', background: gorselOnayModal.hedef === 'dosya' ? '#22c55e' : '#3b82f6', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}
+                >
+                  {gorselOnayModal.hedef === 'dosya' ? `🗄️→📁 ${gorselDurum.urunDb + gorselDurum.markaDb} görseli taşı + kaydet` : `📁→🗄️ ${gorselDurum.urunDosya + gorselDurum.markaDosya} görseli taşı + kaydet`}
+                </button>
+              )}
               <button
-                onClick={handleGorselOnay}
-                style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: gorselOnayModal.hedef === 'dosya' ? '#22c55e' : '#3b82f6', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
-              >{gorselOnayModal.sadeceTercih ? 'Kaydet' : 'Taşı ve Kaydet'}</button>
+                onClick={() => handleGorselOnay(true)}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1.5px solid ${gorselOnayModal.hedef === 'dosya' ? '#bbf7d0' : '#bfdbfe'}`, background: gorselOnayModal.hedef === 'dosya' ? '#f0fdf4' : '#eff6ff', color: gorselOnayModal.hedef === 'dosya' ? '#15803d' : '#1d4ed8', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
+              >Sadece tercihi kaydet (görselleri taşıma)</button>
               <button
                 onClick={() => setGorselOnayModal(null)}
-                style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+                style={{ width: '100%', padding: '9px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
               >İptal</button>
             </div>
           </div>

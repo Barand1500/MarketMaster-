@@ -151,7 +151,8 @@ db.query(`CREATE TABLE IF NOT EXISTS site_settings (
   const defaults = [
     ['site_adi', 'Bostan Manav'],
     ['logo', ''],
-    ['favicon', '']
+    ['favicon', ''],
+    ['gorsel_kayit_tipi', 'veritabani']
   ];
   defaults.forEach(([k, v]) => {
     db.query('INSERT IGNORE INTO site_settings (`key`, `value`) VALUES (?, ?)', [k, v]);

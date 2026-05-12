@@ -284,7 +284,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [showCatPanel, setShowCatPanel] = useState(false);
   const [catSearch, setCatSearch] = useState('');
   const [selectedMarkalar, setSelectedMarkalar] = useState([]);
-  const [showMarkaDrop, setShowMarkaDrop] = useState(false);
+  const [showBrandsView, setShowBrandsView] = useState(false);
   const [sortBy, setSortBy] = useState('default');
   const [showSortDrop, setShowSortDrop] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -483,45 +483,18 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           <div style={{ position: 'relative' }}>
             <button
-              onClick={() => setShowMarkaDrop(!showMarkaDrop)}
+              onClick={() => setShowBrandsView(v => !v)}
               className="header-filter-btn"
-              style={selectedMarkalar.length > 0 ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
+              style={(showBrandsView || selectedMarkalar.length > 0) ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
             >
               🏷️ Markalar
+              {selectedMarkalar.length > 0 && (
+                <span
+                  onClick={e => { e.stopPropagation(); setSelectedMarkalar([]); setShowBrandsView(false); }}
+                  style={{ marginLeft: '4px', opacity: 0.8, cursor: 'pointer' }}
+                >✕</span>
+              )}
             </button>
-            {showMarkaDrop && (
-              <>
-                <div className="dropdown-overlay" onClick={() => setShowMarkaDrop(false)} />
-                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '200px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 8px 4px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Markalar</div>
-                    {markalar.length === 0 && (
-                      <div style={{ padding: '8px 10px', fontSize: '12px', color: '#94a3b8' }}>Henüz marka yok</div>
-                    )}
-                    {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(m => {
-                      const checked = selectedMarkalar.includes(m.id);
-                      return (
-                        <button key={m.id}
-                          onClick={() => setSelectedMarkalar(prev => prev.includes(m.id) ? prev.filter(i => i !== m.id) : [...prev, m.id])}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '7px 10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: checked ? 'rgba(34,197,94,0.07)' : 'transparent', color: checked ? 'var(--primary)' : '#374151', fontWeight: checked ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
-                          onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8fafc'; }}
-                          onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
-                        >
-                          <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${checked ? 'var(--primary)' : '#cbd5e1'}`, background: checked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                            {checked && <span style={{ color: '#fff', fontSize: '10px', fontWeight: '900', lineHeight: 1 }}>✓</span>}
-                          </span>
-                          {m.gorsel && <img src={m.gorsel} alt={m.ad} style={{ width: 18, height: 18, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />}
-                          {m.ad}
-                        </button>
-                      );
-                    })}
-                    {selectedMarkalar.length > 0 && (
-                      <button onClick={() => setSelectedMarkalar([])} style={{ width: '100%', marginTop: '4px', padding: '6px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>✕ Markayı Temizle</button>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
 
         </div>
@@ -1176,10 +1149,104 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             overflow-y: auto !important;
           }
         }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .brand-card {
+          background: #fff;
+          border-radius: 16px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+          border: 1.5px solid #f1f5f9;
+          padding: 16px 12px 12px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.18s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .brand-card:hover {
+          transform: translateY(-3px) scale(1.03);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          border-color: var(--primary);
+        }
+        .brand-card.brand-card-active {
+          border-color: var(--primary);
+          background: #f0fdf4;
+        }
       `}</style>
 
+      {/* ===== MARKALAR SAYFASI ===== */}
+      {showBrandsView && (
+        <div style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', padding: '0 0 32px' }}>
+          {/* Başlık + kapat */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>🏷️ Markalar</div>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{markalar.length} marka</div>
+            </div>
+            <button
+              onClick={() => setShowBrandsView(false)}
+              style={{ padding: '6px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
+            >✕ Kapat</button>
+          </div>
+
+          {markalar.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 24px', color: '#94a3b8', fontSize: '14px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>🏷️</div>
+              Henüz marka eklenmemiş.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
+              {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((m, i) => {
+                const isActive = selectedMarkalar.includes(m.id);
+                const productCount = products.filter(p => p.markaId === m.id || p.marka_id === m.id).length;
+                const COLORS = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#10b981'];
+                const color = COLORS[m.id % COLORS.length];
+                return (
+                  <div
+                    key={m.id}
+                    className={`brand-card${isActive ? ' brand-card-active' : ''}`}
+                    onClick={() => {
+                      setSelectedMarkalar([m.id]);
+                      setShowBrandsView(false);
+                    }}
+                  >
+                    {/* Logo veya baş harf */}
+                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', background: m.gorsel ? '#f8fafc' : color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${m.gorsel ? '#e2e8f0' : color + '30'}`, flexShrink: 0 }}>
+                      {m.gorsel
+                        ? <img src={m.gorsel} alt={m.ad} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '6px' }} />
+                        : <span style={{ fontSize: '22px', fontWeight: '900', color: color }}>{m.ad[0]?.toUpperCase()}</span>
+                      }
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', lineHeight: '1.3', wordBreak: 'break-word' }}>{m.ad}</div>
+                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{productCount} ürün</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Seçili marka etiketi — brands view kapalıyken */}
+      {selectedMarkalar.length > 0 && !showBrandsView && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0 4px', flexWrap: 'wrap' }}>
+          {markalar.filter(m => selectedMarkalar.includes(m.id)).map(m => (
+            <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '20px', fontSize: '12px', fontWeight: '700', color: '#15803d' }}>
+              🏷️ {m.ad}
+              <button onClick={() => setSelectedMarkalar(prev => prev.filter(id => id !== m.id))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#15803d', fontSize: '13px', padding: 0, lineHeight: 1, fontWeight: '900' }}>×</button>
+            </span>
+          ))}
+          <button onClick={() => setSelectedMarkalar([])} style={{ fontSize: '11px', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>Tümünü Temizle</button>
+        </div>
+      )}
+
       {/* Arama/filtre sonucu boş ise */}
-      {filteredProducts.length === 0 && (search || selectedCatId !== null || selectedMarkalar.length > 0) && (
+      {!showBrandsView && filteredProducts.length === 0 && (search || selectedCatId !== null || selectedMarkalar.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.25 }}>🔍</div>
           <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>Sonuç bulunamadı</div>
@@ -1206,7 +1273,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {/* Kategori ilişkisi yoksa tüm ürünleri düz listele */}
-      {hasNoCategoryRelations && (
+      {!showBrandsView && hasNoCategoryRelations && (
         <div className="customer-category-section">
           <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
             <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
@@ -1235,7 +1302,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
       )}
 
-      {displayCategories.map((cat, catIdx) => {
+      {!showBrandsView && displayCategories.map((cat, catIdx) => {
         // Seçili kategori ise tüm filtredProducts (alt kategoriler dahil) göster
         const catProducts = (selectedCatId !== null && cat.id === selectedCatId)
           ? filteredProducts

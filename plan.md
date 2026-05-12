@@ -63,7 +63,7 @@
 
 ---
 
-## ADIM 6 — Görsel Depolama: Base64'ten Dosya Sistemine (Büyük, Altyapı)
+## ADIM 6 — Görsel Depolama: Base64'ten Dosya Sistemine (Büyük, Altyapı) YAPILDI
 **Ne yapılacak:**
 - Şu an ürün ve marka görselleri veritabanına base64 metin olarak kaydediliyor. Bu veritabanını şişiriyor.
 - Backend'e yeni bir `/uploads` klasörü açılacak. Görseller buraya `.jpg/.png` olarak kaydedilecek.
@@ -80,7 +80,7 @@
 
 ---
 
-## ADIM 7 — Müşteri Portalı: Kategori Navigasyonu Yenileme (Büyük, Frontend)
+## ADIM 7 — Müşteri Portalı: Kategori Navigasyonu Yenileme (Büyük, Frontend) 
 **Ne yapılacak:**
 - Header'daki "Kategoriler" butonuna tıklayınca açılan menü tamamen yenileniyor.
 - Yeni tasarım:
