@@ -279,12 +279,11 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [showCatDrop, setShowCatDrop] = useState(false);
+  const [selectedCatId, setSelectedCatId] = useState(null);
+  const [expandedCatIds, setExpandedCatIds] = useState(new Set());
+  const [showCatPanel, setShowCatPanel] = useState(false);
   const [selectedMarkalar, setSelectedMarkalar] = useState([]);
   const [showMarkaDrop, setShowMarkaDrop] = useState(false);
-  const [categoryOrder, setCategoryOrder] = useState(null); // null = doğal sıra
-  const [pendingOrder, setPendingOrder] = useState(null);   // dropdown'da düzenlenen geçici sıra
   const [sortBy, setSortBy] = useState('default');
   const [showSortDrop, setShowSortDrop] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -377,11 +376,28 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
   const discount = parseDiscount(String(customer.discount || '0'));
 
+  // Kategori yardımcı fonksiyonları
+  const getAllDescendantIds = (catId) => {
+    const children = categories.filter(c => c.parentId === catId);
+    return children.flatMap(c => [c.id, ...getAllDescendantIds(c.id)]);
+  };
+
+  const getBreadcrumb = (catId) => {
+    if (!catId) return [];
+    const path = [];
+    let current = categories.find(c => c.id === catId);
+    while (current) {
+      path.unshift(current);
+      current = current.parentId ? categories.find(c => c.id === current.parentId) : null;
+    }
+    return path;
+  };
+
   const filteredProducts = products.filter(p => {
     if (p.inStock === false) return false;
     const matchSearch = p.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
-    const matchCat = selectedCategories.length > 0
-      ? selectedCategories.some(cid => p.categoryIds.includes(cid))
+    const matchCat = selectedCatId !== null
+      ? [selectedCatId, ...getAllDescendantIds(selectedCatId)].some(id => p.categoryIds.includes(id))
       : true;
     const matchMarka = selectedMarkalar.length > 0
       ? selectedMarkalar.includes(p.markaId)
@@ -418,14 +434,11 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
 
-  // Sıra uygulanmış kategoriler
-  const orderedRoots = (() => {
-    const order = categoryOrder || roots.map(c => c.id);
-    return [...roots].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-  })();
+  // Sıra uygulanmış ana kategoriler (alfabetik)
+  const orderedRoots = [...roots].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
-  const displayCategories = selectedCategories.length > 0
-    ? orderedRoots.filter(c => selectedCategories.includes(c.id))
+  const displayCategories = selectedCatId !== null
+    ? (categories.find(c => c.id === selectedCatId) ? [categories.find(c => c.id === selectedCatId)] : orderedRoots)
     : orderedRoots;
 
   // Kategori ilişkisi olmayan ürünleri kontrol et
@@ -452,99 +465,19 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         <div className="header-center">
 
           <div style={{ position: 'relative' }}>
-            <button onClick={() => {
-              setShowCatDrop(!showCatDrop);
-              if (!showCatDrop) setPendingOrder(categoryOrder || roots.map(c => c.id));
-            }} className="header-filter-btn">
-              📂 Kategoriler
+            <button
+              onClick={() => setShowCatPanel(v => !v)}
+              className="header-filter-btn"
+              style={selectedCatId !== null ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
+            >
+              📂 {selectedCatId !== null ? (categories.find(c => c.id === selectedCatId)?.name || 'Kategori') : 'Kategoriler'}
+              {selectedCatId !== null && (
+                <span
+                  onClick={e => { e.stopPropagation(); setSelectedCatId(null); setShowCatPanel(false); }}
+                  style={{ marginLeft: '4px', opacity: 0.8, cursor: 'pointer' }}
+                >✕</span>
+              )}
             </button>
-            {showCatDrop && (
-              <>
-                <div className="dropdown-overlay" onClick={() => setShowCatDrop(false)} />
-                <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, minWidth: '230px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
-
-                  {/* FİLTRE BÖLÜMÜ */}
-                  <div style={{ padding: '8px 8px 4px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '2px 6px 6px' }}>Kategoriler</div>
-                    {(pendingOrder || roots.map(c => c.id)).map(id => {
-                      const c = categories.find(cat => cat.id === id);
-                      if (!c) return null;
-                      const checked = selectedCategories.includes(c.id);
-                      return (
-                        <button key={c.id} onClick={() => setSelectedCategories(prev => prev.includes(c.id) ? prev.filter(i => i !== c.id) : [...prev, c.id])}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '7px 10px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: checked ? 'rgba(34,197,94,0.07)' : 'transparent', color: checked ? 'var(--primary)' : '#374151', fontWeight: checked ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
-                          onMouseEnter={e => { if (!checked) e.currentTarget.style.background = '#f8fafc'; }}
-                          onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent'; }}
-                        >
-                          <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: `2px solid ${checked ? 'var(--primary)' : '#cbd5e1'}`, background: checked ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
-                            {checked && <span style={{ color: '#fff', fontSize: '10px', fontWeight: '900', lineHeight: 1 }}>✓</span>}
-                          </span>
-                          {c.name}
-                        </button>
-                      );
-                    })}
-                    {selectedCategories.length > 0 && (
-                      <button onClick={() => setSelectedCategories([])} style={{ width: '100%', marginTop: '4px', padding: '6px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>✕ Filtreyi Temizle</button>
-                    )}
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0' }} />
-
-                  {/* SIRALAMA BÖLÜMÜ */}
-                  <div style={{ padding: '4px 8px 8px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '6px 6px 6px' }}>Kategori Sırası</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      {(pendingOrder || roots.map(c => c.id)).map((id, idx, arr) => {
-                        const c = categories.find(cat => cat.id === id);
-                        if (!c) return null;
-                        return (
-                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 6px', borderRadius: '8px' }}>
-                            <span style={{ width: '18px', fontSize: '11px', fontWeight: '700', color: '#94a3b8', textAlign: 'center', flexShrink: 0 }}>{idx + 1}</span>
-                            <span style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: '#334155' }}>{c.name}</span>
-                            <div style={{ display: 'flex', gap: '2px' }}>
-                              <button
-                                disabled={idx === 0}
-                                onClick={() => {
-                                  const next = [...arr];
-                                  [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                                  setPendingOrder(next);
-                                }}
-                                style={{ width: '22px', height: '22px', border: 'none', borderRadius: '6px', background: 'transparent', color: idx === 0 ? '#d1d5db' : '#94a3b8', cursor: idx === 0 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >▲</button>
-                              <button
-                                disabled={idx === arr.length - 1}
-                                onClick={() => {
-                                  const next = [...arr];
-                                  [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
-                                  setPendingOrder(next);
-                                }}
-                                style={{ width: '22px', height: '22px', border: 'none', borderRadius: '6px', background: 'transparent', color: idx === arr.length - 1 ? '#d1d5db' : '#94a3b8', cursor: idx === arr.length - 1 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                              >▼</button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      onClick={() => { setCategoryOrder(pendingOrder); setShowCatDrop(false); }}
-                      style={{ width: '100%', marginTop: '8px', padding: '9px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}
-                    >
-                      ✓ Onayla
-                    </button>
-                    {categoryOrder && (
-                      <button
-                        onClick={() => { setCategoryOrder(null); setPendingOrder(roots.map(c => c.id)); }}
-                        style={{ width: '100%', marginTop: '4px', padding: '7px', borderRadius: '10px', border: 'none', background: '#f1f5f9', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
-                      >
-                        ↺ Varsayılan Sıra
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-              </>
-            )}
           </div>
 
           <div style={{ position: 'relative' }}>
@@ -597,6 +530,101 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           <button onClick={() => setShowLogoutConfirm(true)} className="logout-btn-header" title="Çıkış">✕</button>
         </div>
       </div>
+
+      {/* KATEGORİ AĞAÇ PANELİ */}
+      {showCatPanel && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowCatPanel(false)} />
+          <div style={{
+            position: 'sticky', top: '64px', zIndex: 99,
+            background: '#fff', borderRadius: '0 0 16px 16px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+            border: '1px solid #e2e8f0', borderTop: 'none',
+            marginBottom: '8px', maxHeight: '60vh', overflowY: 'auto',
+            padding: '12px 16px 16px'
+          }}>
+            {/* Panel başlık + kapat */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Kategori Seç</span>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {selectedCatId !== null && (
+                  <button onClick={() => { setSelectedCatId(null); setShowCatPanel(false); }} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', cursor: 'pointer' }}>✕ Filtreyi Temizle</button>
+                )}
+                <button onClick={() => setShowCatPanel(false)} style={{ width: '24px', height: '24px', borderRadius: '50%', border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              </div>
+            </div>
+
+            {/* Tümü butonu */}
+            <button
+              onClick={() => { setSelectedCatId(null); setShowCatPanel(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 10px', border: 'none', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', background: selectedCatId === null ? 'rgba(34,197,94,0.08)' : 'transparent', color: selectedCatId === null ? 'var(--primary)' : '#374151', fontWeight: selectedCatId === null ? '800' : '500', fontSize: '13px', textAlign: 'left' }}
+            >
+              🏠 Tüm Ürünler
+              {selectedCatId === null && <span style={{ marginLeft: 'auto', fontSize: '10px', background: 'var(--primary)', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>SEÇİLİ</span>}
+            </button>
+
+            {/* Kategori ağacı */}
+            {(() => {
+              const renderNode = (catId, depth) => {
+                const cat = categories.find(c => c.id === catId);
+                if (!cat) return null;
+                const children = [...categories.filter(c => c.parentId === catId)].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                const hasChildren = children.length > 0;
+                const isExpanded = expandedCatIds.has(catId);
+                const isSelected = selectedCatId === catId;
+                const toggleExpand = (e) => {
+                  e.stopPropagation();
+                  setExpandedCatIds(prev => {
+                    const next = new Set(prev);
+                    next.has(catId) ? next.delete(catId) : next.add(catId);
+                    return next;
+                  });
+                };
+                return (
+                  <div key={catId}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: `${depth * 20}px`, borderRadius: '10px', background: isSelected ? 'rgba(34,197,94,0.08)' : 'transparent', marginBottom: '2px' }}
+                    >
+                      {/* Expand toggle */}
+                      <button
+                        onClick={toggleExpand}
+                        style={{ width: '22px', height: '22px', flexShrink: 0, border: 'none', borderRadius: '6px', cursor: hasChildren ? 'pointer' : 'default', background: 'transparent', color: hasChildren ? '#94a3b8' : 'transparent', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                        disabled={!hasChildren}
+                      >{hasChildren ? '▶' : ''}</button>
+                      {/* Category button */}
+                      <button
+                        onClick={() => { setSelectedCatId(catId); setShowCatPanel(false); }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 8px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', color: isSelected ? 'var(--primary)' : '#374151', fontWeight: isSelected ? '700' : '500', fontSize: '13px', textAlign: 'left' }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isSelected ? 'var(--primary)' : '#cbd5e1', flexShrink: 0 }} />
+                        {cat.name}
+                        {isSelected && <span style={{ marginLeft: 'auto', fontSize: '10px', background: 'var(--primary)', color: '#fff', borderRadius: '6px', padding: '2px 7px', fontWeight: '700' }}>SEÇİLİ</span>}
+                      </button>
+                    </div>
+                    {isExpanded && hasChildren && children.map(child => renderNode(child.id, depth + 1))}
+                  </div>
+                );
+              };
+              return orderedRoots.map(r => renderNode(r.id, 0));
+            })()}
+          </div>
+        </>
+      )}
+
+      {/* BREADCRUMB - kategori seçiliyse göster */}
+      {selectedCatId !== null && !showCatPanel && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 4px', marginBottom: '4px', flexWrap: 'wrap' }}>
+          <button onClick={() => setSelectedCatId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: '600', padding: '2px 4px', borderRadius: '6px' }}>🏠 Tümü</button>
+          {getBreadcrumb(selectedCatId).map((bc, i, arr) => (
+            <span key={bc.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ color: '#cbd5e1', fontSize: '11px' }}>›</span>
+              <button
+                onClick={() => setSelectedCatId(bc.id)}
+                style={{ background: i === arr.length - 1 ? 'rgba(34,197,94,0.1)' : 'none', border: 'none', cursor: 'pointer', color: i === arr.length - 1 ? 'var(--primary)' : '#64748b', fontSize: '12px', fontWeight: i === arr.length - 1 ? '700' : '600', padding: '2px 8px', borderRadius: '6px' }}
+              >{bc.name}</button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* REFRESH & INFO STRIP */}
       <div className="info-strip">
@@ -1110,16 +1138,16 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       `}</style>
 
       {/* Arama/filtre sonucu boş ise */}
-      {filteredProducts.length === 0 && (search || selectedCategories.length > 0 || selectedMarkalar.length > 0) && (
+      {filteredProducts.length === 0 && (search || selectedCatId !== null || selectedMarkalar.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.25 }}>🔍</div>
           <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>Sonuç bulunamadı</div>
           <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px', maxWidth: '320px', lineHeight: '1.6' }}>
             {search ? <><b>"{search}"</b> için ürün bulunamadı.</> : 'Seçili filtrelerle eşleşen ürün yok.'}
-            {(selectedCategories.length > 0 || selectedMarkalar.length > 0) && <> Filtreleri değiştirmeyi deneyin.</>}
+            {(selectedCatId !== null || selectedMarkalar.length > 0) && <> Filtreleri değiştirmeyi deneyin.</>}
           </div>
           <button
-            onClick={() => { setSearch(''); setSelectedCategories([]); setSelectedMarkalar([]); }}
+            onClick={() => { setSearch(''); setSelectedCatId(null); setSelectedMarkalar([]); }}
             style={{ padding: '10px 24px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
           >
             ✕ Filtreleri Temizle
@@ -1128,7 +1156,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {/* DEBUG kaldırıldı — ürün/kategori ilişki sorunu yoksa gösterme */}
-      {(products.length === 0 || categories.length === 0 || (!hasNoCategoryRelations && displayCategories.every(cat => filteredProducts.filter(p => p.categoryIds.includes(cat.id)).length === 0))) && !hasNoCategoryRelations && filteredProducts.length === 0 && !search && selectedCategories.length === 0 && selectedMarkalar.length === 0 && products.length === 0 && (
+      {(products.length === 0 || categories.length === 0 || (!hasNoCategoryRelations && displayCategories.every(cat => filteredProducts.filter(p => p.categoryIds.includes(cat.id)).length === 0))) && !hasNoCategoryRelations && filteredProducts.length === 0 && !search && selectedCatId === null && selectedMarkalar.length === 0 && products.length === 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.2 }}>📦</div>
           <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b', marginBottom: '8px' }}>Henüz ürün eklenmemiş</div>
@@ -1167,7 +1195,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {displayCategories.map((cat, catIdx) => {
-        const catProducts = filteredProducts.filter(p => p.categoryIds.includes(cat.id));
+        // Seçili kategori ise tüm filtredProducts (alt kategoriler dahil) göster
+        const catProducts = (selectedCatId !== null && cat.id === selectedCatId)
+          ? filteredProducts
+          : filteredProducts.filter(p => p.categoryIds.includes(cat.id));
         if (catProducts.length === 0) return null;
         const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0);
 
