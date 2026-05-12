@@ -470,7 +470,6 @@ export default function Products() {
         return (
           <div key={k.id} className="pm-item">
             <div className="pm-item-left" style={{ flex: 1 }}>
-              <span className="pm-item-icon" style={{ color: '#16a34a' }}>%</span>
               {isEditing ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1 }}>
                   <input
@@ -502,7 +501,7 @@ export default function Products() {
               ) : (
                 <span
                   className="pm-item-name"
-                  style={{ fontWeight: 700, fontSize: 13, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: 6, cursor: 'pointer' }}
+                  style={{ fontWeight: 600, fontSize: 13, color: '#0f172a', cursor: 'pointer' }}
                   onDoubleClick={() => {
                     setModalEditing({ id: k.id, type: 'kdv' });
                     setModalEditValue(String(parseFloat(k.oran)));
