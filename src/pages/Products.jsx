@@ -114,7 +114,10 @@ export default function Products() {
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = localStorage.getItem('products_pageSize');
+    return saved ? parseInt(saved, 10) : 10;
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(null);
   
@@ -1002,7 +1005,7 @@ export default function Products() {
           pageSize={pageSize}
           totalCount={filteredProducts.length}
           onPageChange={setCurrentPage}
-          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          onPageSizeChange={v => { setPageSize(v); localStorage.setItem('products_pageSize', v); setCurrentPage(1); }}
         />
       </div>
 
@@ -1071,7 +1074,7 @@ export default function Products() {
           pageSize={pageSize}
           totalCount={filteredProducts.length}
           onPageChange={setCurrentPage}
-          onPageSizeChange={v => { setPageSize(v); setCurrentPage(1); }}
+          onPageSizeChange={v => { setPageSize(v); localStorage.setItem('products_pageSize', v); setCurrentPage(1); }}
           mobile
         />
 
