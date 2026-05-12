@@ -369,7 +369,6 @@ export default function Products() {
       return filtered.map(u => (
         <div key={u.id} className="pm-item">
           <div className="pm-item-left">
-            <span className="pm-item-icon">⚖️</span>
             {modalEditing.id === u.id && modalEditing.type === 'unit' ? (
               <input
                 autoFocus
@@ -663,10 +662,6 @@ export default function Products() {
             <h2 className="toolbar-title">Stok Listesi <span className="count-badge" style={{ marginLeft: '8px', verticalAlign: 'middle' }}>{products.length} Ürün</span></h2>
           </div>
           <div className="toolbar-right">
-            <div className="premium-search">
-              <span className="search-icon">🔍</span>
-              <input type="text" placeholder="Hızlı ara..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
             <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px',
               borderRadius: '10px', border: '1.5px solid #22c55e', background: 'rgba(34,197,94,0.07)',
@@ -674,6 +669,10 @@ export default function Products() {
             }}>
               📅 Excel'den Yükle
             </button>
+            <div className="premium-search">
+              <span className="search-icon">🔍</span>
+              <input type="text" placeholder="Hızlı ara..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
           </div>
         </div>
 

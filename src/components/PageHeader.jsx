@@ -20,8 +20,6 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
   return (
     <div className="page-header">
       <div className="header-left">
-        <h1 className="page-title">{title}</h1>
-        <p className="page-sub">{sub}</p>
       </div>
       <div className="header-right">
         {actions && <div className="header-actions">{actions}</div>}
