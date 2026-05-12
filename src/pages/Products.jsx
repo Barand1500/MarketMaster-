@@ -478,7 +478,12 @@ export default function Products() {
                     value={modalEditValue}
                     min="0" max="100" step="0.1"
                     onChange={e => setModalEditValue(e.target.value)}
-                    style={{ width: 60 }}
+                    style={{ width: 70, MozAppearance: 'textfield', appearance: 'textfield' }}
+                    onBlur={async () => {
+                      const v = parseFloat(modalEditValue);
+                      if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v);
+                      setModalEditing({ id: null, type: null });
+                    }}
                     onKeyDown={async e => {
                       if (e.key === 'Enter') {
                         const v = parseFloat(modalEditValue);
@@ -488,14 +493,6 @@ export default function Products() {
                       if (e.key === 'Escape') setModalEditing({ id: null, type: null });
                     }}
                   />
-                  <button
-                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '1px solid #10b981', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
-                    onClick={async () => {
-                      const v = parseFloat(modalEditValue);
-                      if (!isNaN(v) && v >= 0) await updateKdvOrani(k.id, v);
-                      setModalEditing({ id: null, type: null });
-                    }}
-                  >✓</button>
                 </div>
               ) : (
                 <span
@@ -661,7 +658,7 @@ export default function Products() {
           <div className="toolbar-left">
             <h2 className="toolbar-title">Stok Listesi <span className="count-badge" style={{ marginLeft: '8px', verticalAlign: 'middle' }}>{products.length} Ürün</span></h2>
           </div>
-          <div className="toolbar-right">
+          <div className="toolbar-right" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', flexWrap: 'nowrap' }}>
             <button onClick={() => { setShowExcelModal(true); setExcelStep('guide'); setExcelRows([]); setExcelError(''); }} style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px',
               borderRadius: '10px', border: '1.5px solid #22c55e', background: 'rgba(34,197,94,0.07)',

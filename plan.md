@@ -18,7 +18,7 @@
 
 ---
 
-## ADIM 2 — Sayfalama Kalıcılığı (Hızlı, Kolay)
+## ADIM 2 — Sayfalama Kalıcılığı (Hızlı, Kolay)   YAPILDI
 **Ne yapılacak:**
 - Ürünler sayfasındaki "5 / 10 / 20" sayfa boyutu seçimi localStorage'a kaydedilecek.
 - Sayfa yenilendiğinde veya farklı sayfaya gidip gelindiğinde son seçilen sayfa boyutu korunacak.
@@ -29,7 +29,7 @@
 
 ---
 
-## ADIM 3 — KDV Oranları Görünüm Düzeltmesi (Hızlı, Kolay)
+## ADIM 3 — KDV Oranları Görünüm Düzeltmesi (Hızlı, Kolay)  YAPILDI
 **Ne yapılacak:**
 - KDV Yönetimi modalında oranlar şu an "%%10" gibi görünüyor (iki tane % işareti var).
 - Baştaki fazla % işareti kaldırılacak, sadece "%10" görünecek.

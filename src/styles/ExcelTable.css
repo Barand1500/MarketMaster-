@@ -80,6 +80,9 @@
 .edit-txt { cursor: pointer; font-size: 13.5px; color: #334155; font-weight: 500; }
 .edit-txt.price { font-weight: 800; color: #059669; }
 .inline-edit { width: 100%; padding: 5px 10px; border: 2px solid #10b981; border-radius: 6px; outline: none; font-size: 13.5px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1); }
+.inline-edit[type="number"]::-webkit-inner-spin-button,
+.inline-edit[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.inline-edit[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 .badge-unit { background: #f1f5f9; color: #475569; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .badge-group { display: flex; flex-wrap: wrap; gap: 4px; cursor: pointer; min-height: 24px; }
