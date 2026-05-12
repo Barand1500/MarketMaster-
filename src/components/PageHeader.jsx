@@ -3,6 +3,17 @@ import { useState, useEffect } from 'react';
 export default function PageHeader({ title, sub, helpContent, helpContentMobile, actions }) {
   const [showHelp, setShowHelp] = useState(false);
 
+  // Navbar'a bu sayfanın help içeriği olduğunu bildir
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('pageHelpAvailable', { detail: true }));
+    const handleOpen = () => setShowHelp(true);
+    window.addEventListener('openPageHelp', handleOpen);
+    return () => {
+      window.dispatchEvent(new CustomEvent('pageHelpAvailable', { detail: false }));
+      window.removeEventListener('openPageHelp', handleOpen);
+    };
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F1') {
@@ -23,9 +34,6 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
       </div>
       <div className="header-right">
         {actions && <div className="header-actions">{actions}</div>}
-        <button className="btn-help" onClick={() => setShowHelp(true)} title="Nasıl Kullanılır?">
-          <span>💡</span>
-        </button>
       </div>
 
       {showHelp && (

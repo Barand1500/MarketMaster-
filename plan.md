@@ -80,7 +80,7 @@
 
 ---
 
-## ADIM 7 — Müşteri Portalı: Kategori Navigasyonu Yenileme (Büyük, Frontend) 
+## ADIM 7 — Müşteri Portalı: Kategori Navigasyonu Yenileme (Büyük, Frontend) Yapıldı 
 **Ne yapılacak:**
 - Header'daki "Kategoriler" butonuna tıklayınca açılan menü tamamen yenileniyor.
 - Yeni tasarım:

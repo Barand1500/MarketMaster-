@@ -117,6 +117,30 @@
   transform: scale(1.1);
 }
 
+/* Nasıl Kullanılır ampul butonu — sadece desktop */
+.nav-help-btn {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1.5px solid rgba(251, 191, 36, 0.35);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.nav-help-btn:hover {
+  background: rgba(251, 191, 36, 0.22);
+  transform: scale(1.08);
+}
+
+@media (max-width: 768px) {
+  .nav-help-btn { display: none; }
+}
+
 @media (max-width: 768px) {
   .navbar { height: 52px; }
   .nav-container { padding: 0 10px; }

@@ -7,6 +7,13 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
   const isSysAdmin = session?.role === 'admin';
   const allowed = session?.allowedPages || [];
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [hasPageHelp, setHasPageHelp] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => setHasPageHelp(e.detail);
+    window.addEventListener('pageHelpAvailable', handler);
+    return () => window.removeEventListener('pageHelpAvailable', handler);
+  }, []);
 
   // Profil modal state
   const [showProfile, setShowProfile] = useState(false);
@@ -167,6 +174,13 @@ export default function Navbar({ active, onNav, onLogout, session, onSessionUpda
         </div>
         
         <div className="nav-right">
+          {hasPageHelp && (
+            <button
+              className="nav-help-btn"
+              onClick={() => window.dispatchEvent(new CustomEvent('openPageHelp'))}
+              title="Nasıl Kullanılır? (F1)"
+            >💡</button>
+          )}
           <div className="nav-profile" onClick={openProfile} style={{ cursor: 'pointer' }} title="Profilimi Düzenle">
             <div className="profile-info">
               <span className="profile-name">{session?.contact || session?.username}</span>
