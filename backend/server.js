@@ -693,6 +693,12 @@ app.delete('/api/urunler/:id', (req, res) => {
   });
 });
 
+// Startup migration: musteriler.fiyat_tipi kolonu
+db.query("ALTER TABLE musteriler ADD COLUMN fiyat_tipi VARCHAR(100) NULL DEFAULT NULL", (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (musteriler.fiyat_tipi):', err.message);
+  else if (!err) console.log('✅ Migration: musteriler.fiyat_tipi kolonu eklendi');
+});
+
 // --- MUSTERILER API ---
 app.get('/api/musteriler', (req, res) => {
   db.query('SELECT * FROM musteriler', (err, results) => {
@@ -702,11 +708,11 @@ app.get('/api/musteriler', (req, res) => {
 });
 
 app.post('/api/musteriler', (req, res) => {
-  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres } = req.body;
+  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi } = req.body;
   if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Müşteri adı zorunludur.' });
   const iskonto = iskonto_orani || '0';
-  db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto, adres], (err, result) => {
+  db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto, adres, fiyat_tipi || null], (err, result) => {
     if (err) {
       if (err.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
@@ -718,7 +724,7 @@ app.post('/api/musteriler', (req, res) => {
 });
 
 app.put('/api/musteriler/:id', (req, res) => {
-  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres } = req.body;
+  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi } = req.body;
   const handleDbErr = (err, res) => {
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
@@ -726,14 +732,14 @@ app.put('/api/musteriler/:id', (req, res) => {
     return res.status(500).json({ error: err.message });
   };
   if (sifre) {
-    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, sifre=?, iskonto_orani=?, adres=? WHERE id=?',
-      [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, req.params.id], (err) => {
+    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, sifre=?, iskonto_orani=?, adres=?, fiyat_tipi=? WHERE id=?',
+      [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi || null, req.params.id], (err) => {
       if (err) return handleDbErr(err, res);
       res.json({ success: true });
     });
   } else {
-    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, iskonto_orani=?, adres=? WHERE id=?',
-      [ad_soyad, vkn_tc, telefon, eposta, iskonto_orani, adres, req.params.id], (err) => {
+    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, iskonto_orani=?, adres=?, fiyat_tipi=? WHERE id=?',
+      [ad_soyad, vkn_tc, telefon, eposta, iskonto_orani, adres, fiyat_tipi || null, req.params.id], (err) => {
       if (err) return handleDbErr(err, res);
       res.json({ success: true });
     });

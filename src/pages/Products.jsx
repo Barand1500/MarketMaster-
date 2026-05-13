@@ -127,6 +127,13 @@ export default function Products() {
   // Info popup state
   const [infoPopup, setInfoPopup] = useState(null); // product id or null
 
+  // Fiyat modal state
+  const [fiyatModal, setFiyatModal] = useState(null); // { id, name } or null
+  const [fiyatlarListesi, setFiyatlarListesi] = useState([]);
+  const [fiyatlarLoading, setFiyatlarLoading] = useState(false);
+  const [fiyatForm, setFiyatForm] = useState(null); // null=kapalı, {} = yeni/düzenleme
+  const [fiyatFormLoading, setFiyatFormLoading] = useState(false);
+
   // KDV modal state
   const [kdvModalDahil, setKdvModalDahil] = useState(true);
   const [kdvEditDahil, setKdvEditDahil] = useState(true);
@@ -172,6 +179,58 @@ export default function Products() {
     setModalMarkaGorsel(null);
     setModalMarkaGorselFile(null);
     setEditingCatId(null);
+  };
+
+  const openFiyatModal = async (p) => {
+    setFiyatModal({ id: p.id, name: p.name });
+    setFiyatlarLoading(true);
+    setFiyatlarListesi([]);
+    setFiyatForm(null);
+    try {
+      const res = await fetch(`/api/fiyatlar?urun_id=${p.id}`);
+      const data = await res.json();
+      setFiyatlarListesi(Array.isArray(data) ? data : []);
+    } catch { setFiyatlarListesi([]); }
+    setFiyatlarLoading(false);
+  };
+
+  const saveFiyat = async () => {
+    if (!fiyatForm) return;
+    if (!fiyatForm.fiyat_adi?.trim()) return;
+    setFiyatFormLoading(true);
+    try {
+      const body = {
+        fiyat_adi: fiyatForm.fiyat_adi.trim(),
+        urun_id: fiyatModal.id,
+        birim_id: parseInt(fiyatForm.birim_id) || units[0]?.id || 1,
+        carpan: parseFloat(fiyatForm.carpan) || 1,
+        fiyat: parseFloat(fiyatForm.fiyat) || 0,
+        para_birimi_id: parseInt(fiyatForm.para_birimi_id) || 1,
+        kdv_oran_id: fiyatForm.kdv_oran_id ? parseInt(fiyatForm.kdv_oran_id) : null,
+        iskonto_tipi: fiyatForm.iskonto_tipi || null,
+        iskonto_orani: fiyatForm.iskonto_orani ? parseFloat(fiyatForm.iskonto_orani) : null,
+        barkod: fiyatForm.barkod?.trim() || null
+      };
+      let res;
+      if (fiyatForm.id) {
+        res = await fetch(`/api/fiyatlar/${fiyatForm.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } else {
+        res = await fetch('/api/fiyatlar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      if (res.ok) {
+        const refresh = await fetch(`/api/fiyatlar?urun_id=${fiyatModal.id}`);
+        const data = await refresh.json();
+        setFiyatlarListesi(Array.isArray(data) ? data : []);
+        setFiyatForm(null);
+      }
+    } catch {}
+    setFiyatFormLoading(false);
+  };
+
+  const deleteFiyatRow = async (id) => {
+    if (!window.confirm('Bu fiyat satırını silmek istiyor musunuz?')) return;
+    await fetch(`/api/fiyatlar/${id}`, { method: 'DELETE' });
+    setFiyatlarListesi(prev => prev.filter(f => f.id !== id));
   };
 
   const fileInputRef = useRef(null);
@@ -953,6 +1012,7 @@ export default function Products() {
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', position: 'relative' }}>
                         <button className="del-btn-icon" title="Bilgi" onClick={() => setInfoPopup(infoPopup === p.id ? null : p.id)} style={{ fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }}>ℹ️</button>
+                        <button className="del-btn-icon" title="Fiyatlar" onClick={() => { setInfoPopup(null); openFiyatModal(p); }} style={{ fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', opacity: 0.8 }}>💰</button>
                         <button className="del-btn-icon" onClick={() => setConfirm(p.id)}>🗑</button>
                         {infoPopup === p.id && (
                           <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '14px 16px', minWidth: '220px', zIndex: 999, textAlign: 'left' }}>
@@ -1654,6 +1714,131 @@ export default function Products() {
       {pmTooltip && (
         <div className="pm-float-tooltip" style={{ left: pmTooltip.x, top: pmTooltip.y }}>
           {pmTooltipText || 'Düzenlemek için çift tıklayınız'}
+        </div>
+      )}
+
+      {/* ===================== FİYAT MODAL ===================== */}
+      {fiyatModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '40px', overflowY: 'auto' }} onClick={() => { setFiyatModal(null); setFiyatForm(null); }}>
+          <div style={{ background: '#fff', borderRadius: '18px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', padding: '28px', width: '96%', maxWidth: '900px', marginBottom: 40 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '16px', color: '#0f172a' }}>💰 Fiyat Listesi</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: 2 }}>{fiyatModal.name}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!fiyatForm && (
+                  <button onClick={() => setFiyatForm({ fiyat_adi: '', birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', iskonto_tipi: '', iskonto_orani: '', barkod: '' })} style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>+ Yeni Fiyat</button>
+                )}
+                <button onClick={() => { setFiyatModal(null); setFiyatForm(null); }} style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#374151', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>Kapat</button>
+              </div>
+            </div>
+
+            {/* Yeni/Düzenleme Formu */}
+            {fiyatForm && (
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1.5px solid #e2e8f0' }}>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', marginBottom: '12px' }}>{fiyatForm.id ? '✏️ Fiyat Düzenle' : '➕ Yeni Fiyat Ekle'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Fiyat Adı *</div>
+                    <input className="lite-input" placeholder="Örn: Toptancı, Perakende..." value={fiyatForm.fiyat_adi} onChange={e => setFiyatForm(p => ({ ...p, fiyat_adi: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Birim</div>
+                    <select className="lite-select" value={fiyatForm.birim_id} onChange={e => setFiyatForm(p => ({ ...p, birim_id: e.target.value }))}>
+                      {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Çarpan</div>
+                    <input className="lite-input" type="number" min="0" step="0.0001" placeholder="1" value={fiyatForm.carpan} onChange={e => setFiyatForm(p => ({ ...p, carpan: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Fiyat *</div>
+                    <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={fiyatForm.fiyat} onChange={e => setFiyatForm(p => ({ ...p, fiyat: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Para Birimi</div>
+                    <select className="lite-select" value={fiyatForm.para_birimi_id} onChange={e => setFiyatForm(p => ({ ...p, para_birimi_id: e.target.value }))}>
+                      {paraBirimleri.map(pb => <option key={pb.id} value={pb.id}>{pb.sembol} {pb.kisa_ad}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>KDV</div>
+                    <select className="lite-select" value={fiyatForm.kdv_oran_id || ''} onChange={e => setFiyatForm(p => ({ ...p, kdv_oran_id: e.target.value || null }))}>
+                      <option value="">KDV Yok</option>
+                      {kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>İskonto Tipi</div>
+                    <select className="lite-select" value={fiyatForm.iskonto_tipi || ''} onChange={e => setFiyatForm(p => ({ ...p, iskonto_tipi: e.target.value || null }))}>
+                      <option value="">—</option>
+                      <option value="oran">Oran (%)</option>
+                      <option value="tutar">Tutar</option>
+                    </select>
+                  </div>
+                  {fiyatForm.iskonto_tipi && (
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>İskonto {fiyatForm.iskonto_tipi === 'oran' ? '(%)' : '(Tutar)'}</div>
+                      <input className="lite-input" type="number" min="0" step="0.01" placeholder="0" value={fiyatForm.iskonto_orani || ''} onChange={e => setFiyatForm(p => ({ ...p, iskonto_orani: e.target.value }))} />
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>Barkod</div>
+                    <input className="lite-input" placeholder="Barkod..." value={fiyatForm.barkod || ''} onChange={e => setFiyatForm(p => ({ ...p, barkod: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveFiyat} disabled={fiyatFormLoading} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer', opacity: fiyatFormLoading ? 0.7 : 1 }}>{fiyatFormLoading ? '...' : (fiyatForm.id ? 'Güncelle' : 'Kaydet')}</button>
+                  <button onClick={() => setFiyatForm(null)} style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>İptal</button>
+                </div>
+              </div>
+            )}
+
+            {/* Fiyat Listesi Tablosu */}
+            {fiyatlarLoading ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px', fontSize: '14px' }}>Yükleniyor...</div>
+            ) : fiyatlarListesi.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '24px', fontSize: '13px' }}>Henüz fiyat eklenmemiş. Yukarıdaki "+ Yeni Fiyat" butonuyla başlayın.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', color: '#64748b', fontWeight: '700' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>Fiyat Adı</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>Birim</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>Çarpan</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #e2e8f0' }}>Fiyat</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>KDV</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>İskonto</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>Barkod</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fiyatlarListesi.map(f => (
+                      <tr key={f.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: '700', color: '#0f172a' }}>{f.fiyat_adi}</td>
+                        <td style={{ padding: '8px 10px', color: '#374151' }}>{f.birim_adi}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{parseFloat(f.carpan)}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{Number(f.fiyat).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {f.sembol || '₺'}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{f.kdv_oran != null ? `%${parseFloat(f.kdv_oran)}` : '—'}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{f.iskonto_tipi ? `${f.iskonto_orani} ${f.iskonto_tipi === 'oran' ? '%' : f.sembol || '₺'}` : '—'}</td>
+                        <td style={{ padding: '8px 10px', color: '#64748b' }}>{f.barkod || '—'}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button onClick={() => setFiyatForm({ ...f, kdv_oran_id: f.kdv_oran_id || '', iskonto_tipi: f.iskonto_tipi || '', iskonto_orani: f.iskonto_orani || '', barkod: f.barkod || '' })} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>✏️</button>
+                            <button onClick={() => deleteFiyatRow(f.id)} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>🗑</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -97,7 +97,8 @@ export function DataProvider({ children }) {
             password: c.sifre,
             discount: c.iskonto_orani || '0', 
             address: c.adres,
-            createdAt: c.kayit_tarihi
+            createdAt: c.kayit_tarihi,
+            fiyatTipi: c.fiyat_tipi || null
           })) : []);
           setUsers(Array.isArray(staff) ? staff.map(s => ({ 
             id: s.id, 
@@ -512,7 +513,8 @@ export function DataProvider({ children }) {
           eposta: customer.email,
           sifre: customer.password,
           iskonto_orani: customer.discount,
-          adres: customer.address
+          adres: customer.address,
+          fiyat_tipi: customer.fiyatTipi || null
         })
       });
       if (!res.ok) {
@@ -531,7 +533,8 @@ export function DataProvider({ children }) {
         password: data.sifre, 
         discount: data.iskonto_orani || '0', 
         address: data.adres,
-        createdAt: data.kayit_tarihi
+        createdAt: data.kayit_tarihi,
+        fiyatTipi: data.fiyat_tipi || null
       }]);
     } catch (e) { setApiError(e.message || 'Müşteri eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -543,7 +546,8 @@ export function DataProvider({ children }) {
       telefon: updates.phone !== undefined ? updates.phone : current.phone,
       eposta: updates.email !== undefined ? updates.email : current.email,
       iskonto_orani: updates.discount !== undefined ? updates.discount : current.discount,
-      adres: updates.address !== undefined ? updates.address : current.address
+      adres: updates.address !== undefined ? updates.address : current.address,
+      fiyat_tipi: updates.fiyatTipi !== undefined ? updates.fiyatTipi : current.fiyatTipi
     };
     // Yeni sifre gonderilmisse ekle (hash backend'de yapilir)
     if (updates.password) fullData.sifre = updates.password;

@@ -40,7 +40,7 @@ function pBtn(disabled, active = false) {
 export default function Customers() {
   const { customers, addCustomer, updateCustomer, deleteCustomer } = useData();
 
-  const [newRow, setNewRow] = useState({ name: '', taxId: '', phone: '', password: '', discount: '', email: '' });
+  const [newRow, setNewRow] = useState({ name: '', taxId: '', phone: '', password: '', discount: '', email: '', fiyatTipi: '' });
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -48,6 +48,11 @@ export default function Customers() {
   const [infoModal, setInfoModal] = useState(null);
   const [showInfoPass, setShowInfoPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [fiyatTipiAdlari, setFiyatTipiAdlari] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/fiyatlar/adlar').then(r => r.ok ? r.json() : []).then(d => setFiyatTipiAdlari(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
 
   // MOBİL state
   const [mobileEdit, setMobileEdit] = useState(null); // customer being edited
@@ -181,7 +186,7 @@ export default function Customers() {
       taxId: cleanedTaxId,
       discount: newRow.discount || '0'
     });
-    setNewRow({ name: '', taxId: '', phone: '', password: '', discount: '', email: '' });
+    setNewRow({ name: '', taxId: '', phone: '', password: '', discount: '', email: '', fiyatTipi: '' });
   };
 
   const handleBlur = (id, field, value) => {
@@ -285,6 +290,7 @@ export default function Customers() {
                 <th style={{ width: '180px' }}>E-posta <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '120px' }}>Şifre <span style={{ color: 'var(--danger)', fontSize: '14px' }}>*</span></th>
                 <th style={{ width: '130px' }}>İskonto %</th>
+                <th style={{ width: '140px' }}>Fiyat Tipi</th>
                 <th style={{ width: '100px', textAlign: 'center' }}>İşlem</th>
               </tr>
               {/* EXCEL ADD ROW */}
@@ -299,6 +305,12 @@ export default function Customers() {
                 <td><input className="lite-input" type="email" placeholder="Zorunlu..." value={newRow.email} onChange={e => setNewRow({...newRow, email: e.target.value})} /></td>
                 <td><input className="lite-input" type="password" placeholder="••••••" value={newRow.password} onChange={e => setNewRow({...newRow, password: e.target.value})} /></td>
                 <td><input className="lite-input" type="text" placeholder="0 veya 20+20" value={newRow.discount} onChange={e => setNewRow({...newRow, discount: e.target.value})} /></td>
+                <td>
+                  <select className="lite-select" value={newRow.fiyatTipi || ''} onChange={e => setNewRow({...newRow, fiyatTipi: e.target.value || null})}>
+                    <option value="">— Yok —</option>
+                    {fiyatTipiAdlari.map(ad => <option key={ad} value={ad}>{ad}</option>)}
+                  </select>
+                </td>
                 <td style={{ textAlign: 'center', position: 'relative' }}>
                   <button className="lite-add-btn" onClick={handleAdd} title="Müşteri ekle">+</button>
                   {errorMsg && <div style={{ 
@@ -396,7 +408,20 @@ export default function Customers() {
                     {editing?.id === c.id && editing?.field === 'discount' ? (
                       <input autoFocus type="text" className="lite-input" defaultValue={c.discount} placeholder="0 veya 20+20" onBlur={(e) => handleBlur(c.id, 'discount', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
-                      <span className="edit-txt">{displayDiscount(c.discount)}</span>
+                      <span className="edit-txt" style={c.fiyatTipi ? { color: '#94a3b8', textDecoration: 'line-through', opacity: 0.5 } : {}}>{displayDiscount(c.discount)}</span>
+                    )}
+                  </td>
+
+                  <td onDoubleClick={() => setEditing({ id: c.id, field: 'fiyatTipi' })}>
+                    {editing?.id === c.id && editing?.field === 'fiyatTipi' ? (
+                      <select autoFocus className="lite-select" defaultValue={c.fiyatTipi || ''} onBlur={(e) => handleBlur(c.id, 'fiyatTipi', e.target.value || null)} onKeyDown={e => e.key === 'Enter' && e.target.blur()}>
+                        <option value="">— Yok —</option>
+                        {fiyatTipiAdlari.map(ad => <option key={ad} value={ad}>{ad}</option>)}
+                      </select>
+                    ) : (
+                      <span className="edit-txt" style={c.fiyatTipi ? { color: '#0369a1', fontWeight: '700' } : { color: '#94a3b8' }}>
+                        {c.fiyatTipi || '—'}
+                      </span>
                     )}
                   </td>
 
