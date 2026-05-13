@@ -25,6 +25,7 @@ export default function Settings() {
   const [gorselOnayModal, setGorselOnayModal] = useState(null); // { hedef }
   const [gorselMigrasyonSonuc, setGorselMigrasyonSonuc] = useState(null);
   const [gorselMigrasyonYukleniyor, setGorselMigrasyonYukleniyor] = useState(false);
+  const [showGorselHelp, setShowGorselHelp] = useState(false);
 
   // Sayfa yüklenince DB'den doğrudan oku (Ctrl+Shift+R sonrası doğru değeri göster)
   useEffect(() => {
@@ -894,6 +895,11 @@ export default function Settings() {
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '18px' }}>
           <h2 className="toolbar-title">🖼️ Görsel Saklama</h2>
+          <button
+            onClick={() => setShowGorselHelp(true)}
+            title="Nasıl çalışır?"
+            style={{ background: 'rgba(251,191,36,0.13)', border: '1.5px solid rgba(251,191,36,0.4)', borderRadius: '7px', width: '26px', height: '26px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s', marginLeft: 'auto' }}
+          >💡</button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1010,6 +1016,82 @@ export default function Settings() {
               <button onClick={handlePbSilOnayla} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Sil</button>
               <button onClick={() => setPbSilOnay(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Görsel Saklama Bilgi Modali */}
+      {showGorselHelp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGorselHelp(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            {/* Başlık */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>💡</div>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>Görsel Saklama Nasıl Çalışır?</div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Saklama yöntemleri hakkında bilgi</div>
+              </div>
+              <button onClick={() => setShowGorselHelp(false)} style={{ marginLeft: 'auto', background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px', color: '#475569', fontWeight: '600' }}>✕</button>
+            </div>
+
+            {/* İçerik */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '4px' }}>🗄️ Veritabanı Modu</div>
+                Görseller base64 formatında doğrudan veritabanına yazılır. Kurulum gerektirmez, taşınabilirdir. Ancak çok sayıda görsel olduğunda veritabanı boyutu büyüyebilir ve sayfa yükleme hızı düşebilir.
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>📁 Dosya Sistemi Modu</div>
+                Görseller sunucudaki <code style={{ background: '#dcfce7', padding: '1px 5px', borderRadius: '4px', fontSize: '12px' }}>/uploads/</code> klasörüne kaydedilir, veritabanında sadece dosya yolu tutulur. Veritabanı küçük kalır ve yükleme çok daha hızlı olur.
+              </div>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#374151', marginBottom: '4px' }}>🔄 Yöntem Değiştirme</div>
+                Bir yöntemden diğerine geçerken <strong>mevcut görselleri taşı</strong> seçeneği ile tüm eski görseller yeni sisteme aktarabilirsin. Ya da sadece tercihi kaydedip yeni eklenen görsellerin yeni yöntemle saklanmasını sağlayabilirsin.
+              </div>
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#92400e' }}>
+                <strong>⚠️ Not:</strong> Dosya sistemi modunu kullanıyorsan nginx yapılandırmanızda <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğunun tanımlandığından emin olun.
+              </div>
+            </div>
+
+            <button onClick={() => setShowGorselHelp(false)} style={{ marginTop: '20px', width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>Anlaştım ✓</button>
+          </div>
+        </div>
+      )}
+
+      {/* Görsel Saklama Bilgi Modali */}
+      {showGorselHelp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGorselHelp(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            {/* Başlık */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>💡</div>
+              <div>
+                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>Görsel Saklama Nasıl Çalışır?</div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Saklama yöntemleri hakkında bilgi</div>
+              </div>
+              <button onClick={() => setShowGorselHelp(false)} style={{ marginLeft: 'auto', background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px', color: '#475569', fontWeight: '600' }}>✕</button>
+            </div>
+
+            {/* İçerik */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '4px' }}>🗄️ Veritabanı Modu</div>
+                Görseller base64 formatında doğrudan veritabanına yazılır. Kurulum gerektirmez, taşınabilirdir. Ancak çok sayıda görsel olduğunda veritabanı boyutu büyüyebilir ve sayfa yükleme hızı düşebilir.
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>📁 Dosya Sistemi Modu</div>
+                Görseller sunucudaki <code style={{ background: '#dcfce7', padding: '1px 5px', borderRadius: '4px', fontSize: '12px' }}>/uploads/</code> klasörüne kaydedilir, veritabanında sadece dosya yolu tutulur. Veritabanı küçük kalır ve yükleme çok daha hızlı olur.
+              </div>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#374151', marginBottom: '4px' }}>🔄 Yöntem Değiştirme</div>
+                Bir yöntemden diğerine geçerken <strong>mevcut görselleri taşı</strong> seçeneği ile tüm eski görseller yeni sisteme aktarılır. Ya da sadece tercihi kaydedip yeni eklenen görsellerin yeni yöntemle saklanmasını sağlayabilirsin.
+              </div>
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#92400e' }}>
+                <strong>⚠️ Not:</strong> Dosya sistemi modunu kullanıyorsan nginx yapılandırmanızda <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğunun tanımlandığından emin olun.
+              </div>
+            </div>
+
+            <button onClick={() => setShowGorselHelp(false)} style={{ marginTop: '18px', width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>Anlaştım ✓</button>
           </div>
         </div>
       )}
