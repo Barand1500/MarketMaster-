@@ -146,6 +146,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
   const effectiveSembol = ozelFiyat ? (ozelFiyat.sembol || p.pbSembol) : p.pbSembol;
   const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisaAd || p.pbKisaAd) : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
+  const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
   const discountedPrice = ozelFiyat ? effectivePrice : effectivePrice * (1 - discount / 100);
   const effectiveDiscount = ozelFiyat ? 0 : discount; // Özel fiyatta iskonto badge gösterme
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
@@ -174,7 +175,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
         <td className="cp-col-name" style={{ padding: '10px 10px' }}>
           <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-            <span className="badge-unit" style={{ cursor: 'default' }}>{p.unit || 'Kg'}</span>
+            <span className="badge-unit" style={{ cursor: 'default' }}>{effectiveUnit || 'Kg'}</span>
             {p.kdvOrani != null && (
               <span style={{
                 fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
@@ -225,7 +226,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
   return (
     <div className="product-card" {...hoverHandlers}>
       <div className="product-image-container">
-        <div className="card-unit-corner">{p.unit || 'Kg'}</div>
+        <div className="card-unit-corner">{effectiveUnit || 'Kg'}</div>
         {p.image ? (
           <img src={p.image} alt={p.name} className="product-image" />
         ) : (
