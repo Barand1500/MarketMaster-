@@ -162,9 +162,13 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
   const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisa_ad || p.pbKisaAd) : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
-  // KDV: ozelFiyat varsa fiyatlar tablosundaki kdv_oran ve kdv_dahil kullan
-  const effectiveKdvOrani = ozelFiyat ? (ozelFiyat.kdv_oran != null ? ozelFiyat.kdv_oran : null) : p.kdvOrani;
-  const effectiveKdvDahil = ozelFiyat ? (ozelFiyat.kdv_dahil != null ? !!ozelFiyat.kdv_dahil : null) : p.kdvDahil;
+  // KDV: ozelFiyat varsa fiyatlar tablosundaki kdv_oran/kdv_dahil kullan, yoksa ürünün KDV'sine dön
+  const effectiveKdvOrani = ozelFiyat
+    ? (ozelFiyat.kdv_oran != null ? ozelFiyat.kdv_oran : p.kdvOrani)
+    : p.kdvOrani;
+  const effectiveKdvDahil = ozelFiyat
+    ? (ozelFiyat.kdv_dahil != null ? !!ozelFiyat.kdv_dahil : p.kdvDahil)
+    : p.kdvDahil;
   // Fiyat listesi iskontosu: fiyatlar tablosundaki iskonto_orani (ürüne özel)
   const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
   // hasFiyatTipi varsa customer iskontosu bypass — sadece fiyatlar.iskonto_orani kullanılır
