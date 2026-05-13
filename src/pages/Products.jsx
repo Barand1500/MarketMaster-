@@ -207,6 +207,7 @@ export default function Products() {
         fiyat: parseFloat(fiyatForm.fiyat) || 0,
         para_birimi_id: parseInt(fiyatForm.para_birimi_id) || 1,
         kdv_oran_id: fiyatForm.kdv_oran_id ? parseInt(fiyatForm.kdv_oran_id) : null,
+        kdv_dahil: fiyatForm.kdv_oran_id ? (fiyatForm.kdv_dahil != null ? parseInt(fiyatForm.kdv_dahil) : null) : null,
         iskonto_tipi: fiyatForm.iskonto_tipi || null,
         iskonto_orani: fiyatForm.iskonto_orani ? parseFloat(fiyatForm.iskonto_orani) : null,
         barkod: fiyatForm.barkod?.trim() || null
@@ -1770,6 +1771,16 @@ export default function Products() {
                       {kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}
                     </select>
                   </div>
+                  {fiyatForm.kdv_oran_id && (
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>KDV Tipi</div>
+                      <select className="lite-select" value={fiyatForm.kdv_dahil != null ? String(fiyatForm.kdv_dahil) : ''} onChange={e => setFiyatForm(p => ({ ...p, kdv_dahil: e.target.value !== '' ? parseInt(e.target.value) : null }))}>
+                        <option value="">— Seç —</option>
+                        <option value="1">Dahil</option>
+                        <option value="0">Hariç</option>
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <div style={{ fontSize: '11px', color: '#64748b', marginBottom: 3, fontWeight: 600 }}>İskonto Tipi</div>
                     <select className="lite-select" value={fiyatForm.iskonto_tipi || ''} onChange={e => setFiyatForm(p => ({ ...p, iskonto_tipi: e.target.value || null }))}>

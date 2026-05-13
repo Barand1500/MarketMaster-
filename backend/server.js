@@ -369,7 +369,7 @@ app.get('/api/fiyatlar', (req, res) => {
   const sql = `
     SELECT f.*,
       b.birim_adi,
-      pb.ad AS para_birimi_adi, pb.sembol AS para_birimi_sembol,
+      pb.ad AS para_birimi_adi, pb.sembol, pb.kisa_ad,
       k.oran AS kdv_oran
     FROM fiyatlar f
     LEFT JOIN birimler b ON f.birim_id = b.id
@@ -391,7 +391,7 @@ app.get('/api/fiyatlar/liste', (req, res) => {
     SELECT f.*,
       u.urun_adi,
       b.birim_adi,
-      pb.sembol AS para_birimi_sembol,
+      pb.sembol, pb.kisa_ad,
       k.oran AS kdv_oran
     FROM fiyatlar f
     LEFT JOIN urunler u ON f.urun_id = u.id
@@ -418,10 +418,10 @@ app.get('/api/fiyatlar/adlar', (req, res) => {
 
 // Yeni fiyat satırı ekle
 app.post('/api/fiyatlar', (req, res) => {
-  const { fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  const { fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
   if (!fiyat_adi || !urun_id || !birim_id) return res.status(400).json({ error: 'fiyat_adi, urun_id ve birim_id zorunlu' });
-  const sql = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const sql = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const vals = [
     fiyat_adi,
     urun_id,
@@ -430,6 +430,7 @@ app.post('/api/fiyatlar', (req, res) => {
     parseFloat(fiyat) || 0,
     para_birimi_id || 1,
     kdv_oran_id || null,
+    kdv_dahil != null ? parseInt(kdv_dahil) : null,
     iskonto_tipi || null,
     iskonto_orani != null ? parseFloat(iskonto_orani) : null,
     barkod || null
@@ -442,8 +443,8 @@ app.post('/api/fiyatlar', (req, res) => {
 
 // Fiyat satırı güncelle
 app.put('/api/fiyatlar/:id', (req, res) => {
-  const { fiyat_adi, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod } = req.body;
-  const sql = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
+  const { fiyat_adi, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  const sql = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, kdv_dahil=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
                WHERE id=?`;
   const vals = [
     fiyat_adi,
@@ -452,6 +453,7 @@ app.put('/api/fiyatlar/:id', (req, res) => {
     parseFloat(fiyat) || 0,
     para_birimi_id || 1,
     kdv_oran_id || null,
+    kdv_dahil != null ? parseInt(kdv_dahil) : null,
     iskonto_tipi || null,
     iskonto_orani != null ? parseFloat(iskonto_orani) : null,
     barkod || null,

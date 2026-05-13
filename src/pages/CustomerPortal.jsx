@@ -159,9 +159,12 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
   // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
   const effectivePrice = ozelFiyat ? ozelFiyat.fiyat * ozelFiyat.carpan : p.price;
   const effectiveSembol = ozelFiyat ? (ozelFiyat.sembol || p.pbSembol) : p.pbSembol;
-  const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisaAd || p.pbKisaAd) : p.pbKisaAd;
+  const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisa_ad || p.pbKisaAd) : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
+  // KDV: ozelFiyat varsa fiyatlar tablosundaki kdv_oran ve kdv_dahil kullan
+  const effectiveKdvOrani = ozelFiyat ? (ozelFiyat.kdv_oran != null ? ozelFiyat.kdv_oran : null) : p.kdvOrani;
+  const effectiveKdvDahil = ozelFiyat ? (ozelFiyat.kdv_dahil != null ? !!ozelFiyat.kdv_dahil : null) : p.kdvDahil;
   // Fiyat listesi iskontosu: fiyatlar tablosundaki iskonto_orani (ürüne özel)
   const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
   // hasFiyatTipi varsa customer iskontosu bypass — sadece fiyatlar.iskonto_orani kullanılır
@@ -194,14 +197,14 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
           <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
             <span className="badge-unit" style={{ cursor: 'default' }}>{effectiveUnit || 'Kg'}</span>
-            {p.kdvOrani != null && (
+            {effectiveKdvOrani != null && effectiveKdvDahil != null && (
               <span style={{
                 fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
-                background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
-                color: p.kdvDahil ? '#16a34a' : '#b91c1c',
-                border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
+                background: effectiveKdvDahil ? '#f0fdf4' : '#fef2f2',
+                color: effectiveKdvDahil ? '#16a34a' : '#b91c1c',
+                border: `1px solid ${effectiveKdvDahil ? '#bbf7d0' : '#fecaca'}`,
               }}>
-                %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
+                %{parseFloat(effectiveKdvOrani) % 1 === 0 ? parseInt(effectiveKdvOrani) : parseFloat(effectiveKdvOrani)} KDV {effectiveKdvDahil ? 'Dahil' : 'Hariç'}
               </span>
             )}
           </div>
@@ -263,15 +266,15 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
           hovered={hovered}
           isOzel={!!ozelFiyat}
         />
-        {p.kdvOrani != null && (
+        {effectiveKdvOrani != null && effectiveKdvDahil != null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
             <span style={{
               fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
-              background: p.kdvDahil ? '#f0fdf4' : '#fef2f2',
-              color: p.kdvDahil ? '#16a34a' : '#b91c1c',
-              border: `1px solid ${p.kdvDahil ? '#bbf7d0' : '#fecaca'}`,
+              background: effectiveKdvDahil ? '#f0fdf4' : '#fef2f2',
+              color: effectiveKdvDahil ? '#16a34a' : '#b91c1c',
+              border: `1px solid ${effectiveKdvDahil ? '#bbf7d0' : '#fecaca'}`,
             }}>
-              %{parseFloat(p.kdvOrani) % 1 === 0 ? parseInt(p.kdvOrani) : parseFloat(p.kdvOrani)} KDV {p.kdvDahil ? 'Dahil' : 'Hariç'}
+              %{parseFloat(effectiveKdvOrani) % 1 === 0 ? parseInt(effectiveKdvOrani) : parseFloat(effectiveKdvOrani)} KDV {effectiveKdvDahil ? 'Dahil' : 'Hariç'}
             </span>
           </div>
         )}
