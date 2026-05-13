@@ -153,7 +153,6 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
 const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) => {
-  const isTRY = !p.pbKisaAd || p.pbKisaAd === 'TRY';
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
   // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
@@ -162,6 +161,8 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
   const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisa_ad || p.pbKisaAd) : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
+  // isTRY: özel fiyatın para birimine göre hesapla (ürünün değil)
+  const isTRY = !effectiveKisaAd || effectiveKisaAd === 'TRY';
   // KDV: ozelFiyat varsa fiyatlar tablosundaki kdv_oran/kdv_dahil kullan, yoksa ürünün KDV'sine dön
   const effectiveKdvOrani = ozelFiyat
     ? (ozelFiyat.kdv_oran != null ? ozelFiyat.kdv_oran : p.kdvOrani)
