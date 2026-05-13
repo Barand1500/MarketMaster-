@@ -83,7 +83,8 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 };
 
 // Liste görünümü fiyat satırı — hover tüm satırı kapsar, hovered dışardan gelir
-const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel }) => {
+// hasExtraCols: tabloda İndirim ve Sana Özel kolonları gösteriliyorsa true — her satır tam 3 td emit etmeli
+const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel, hasExtraCols }) => {
   const isTRY = !kisaAd || kisaAd === 'TRY';
   const showTL = hovered && !isTRY;
   const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
@@ -112,42 +113,42 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
       </>
     );
   }
-  return (
-    <>
-      <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-          {discount > 0
-            ? <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
-            : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
-        </span>
-      </td>
-      {discount > 0 && (
-        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-          <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
-            <span className="card-indirim-pct">Sana Özel</span>
-            <span className="card-indirim-label">%{discount} İndirim</span>
+  // Özel fiyat yok — hasExtraCols ise tabloda 3 kolon var, 3 td emit et (boşları boş bırak)
+  if (hasExtraCols) {
+    return (
+      <>
+        <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            {discount > 0
+              ? <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
+              : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
           </span>
         </td>
-      )}
-      {discount > 0 && (
-        <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          <div className="cp-mobile-price-stack">
-            <span className="cp-mobile-base-price">
-              <span key={showTL ? 'tl-mob' : 'orig-mob'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-                <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }} symRatio={0.8} />
-              </span>
-            </span>
-            <span className="card-indirim-badge cp-mobile-badge" style={{ display: 'inline-flex' }}>
-              <span className="card-indirim-pct">Sana Özel</span>
+        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+          {discount > 0 && (
+            <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
+              <span className="card-indirim-pct">İndirim</span>
               <span className="card-indirim-label">%{discount} İndirim</span>
             </span>
-          </div>
-          <span key={showTL ? 'tl-final' : 'orig-final'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-            <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
-          </span>
+          )}
         </td>
-      )}
-    </>
+        <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {discount > 0 && (
+            <span key={showTL ? 'tl-final' : 'orig-final'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+            </span>
+          )}
+        </td>
+      </>
+    );
+  }
+  // Hiç ekstra kolon yok — tek td yeterli
+  return (
+    <td className="cp-col-price-only" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+        <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />
+      </span>
+    </td>
   );
 };
 
@@ -157,8 +158,13 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
   const hoverTimerRef = useRef(null);
   // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
   const effectivePrice = ozelFiyat ? ozelFiyat.fiyat * ozelFiyat.carpan : p.price;
-  const effectiveSembol = ozelFiyat ? (ozelFiyat.sembol || p.pbSembol) : p.pbSembol;
-  const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisa_ad || p.pbKisaAd) : p.pbKisaAd;
+  // Sembol/kisaAd: ozelFiyat varsa önce fiyatlar tablosundan al, yoksa para_birimi_id=1 (TRY) varsay, en son ürün para birimine dön
+  const effectiveSembol = ozelFiyat
+    ? (ozelFiyat.sembol || (ozelFiyat.para_birimi_id === 1 ? '₺' : (p.pbSembol || '₺')))
+    : p.pbSembol;
+  const effectiveKisaAd = ozelFiyat
+    ? (ozelFiyat.kisa_ad || (ozelFiyat.para_birimi_id === 1 ? 'TRY' : (p.pbKisaAd || 'TRY')))
+    : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
   // isTRY: özel fiyatın para birimine göre hesapla (ürünün değil)
@@ -186,9 +192,11 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
     onTouchStart: () => { setHovered(true); clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => setHovered(false), 2000); },
   };
 
+  const hasExtraCols = hasFiyatTipi || discount > 0;
+
   if (viewMode === 'list') {
     return (
-      <tr className="cp-list-row" {...hoverHandlers}>
+      <tr className="cp-list-row" style={{ borderBottom: '1px solid #e2e8f0' }} {...hoverHandlers}>
         {/* Görsel */}
         <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
           <div className="thumb-box">
@@ -223,6 +231,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
           kur={effectiveKur}
           hovered={hovered}
           isOzel={!!ozelFiyat}
+          hasExtraCols={hasExtraCols}
         />
         {/* Son Fiyat Güncelleme */}
         <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
