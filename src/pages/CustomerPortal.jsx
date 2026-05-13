@@ -24,14 +24,27 @@ const Pr = ({ n, sembol, numStyle, symRatio = 0.62 }) => {
 };
 
 // Grid card fiyat bölümü — hover tüm kartı kapsar, hovered dışardan gelir
-const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered }) => {
+const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel }) => {
   const isTRY = !kisaAd || kisaAd === 'TRY';
   const showTL = hovered && !isTRY;
   const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
   const dispS = showTL ? '₺' : (sembol || '₺');
   return (
     <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
-      {discount > 0 ? (
+      {isOzel ? (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+            <span className="card-indirim-badge">
+              <span className="card-indirim-pct">Sana Özel</span>
+            </span>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <span key={showTL ? 'tl-ozel' : 'orig-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+            </span>
+          </div>
+        </>
+      ) : discount > 0 ? (
         <>
           <div style={{ textAlign: 'center', marginBottom: '6px' }}>
             <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
@@ -62,11 +75,28 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 };
 
 // Liste görünümü fiyat satırı — hover tüm satırı kapsar, hovered dışardan gelir
-const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered }) => {
+const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel }) => {
   const isTRY = !kisaAd || kisaAd === 'TRY';
   const showTL = hovered && !isTRY;
   const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
   const dispS = showTL ? '₺' : (sembol || '₺');
+  if (isOzel) {
+    return (
+      <>
+        <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} />
+        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+          <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
+            <span className="card-indirim-pct">Sana Özel</span>
+          </span>
+        </td>
+        <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <span key={showTL ? 'tl-ozel' : 'orig-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+          </span>
+        </td>
+      </>
+    );
+  }
   return (
     <>
       <td className={discount > 0 ? 'cp-col-price-base' : 'cp-col-price-only'} style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -107,11 +137,17 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 };
 
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
-const ProductItem = memo(({ p, viewMode, discount }) => {
+const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
   const isTRY = !p.pbKisaAd || p.pbKisaAd === 'TRY';
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
-  const discountedPrice = p.price * (1 - discount / 100);
+  // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
+  const effectivePrice = ozelFiyat ? ozelFiyat.fiyat * ozelFiyat.carpan : p.price;
+  const effectiveSembol = ozelFiyat ? (ozelFiyat.sembol || p.pbSembol) : p.pbSembol;
+  const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisaAd || p.pbKisaAd) : p.pbKisaAd;
+  const effectiveKur = ozelFiyat ? 1 : p.pbKur;
+  const discountedPrice = ozelFiyat ? effectivePrice : effectivePrice * (1 - discount / 100);
+  const effectiveDiscount = ozelFiyat ? 0 : discount; // Özel fiyatta iskonto badge gösterme
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
   const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
   const lastPriceUpdate = p.lastPriceChange
@@ -152,13 +188,14 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
           </div>
         </td>
         <ListPriceSection
-          price={p.price}
+          price={effectivePrice}
           discountedPrice={discountedPrice}
-          discount={discount}
-          sembol={p.pbSembol}
-          kisaAd={p.pbKisaAd}
-          kur={p.pbKur}
+          discount={effectiveDiscount}
+          sembol={effectiveSembol}
+          kisaAd={effectiveKisaAd}
+          kur={effectiveKur}
           hovered={hovered}
+          isOzel={!!ozelFiyat}
         />
         {/* Son Fiyat Güncelleme */}
         <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
@@ -198,13 +235,14 @@ const ProductItem = memo(({ p, viewMode, discount }) => {
       <div className="card-body">
         <strong className="card-name">{p.name}</strong>
         <GridPriceSection
-          price={p.price}
+          price={effectivePrice}
           discountedPrice={discountedPrice}
-          discount={discount}
-          sembol={p.pbSembol}
-          kisaAd={p.pbKisaAd}
-          kur={p.pbKur}
+          discount={effectiveDiscount}
+          sembol={effectiveSembol}
+          kisaAd={effectiveKisaAd}
+          kur={effectiveKur}
           hovered={hovered}
+          isOzel={!!ozelFiyat}
         />
         {p.kdvOrani != null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
@@ -376,6 +414,21 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   }, [showProfile, showLogoutConfirm]);
 
   const discount = parseDiscount(String(customer.discount || '0'));
+
+  // Müşteriye özel fiyat listesi (fiyat_tipi atanmışsa)
+  const [ozelFiyatlar, setOzelFiyatlar] = useState({}); // { urun_id: fiyat_row }
+  useEffect(() => {
+    if (!customer.fiyatTipi) { setOzelFiyatlar({}); return; }
+    fetch(`${API_URL}/fiyatlar/liste?fiyat_adi=${encodeURIComponent(customer.fiyatTipi)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const map = {};
+        data.forEach(f => { map[f.urun_id] = f; });
+        setOzelFiyatlar(map);
+      })
+      .catch(() => {});
+  }, [customer.fiyatTipi]);
 
   // Kategori yardımcı fonksiyonları
   const getAllDescendantIds = (catId) => {
@@ -1281,7 +1334,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</div>
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1289,12 +1342,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th style={{ width: '52px' }}>Görsel</th>
                     <th>Ürün Adı</th>
                     <th style={{ textAlign: 'right' }}>Fiyat</th>
-                    {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
-                    {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                    {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                    {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</tbody>
+                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</tbody>
                 </table>
               </div>
             )
@@ -1318,7 +1371,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1326,12 +1379,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th style={{ width: '52px' }}>Görsel</th>
                       <th>Ürün Adı</th>
                       <th style={{ textAlign: 'right' }}>Fiyat</th>
-                      {discount > 0 && <th style={{ textAlign: 'center' }}>İndirim</th>}
-                      {discount > 0 && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                      {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                      {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</tbody>
                   </table>
                 </div>
               )
