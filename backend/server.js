@@ -252,6 +252,30 @@ db.query('ALTER TABLE urunler ADD COLUMN stok_kodu VARCHAR(100) NULL UNIQUE', (e
   else if (!err) console.log('✅ Migration: urunler.stok_kodu kolonu eklendi');
 });
 
+// Startup migration: fiyatlar tablosu
+db.query(`CREATE TABLE IF NOT EXISTS fiyatlar (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  fiyat_adi VARCHAR(100) NOT NULL,
+  urun_id INT NOT NULL,
+  birim_id INT NOT NULL,
+  carpan DECIMAL(10,4) NOT NULL DEFAULT 1,
+  fiyat DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  para_birimi_id INT NOT NULL DEFAULT 1,
+  kdv_oran_id INT DEFAULT NULL,
+  iskonto_tipi ENUM('oran','tutar') DEFAULT NULL,
+  iskonto_orani DECIMAL(10,2) DEFAULT NULL,
+  barkod VARCHAR(100) DEFAULT NULL,
+  olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  guncelleme_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (urun_id) REFERENCES urunler(id) ON DELETE CASCADE,
+  FOREIGN KEY (birim_id) REFERENCES birimler(id) ON DELETE RESTRICT,
+  FOREIGN KEY (para_birimi_id) REFERENCES para_birimleri(id) ON DELETE RESTRICT,
+  FOREIGN KEY (kdv_oran_id) REFERENCES kdv_oranlari(id) ON DELETE SET NULL
+)`, (err) => {
+  if (err) console.warn('fiyatlar tablo olusturma hatasi:', err.message);
+  else console.log('✅ Migration: fiyatlar tablosu hazir');
+});
+
 // Startup migration: kdv_oranlari.dahil NULL yap (mevcut tablo icin)
 db.query('ALTER TABLE kdv_oranlari MODIFY COLUMN dahil TINYINT(1) NULL DEFAULT NULL', (err) => {
   if (err) console.warn('Migration uyarisi (kdv_oranlari.dahil NULL):', err.message);
