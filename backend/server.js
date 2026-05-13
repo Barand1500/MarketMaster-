@@ -361,6 +361,124 @@ app.delete('/api/kdv-oranlari/:id', (req, res) => {
   });
 });
 
+// --- FIYATLAR API ---
+// Bir ürünün tüm fiyat satırlarını getir (JOIN ile birim, para birimi, kdv oran adlarını da getir)
+app.get('/api/fiyatlar', (req, res) => {
+  const { urun_id } = req.query;
+  if (!urun_id) return res.status(400).json({ error: 'urun_id gerekli' });
+  const sql = `
+    SELECT f.*,
+      b.birim_adi,
+      pb.ad AS para_birimi_adi, pb.sembol AS para_birimi_sembol,
+      k.oran AS kdv_oran
+    FROM fiyatlar f
+    LEFT JOIN birimler b ON f.birim_id = b.id
+    LEFT JOIN para_birimleri pb ON f.para_birimi_id = pb.id
+    LEFT JOIN kdv_oranlari k ON f.kdv_oran_id = k.id
+    WHERE f.urun_id = ?
+    ORDER BY f.fiyat_adi, f.carpan
+  `;
+  db.query(sql, [urun_id], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// Tüm fiyatları listele (opsiyonel: fiyat_adi filtresi)
+app.get('/api/fiyatlar/liste', (req, res) => {
+  const { fiyat_adi } = req.query;
+  let sql = `
+    SELECT f.*,
+      u.urun_adi,
+      b.birim_adi,
+      pb.sembol AS para_birimi_sembol,
+      k.oran AS kdv_oran
+    FROM fiyatlar f
+    LEFT JOIN urunler u ON f.urun_id = u.id
+    LEFT JOIN birimler b ON f.birim_id = b.id
+    LEFT JOIN para_birimleri pb ON f.para_birimi_id = pb.id
+    LEFT JOIN kdv_oranlari k ON f.kdv_oran_id = k.id
+  `;
+  const params = [];
+  if (fiyat_adi) { sql += ' WHERE f.fiyat_adi = ?'; params.push(fiyat_adi); }
+  sql += ' ORDER BY u.urun_adi, f.fiyat_adi, f.carpan';
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+// Mevcut fiyat_adi değerlerini listele (dropdown için)
+app.get('/api/fiyatlar/adlar', (req, res) => {
+  db.query('SELECT DISTINCT fiyat_adi FROM fiyatlar ORDER BY fiyat_adi', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results.map(r => r.fiyat_adi));
+  });
+});
+
+// Yeni fiyat satırı ekle
+app.post('/api/fiyatlar', (req, res) => {
+  const { fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  if (!fiyat_adi || !urun_id || !birim_id) return res.status(400).json({ error: 'fiyat_adi, urun_id ve birim_id zorunlu' });
+  const sql = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const vals = [
+    fiyat_adi,
+    urun_id,
+    birim_id,
+    parseFloat(carpan) || 1,
+    parseFloat(fiyat) || 0,
+    para_birimi_id || 1,
+    kdv_oran_id || null,
+    iskonto_tipi || null,
+    iskonto_orani != null ? parseFloat(iskonto_orani) : null,
+    barkod || null
+  ];
+  db.query(sql, vals, (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: result.insertId, ...req.body });
+  });
+});
+
+// Fiyat satırı güncelle
+app.put('/api/fiyatlar/:id', (req, res) => {
+  const { fiyat_adi, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  const sql = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
+               WHERE id=?`;
+  const vals = [
+    fiyat_adi,
+    birim_id,
+    parseFloat(carpan) || 1,
+    parseFloat(fiyat) || 0,
+    para_birimi_id || 1,
+    kdv_oran_id || null,
+    iskonto_tipi || null,
+    iskonto_orani != null ? parseFloat(iskonto_orani) : null,
+    barkod || null,
+    req.params.id
+  ];
+  db.query(sql, vals, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Fiyat satırı sil
+app.delete('/api/fiyatlar/:id', (req, res) => {
+  db.query('DELETE FROM fiyatlar WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Bir ürünün tüm fiyat satırlarını sil (ürün silinirken kullanılır, CASCADE zaten var ama manuel de çağrılabilir)
+app.delete('/api/fiyatlar/urun/:urun_id', (req, res) => {
+  db.query('DELETE FROM fiyatlar WHERE urun_id = ?', [req.params.urun_id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 // --- BIRIMLER API ---
 app.get('/api/birimler', (req, res) => {
   db.query('SELECT * FROM birimler', (err, results) => {
