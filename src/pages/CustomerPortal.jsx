@@ -33,14 +33,22 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
     <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
       {isOzel ? (
         <>
+          {discount > 0 && (
+            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+              <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+                <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }} symRatio={0.75} />
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
             <span className="card-indirim-badge">
               <span className="card-indirim-pct">Sana Özel</span>
+              {discount > 0 && <span className="card-indirim-label">%{discount} İndirim</span>}
             </span>
           </div>
           <div style={{ textAlign: 'center' }}>
             <span key={showTL ? 'tl-ozel' : 'orig-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-              <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+              <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
             </span>
           </div>
         </>
@@ -83,15 +91,22 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
   if (isOzel) {
     return (
       <>
-        <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }} />
+        <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+          {discount > 0 && (
+            <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(price)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
+            </span>
+          )}
+        </td>
         <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
             <span className="card-indirim-pct">Sana Özel</span>
+            {discount > 0 && <span className="card-indirim-label">%{discount} İndirim</span>}
           </span>
         </td>
         <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
           <span key={showTL ? 'tl-ozel' : 'orig-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-            <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
+            <Pr n={dispN(discountedPrice)} sembol={dispS} numStyle={{ fontSize: '26px', fontWeight: '900', color: 'var(--primary)', letterSpacing: '-0.5px' }} />
           </span>
         </td>
       </>
@@ -137,7 +152,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 };
 
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
-const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
+const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) => {
   const isTRY = !p.pbKisaAd || p.pbKisaAd === 'TRY';
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
@@ -147,8 +162,11 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat }) => {
   const effectiveKisaAd = ozelFiyat ? (ozelFiyat.kisaAd || p.pbKisaAd) : p.pbKisaAd;
   const effectiveKur = ozelFiyat ? 1 : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
-  const discountedPrice = ozelFiyat ? effectivePrice : effectivePrice * (1 - discount / 100);
-  const effectiveDiscount = ozelFiyat ? 0 : discount; // Özel fiyatta iskonto badge gösterme
+  // Fiyat listesi iskontosu: fiyatlar tablosundaki iskonto_orani (ürüne özel)
+  const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
+  // hasFiyatTipi varsa customer iskontosu bypass — sadece fiyatlar.iskonto_orani kullanılır
+  const effectiveDiscount = ozelFiyat ? fiyatIskontoOrani : (hasFiyatTipi ? 0 : discount);
+  const discountedPrice = effectivePrice * (1 - effectiveDiscount / 100);
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
   const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
   const lastPriceUpdate = p.lastPriceChange
@@ -706,8 +724,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               style={{ background: showSearch ? 'var(--primary)' : '#f1f5f9', color: showSearch ? '#fff' : '#64748b' }}
               title="Ürün ara"
             >🔍</button>
-            {/* İndirim badge: arama açıkken gizle */}
-            {discount > 0 && !showSearch && (
+            {/* İndirim badge: arama açıkken ve fiyat tipi atanmışsa gizle */}
+            {discount > 0 && !showSearch && !customer.fiyatTipi && (
               <div className="discount-badge-premium">
                 <span className="badge-icon">✨</span>
                 <span className="badge-text">
@@ -1335,7 +1353,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</div>
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1348,7 +1366,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</tbody>
+                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
                 </table>
               </div>
             )
@@ -1372,7 +1390,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1385,7 +1403,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
                   </table>
                 </div>
               )
