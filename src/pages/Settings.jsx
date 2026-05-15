@@ -102,6 +102,19 @@ export default function Settings() {
   const [pbKaydetYukleniyor, setPbKaydetYukleniyor] = useState(false);
   const [pbSilOnay, setPbSilOnay] = useState(null); // { id, ad, kullananSayi }
 
+  // ── Fiyat Tanımları ──────────────────────────────────────────
+  const [fiyatTanimlari, setFiyatTanimlari] = useState([]);
+  const [showFtModal, setShowFtModal] = useState(false);
+  const [ftForm, setFtForm] = useState({ id: null, ad: '', baslangic_tarihi: '', bitis_tarihi: '' });
+  const [ftSaving, setFtSaving] = useState(false);
+  const [ftMsg, setFtMsg] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/fiyat-tanimlari').then(r => r.ok ? r.json() : []).then(data => {
+      if (Array.isArray(data)) setFiyatTanimlari(data);
+    }).catch(() => {});
+  }, []);
+
   // pbMsg auto-dismiss
   useEffect(() => {
     if (!pbMsg) return;
@@ -993,6 +1006,51 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* FİYAT TANIMLARI KARTI */}
+      <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
+        <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '18px' }}>
+          <h2 className="toolbar-title">🏷️ Fiyat Tanımları</h2>
+          <button
+            onClick={() => { setFtForm({ id: null, ad: '', baslangic_tarihi: '', bitis_tarihi: '' }); setFtMsg(null); setShowFtModal(true); }}
+            className="lite-add-btn" style={{ marginLeft: 'auto' }}
+          >+ Yeni</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {fiyatTanimlari.length === 0 && (
+            <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Henüz fiyat tanımı eklenmemiş.</div>
+          )}
+          {fiyatTanimlari.map(ft => (
+            <div
+              key={ft.id}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', cursor: 'pointer' }}
+              onDoubleClick={() => { setFtForm({ id: ft.id, ad: ft.ad, baslangic_tarihi: ft.baslangic_tarihi ? ft.baslangic_tarihi.slice(0, 10) : '', bitis_tarihi: ft.bitis_tarihi ? ft.bitis_tarihi.slice(0, 10) : '' }); setFtMsg(null); setShowFtModal(true); }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a' }}>{ft.ad}</div>
+                {(ft.baslangic_tarihi || ft.bitis_tarihi) && (
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    {ft.baslangic_tarihi ? new Date(ft.baslangic_tarihi).toLocaleDateString('tr-TR') : '—'}
+                    {' → '}
+                    {ft.bitis_tarihi ? new Date(ft.bitis_tarihi).toLocaleDateString('tr-TR') : '—'}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!window.confirm(`"${ft.ad}" fiyat tanımını silmek istiyor musunuz?`)) return;
+                  const r = await fetch(`/api/fiyat-tanimlari/${ft.id}`, { method: 'DELETE' });
+                  if (r.ok) setFiyatTanimlari(prev => prev.filter(x => x.id !== ft.id));
+                }}
+                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '2px 6px', flexShrink: 0 }}
+                title="Sil"
+              >×</button>
+            </div>
+          ))}
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Çift tıklayarak düzenleyebilirsiniz.</div>
+        </div>
+      </div>
+
       {/* Para Birimi Silme Onay Modali */}
       {pbSilOnay && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPbSilOnay(null)}>
@@ -1157,6 +1215,64 @@ export default function Settings() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handleRestoreConfirmed} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Geri Yükle</button>
               <button onClick={() => setRestoreConfirm(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fiyat Tanımı Modal */}
+      {showFtModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowFtModal(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: '800', fontSize: '16px', color: '#0f172a', marginBottom: '20px' }}>
+              {ftForm.id ? '✏️ Fiyat Tanımını Düzenle' : '🏷️ Yeni Fiyat Tanımı'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>Ad <span style={{ color: '#ef4444' }}>*</span></label>
+                <input style={inputStyle} value={ftForm.ad} onChange={e => setFtForm(f => ({ ...f, ad: e.target.value }))} placeholder="Fiyat tanımı adı..." autoFocus />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>Başlangıç Tarihi <span style={{ color: '#94a3b8' }}>(opsiyonel)</span></label>
+                <input style={inputStyle} type="date" value={ftForm.baslangic_tarihi} onChange={e => setFtForm(f => ({ ...f, baslangic_tarihi: e.target.value }))} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '6px' }}>Bitiş Tarihi <span style={{ color: '#94a3b8' }}>(opsiyonel)</span></label>
+                <input style={inputStyle} type="date" value={ftForm.bitis_tarihi} onChange={e => setFtForm(f => ({ ...f, bitis_tarihi: e.target.value }))} />
+              </div>
+            </div>
+            {ftMsg && (
+              <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', background: ftMsg.ok ? '#f0fdf4' : '#fef2f2', color: ftMsg.ok ? '#15803d' : '#dc2626', border: `1px solid ${ftMsg.ok ? '#86efac' : '#fca5a5'}` }}>
+                {ftMsg.ok ? '✅ ' : '❌ '}{ftMsg.text}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button
+                onClick={async () => {
+                  if (!ftForm.ad.trim()) return setFtMsg({ ok: false, text: 'Ad zorunludur.' });
+                  setFtSaving(true);
+                  setFtMsg(null);
+                  try {
+                    let r;
+                    if (ftForm.id) {
+                      r = await fetch(`/api/fiyat-tanimlari/${ftForm.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ad: ftForm.ad.trim(), baslangic_tarihi: ftForm.baslangic_tarihi || null, bitis_tarihi: ftForm.bitis_tarihi || null }) });
+                    } else {
+                      r = await fetch('/api/fiyat-tanimlari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ad: ftForm.ad.trim(), baslangic_tarihi: ftForm.baslangic_tarihi || null, bitis_tarihi: ftForm.bitis_tarihi || null }) });
+                    }
+                    const data = await r.json();
+                    if (!r.ok) { setFtMsg({ ok: false, text: data.error || 'Kaydedilemedi.' }); }
+                    else {
+                      const fresh = await fetch('/api/fiyat-tanimlari').then(x => x.ok ? x.json() : []);
+                      setFiyatTanimlari(Array.isArray(fresh) ? fresh : []);
+                      setShowFtModal(false);
+                    }
+                  } catch { setFtMsg({ ok: false, text: 'Sunucuya bağlanılamadı.' }); }
+                  setFtSaving(false);
+                }}
+                disabled={ftSaving}
+                style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer', opacity: ftSaving ? 0.7 : 1 }}
+              >{ftSaving ? '...' : ftForm.id ? 'Güncelle' : 'Kaydet'}</button>
+              <button onClick={() => { setShowFtModal(false); setFtMsg(null); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
             </div>
           </div>
         </div>

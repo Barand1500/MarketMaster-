@@ -276,6 +276,17 @@ db.query(`CREATE TABLE IF NOT EXISTS fiyatlar (
   else console.log('✅ Migration: fiyatlar tablosu hazir');
 });
 
+// Startup migration: fiyat_tanimlari tablosu (gerekirse burada da çağrılır, CRUD bölümünde tanımlandı)
+db.query(`CREATE TABLE IF NOT EXISTS fiyat_tanimlari (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ad VARCHAR(100) NOT NULL,
+  baslangic_tarihi DATE NULL,
+  bitis_tarihi DATE NULL,
+  olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.warn('fiyat_tanimlari migration (startup):', err.message);
+});
+
 // Startup migration: kdv_oranlari.dahil NULL yap (mevcut tablo icin)
 db.query('ALTER TABLE kdv_oranlari MODIFY COLUMN dahil TINYINT(1) NULL DEFAULT NULL', (err) => {
   if (err) console.warn('Migration uyarisi (kdv_oranlari.dahil NULL):', err.message);
@@ -291,6 +302,57 @@ db.query(`CREATE TABLE IF NOT EXISTS kdv_oranlari (
 )`, (err) => {
   if (err) console.warn('kdv_oranlari tablo olusturma hatasi:', err.message);
   else console.log('✅ Migration: kdv_oranlari tablosu hazir');
+});
+
+// Startup migration: fiyat_tanimlari tablosu
+db.query(`CREATE TABLE IF NOT EXISTS fiyat_tanimlari (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  ad VARCHAR(100) NOT NULL,
+  baslangic_tarihi DATE NULL,
+  bitis_tarihi DATE NULL,
+  olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)`, (err) => {
+  if (err) console.warn('fiyat_tanimlari tablo olusturma hatasi:', err.message);
+  else console.log('✅ Migration: fiyat_tanimlari tablosu hazir');
+});
+
+// --- FİYAT TANIMLARI API ---
+app.get('/api/fiyat-tanimlari', (req, res) => {
+  db.query('SELECT * FROM fiyat_tanimlari ORDER BY ad', (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post('/api/fiyat-tanimlari', (req, res) => {
+  const { ad, baslangic_tarihi, bitis_tarihi } = req.body;
+  if (!ad || !ad.trim()) return res.status(400).json({ error: 'Ad zorunludur.' });
+  db.query('INSERT INTO fiyat_tanimlari (ad, baslangic_tarihi, bitis_tarihi) VALUES (?, ?, ?)',
+    [ad.trim(), baslangic_tarihi || null, bitis_tarihi || null],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: result.insertId, ad: ad.trim(), baslangic_tarihi: baslangic_tarihi || null, bitis_tarihi: bitis_tarihi || null });
+    }
+  );
+});
+
+app.put('/api/fiyat-tanimlari/:id', (req, res) => {
+  const { ad, baslangic_tarihi, bitis_tarihi } = req.body;
+  if (!ad || !ad.trim()) return res.status(400).json({ error: 'Ad zorunludur.' });
+  db.query('UPDATE fiyat_tanimlari SET ad=?, baslangic_tarihi=?, bitis_tarihi=? WHERE id=?',
+    [ad.trim(), baslangic_tarihi || null, bitis_tarihi || null, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
+app.delete('/api/fiyat-tanimlari/:id', (req, res) => {
+  db.query('DELETE FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
 });
 
 // --- MARKALAR API ---
@@ -1625,5 +1687,5 @@ app.post('/api/migrate-gorsel', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Backend sunucusu port ${PORT} uzerinde calisiyor...`);
+  console.log(` Backend sunucusu port ${PORT} uzerinde calisiyor...`);
 });
