@@ -483,7 +483,7 @@ app.get('/api/fiyatlar/liste', (req, res) => {
     SELECT f.*,
       u.urun_adi,
       b.birim_adi,
-      pb.sembol, pb.kisa_ad,
+      pb.sembol, pb.kisa_ad, pb.kur,
       k.oran AS kdv_oran
     FROM fiyatlar f
     LEFT JOIN urunler u ON f.urun_id = u.id
@@ -577,6 +577,14 @@ app.delete('/api/fiyatlar/:id', (req, res) => {
   db.query('DELETE FROM fiyatlar WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
+  });
+});
+
+// Sıfır fiyatlı veya geçersiz fiyat_adi'li kayıtları temizle
+app.delete('/api/fiyatlar-temizle/sifir', (req, res) => {
+  db.query('DELETE FROM fiyatlar WHERE fiyat IS NULL OR fiyat <= 0', (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, silinen: result.affectedRows });
   });
 });
 

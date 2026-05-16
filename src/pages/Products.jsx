@@ -279,6 +279,11 @@ export default function Products() {
 
   const saveChip = async () => {
     if (!editingChip) return;
+    const fiyatVal = parseFloat(chipForm.fiyat);
+    if (isNaN(fiyatVal) || fiyatVal < 0) {
+      alert('Lütfen geçerli bir fiyat girin (0 veya daha büyük olmalı).');
+      return;
+    }
     setChipSaving(true);
     try {
       const body = {
@@ -286,7 +291,7 @@ export default function Products() {
         urun_id: editingChip.urun_id,
         birim_id: parseInt(chipForm.birim_id) || units[0]?.id || 1,
         carpan: parseFloat(chipForm.carpan) || 1,
-        fiyat: parseFloat(chipForm.fiyat) || 0,
+        fiyat: fiyatVal,
         para_birimi_id: parseInt(chipForm.para_birimi_id) || 1,
         kdv_oran_id: chipForm.kdv_oran_id ? parseInt(chipForm.kdv_oran_id) : null,
         kdv_dahil: chipForm.kdv_oran_id ? (chipForm.kdv_dahil != null && chipForm.kdv_dahil !== '' ? parseInt(chipForm.kdv_dahil) : null) : null,
@@ -311,12 +316,12 @@ export default function Products() {
 
   const deleteChip = async (fiyat_id) => {
     if (!window.confirm('Bu fiyat satırını silmek istiyor musunuz?')) return;
-    await fetch(`/api/fiyatlar/${fiyat_id}`, { method: 'DELETE' });
-    setTabFiyatlarMap(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(uid => { next[uid] = next[uid].filter(f => f.id !== fiyat_id); });
-      return next;
-    });
+    const res = await fetch(`/api/fiyatlar/${fiyat_id}`, { method: 'DELETE' });
+    if (res.ok) {
+      await refreshTabFiyatlar();
+    } else {
+      alert('Silme işlemi başarısız oldu.');
+    }
   };
 
   const fileInputRef = useRef(null);
@@ -829,7 +834,6 @@ export default function Products() {
               </div>
             } />
           </div>
-          </div>
         </div>
 
         {/* ===== Fiyat Listesi Tabları ===== */}
@@ -973,10 +977,11 @@ export default function Products() {
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
-                              {idx === allRows.length - 1 && !hasNewRow && (
+                              {idx === allRows.length - 1 && !hasNewRow ? (
                                 <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil:'', iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', width:'28px', height:'28px', fontSize: '16px', cursor: 'pointer', fontWeight: '700', lineHeight: 1, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} title="Yeni birim/fiyat satırı ekle">+</button>
+                              ) : (
+                                <div style={{ width:'28px', height:'28px', flexShrink:0 }} />
                               )}
-                              {idx !== allRows.length - 1 && !hasNewRow && <div style={{ width:'28px', height:'28px', flexShrink:0 }} />}
                               <button onClick={() => deleteChip(f.id)} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'16px', padding:'0', width:'28px', height:'28px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} title="Sil">🗑</button>
                             </div>
                           )}

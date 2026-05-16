@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+﻿import { useState, useEffect, useRef, memo } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -163,8 +163,8 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
   // Çoklu birim desteği: ozelFiyatlar bir dizi, seçilen indexe göre aktif satır
   const ozelFiyat = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 0 ? ozelFiyatlar[selectedIdx] || ozelFiyatlar[0] : null;
   const hasMultiUnit = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 1;
-  // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
-  const effectivePrice = ozelFiyat ? ozelFiyat.fiyat * ozelFiyat.carpan : p.price;
+  // Özel fiyat varsa onu kullan (0 TL de geçerli — bedava ürün olabilir), negatif olamaz
+  const effectivePrice = ozelFiyat ? Math.max(0, ozelFiyat.fiyat * ozelFiyat.carpan) : p.price;
   // Sembol/kisaAd: ozelFiyat varsa önce fiyatlar tablosundan al, yoksa para_birimi_id=1 (TRY) varsay, en son ürün para birimine dön
   const effectiveSembol = ozelFiyat
     ? (ozelFiyat.sembol || (ozelFiyat.para_birimi_id === 1 ? '₺' : (p.pbSembol || '₺')))
@@ -172,7 +172,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
   const effectiveKisaAd = ozelFiyat
     ? (ozelFiyat.kisa_ad || (ozelFiyat.para_birimi_id === 1 ? 'TRY' : (p.pbKisaAd || 'TRY')))
     : p.pbKisaAd;
-  const effectiveKur = ozelFiyat ? 1 : p.pbKur;
+  const effectiveKur = ozelFiyat ? (parseFloat(ozelFiyat.kur) || 1) : p.pbKur;
   const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
   // isTRY: özel fiyatın para birimine göre hesapla (ürünün değil)
   const isTRY = !effectiveKisaAd || effectiveKisaAd === 'TRY';
@@ -190,7 +190,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
   const effectiveDiscount = ozelFiyat ? fiyatIskontoOrani : (hasFiyatTipi ? 0 : discount);
   const discountedPrice = (ozelFiyat && fiyatIskontoTipi === 'tutar')
     ? Math.max(0, effectivePrice - fiyatIskontoOrani)
-    : effectivePrice * (1 - effectiveDiscount / 100);
+    : Math.max(0, effectivePrice * (1 - effectiveDiscount / 100));
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
   const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
   const lastPriceUpdate = p.lastPriceChange
@@ -391,10 +391,22 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedCatId, setSelectedCatId] = useState(null);
   const [expandedCatIds, setExpandedCatIds] = useState(new Set());
-  const [showCatPanel, setShowCatPanel] = useState(false);
+  const [catBrowserOpen, setCatBrowserOpen] = useState(() => { try { return !!JSON.parse(localStorage.getItem('cp_pinned_path')); } catch { return false; } });
+  const catBrowserTimerRef = useRef(null);
+  const catBrowserPinnedRef = useRef(!!JSON.parse(localStorage.getItem('cp_pinned_path') || 'null'));
   const [catSearch, setCatSearch] = useState('');
   const [selectedMarkalar, setSelectedMarkalar] = useState([]);
   const [showBrandsView, setShowBrandsView] = useState(false);
+  // Column browser state
+  const [catColumnPath, setCatColumnPath] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cp_cat_path') || '[]'); } catch { return []; }
+  });
+  const [pinnedPath, setPinnedPath] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cp_pinned_path') || 'null'); } catch { return null; }
+  });
+  const [pinnedBrands, setPinnedBrands] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cp_pinned_brands') || 'null'); } catch { return null; }
+  });
   const [sortBy, setSortBy] = useState('default');
   const [showSortDrop, setShowSortDrop] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -519,11 +531,17 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     return path;
   };
 
+  // Column browser: aktif kategori = catColumnPath'in son elemanı
+  const activeCatId = catColumnPath.length > 0 ? catColumnPath[catColumnPath.length - 1] : null;
+
+  // catColumnPath değişince selectedCatId'yi de senkronize et (eski kod uyumluluğu)
+  const effectiveCatId = activeCatId !== null ? activeCatId : selectedCatId;
+
   const filteredProducts = products.filter(p => {
     if (p.inStock === false) return false;
     const matchSearch = p.name.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'));
-    const matchCat = selectedCatId !== null
-      ? [selectedCatId, ...getAllDescendantIds(selectedCatId)].some(id => p.categoryIds.includes(id))
+    const matchCat = effectiveCatId !== null
+      ? [effectiveCatId, ...getAllDescendantIds(effectiveCatId)].some(id => p.categoryIds.includes(id))
       : true;
     const matchMarka = selectedMarkalar.length > 0
       ? selectedMarkalar.includes(p.markaId)
@@ -577,7 +595,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       <div className="customer-header">
         <div className="header-left">
           <div className="nav-logo" style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-            onClick={() => { setSearch(''); setSelectedCatId(null); setSelectedMarkalar([]); setShowBrandsView(false); setSortBy('default'); setShowCatPanel(false); }}>
+            onClick={() => { setSearch(''); setSelectedCatId(null); setSelectedMarkalar([]); setShowBrandsView(false); setSortBy('default'); setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}>
             {siteSettings?.logo
               ? <img src={siteSettings.logo} alt="logo" style={{ height: '26px', width: '26px', objectFit: 'contain', borderRadius: '4px' }} />
               : siteSettings !== null ? <span>🍉</span> : null
@@ -591,21 +609,13 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         {/* FILTER AREA */}
         <div className="header-center">
 
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowCatPanel(v => !v)}
-              className="header-filter-btn"
-              style={selectedCatId !== null ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : {}}
-            >
-              📂 {selectedCatId !== null ? (categories.find(c => c.id === selectedCatId)?.name || 'Kategori') : 'Kategoriler'}
-              {selectedCatId !== null && (
-                <span
-                  onClick={e => { e.stopPropagation(); setSelectedCatId(null); setShowCatPanel(false); }}
-                  style={{ marginLeft: '4px', opacity: 0.8, cursor: 'pointer' }}
-                >✕</span>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={() => setCatBrowserOpen(v => !v)}
+            className="header-filter-btn"
+            style={(selectedCatId !== null || catColumnPath.length > 0) ? { fontWeight: '700', background: 'var(--primary)', color: '#fff', borderColor: 'var(--primary)' } : catBrowserOpen ? { borderColor: 'var(--primary)', boxShadow: '0 0 0 2px rgba(34,197,94,0.18)' } : {}}
+          >
+            📂 Kategoriler
+          </button>
 
           <div style={{ position: 'relative' }}>
             <button
@@ -631,8 +641,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
       </div>
 
-      {/* KATEGORİ AĞAÇ PANELİ */}
-      {showCatPanel && (
+      {/* KATEGORİ AĞAÇ PANELİ — devre dışı, column browser kullanılıyor */}
+      {false && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => { setShowCatPanel(false); setCatSearch(''); }} />
           <div style={{
@@ -645,7 +655,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             {/* Panel başlık: sol «Kategori Seç», orta arama, sağ temizle+kapat */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', whiteSpace: 'nowrap' }}>Kategori Seç</span>
-              {/* Arama kutusu */}
               <div style={{ flex: 1, position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '11px', color: '#94a3b8', pointerEvents: 'none' }}>🔍</span>
                 <input
@@ -667,7 +676,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               </div>
             </div>
 
-            {/* Tümü butonu */}
             {!catSearch && (
               <button
                 onClick={() => { setSelectedCatId(null); setShowCatPanel(false); setCatSearch(''); }}
@@ -678,11 +686,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               </button>
             )}
 
-            {/* Kategori ağacı */}
             {(() => {
               const q = catSearch.toLocaleLowerCase('tr');
-
-              // Arama modunda: tüm kategorileri düz liste olarak göster
               if (q) {
                 const matched = categories.filter(c => c.name.toLocaleLowerCase('tr').includes(q));
                 if (matched.length === 0) return <div style={{ fontSize: '12px', color: '#94a3b8', padding: '8px 10px' }}>Sonuç bulunamadı</div>;
@@ -698,8 +703,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   </button>
                 ));
               }
-
-              // Normal ağaç modu
               const renderNode = (catId, depth) => {
                 const cat = categories.find(c => c.id === catId);
                 if (!cat) return null;
@@ -717,9 +720,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                 };
                 return (
                   <div key={catId}>
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: `${depth * 16}px`, borderRadius: '8px', background: isSelected ? 'rgba(34,197,94,0.08)' : 'transparent', marginBottom: '1px' }}
-                    >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: `${depth * 16}px`, borderRadius: '8px', background: isSelected ? 'rgba(34,197,94,0.08)' : 'transparent', marginBottom: '1px' }}>
                       <button
                         onClick={toggleExpand}
                         style={{ width: '18px', height: '18px', flexShrink: 0, border: 'none', borderRadius: '5px', cursor: hasChildren ? 'pointer' : 'default', background: 'transparent', color: hasChildren ? '#94a3b8' : 'transparent', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
@@ -738,7 +739,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   </div>
                 );
               };
-              // Ana kategoriler arası ince çizgi
               return orderedRoots.map((r, i) => (
                 <div key={r.id}>
                   {i > 0 && <div style={{ height: '1px', background: '#f1f5f9', margin: '3px 0' }} />}
@@ -751,7 +751,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {/* BREADCRUMB - kategori seçiliyse göster */}
-      {selectedCatId !== null && !showCatPanel && (
+      {selectedCatId !== null && !catBrowserOpen && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 4px', marginBottom: '4px', flexWrap: 'wrap' }}>
           <button onClick={() => setSelectedCatId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: '600', padding: '2px 4px', borderRadius: '6px' }}>🏠 Tümü</button>
           {getBreadcrumb(selectedCatId).map((bc, i, arr) => (
@@ -763,6 +763,159 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               >{bc.name}</button>
             </span>
           ))}
+        </div>
+      )}
+
+      {/* ===================== SÜTUN TARAYICI (COLUMN BROWSER) ===================== */}
+      <div
+        className={`cp-browser-anim-wrap ${catBrowserOpen ? 'cp-browser-open' : 'cp-browser-closed'}`}
+        onMouseEnter={() => clearTimeout(catBrowserTimerRef.current)}
+        onMouseLeave={() => { if (!catBrowserPinnedRef.current) { catBrowserTimerRef.current = setTimeout(() => setCatBrowserOpen(false), 300); } }}
+      >
+        <div style={{ position: 'relative' }}>
+
+          {/* ── Sabitle butonu — sağ üst köşe, header hizasında ── */}
+          <button
+            className={`cp-pin-float-btn ${pinnedPath ? 'pinned' : ''}`}
+            title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle — panel her zaman açık kalsın'}
+            onClick={() => {
+              if (pinnedPath) {
+                catBrowserPinnedRef.current = false;
+                setPinnedPath(null); setPinnedBrands(null);
+                localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
+              } else {
+                catBrowserPinnedRef.current = true;
+                const p = { cats: catColumnPath, brands: selectedMarkalar };
+                setPinnedPath(p); setPinnedBrands(selectedMarkalar);
+                localStorage.setItem('cp_pinned_path', JSON.stringify(p));
+                localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
+              }
+            }}
+          >
+            {pinnedPath ? '📌 Sabitli' : '📍 Sabitle'}
+          </button>
+
+          <div className="cp-column-browser">
+
+            {/* ── Markalar sütunu ── */}
+          <div className="cp-col-panel">
+            <div className="cp-col-header">🏷️ Markalar</div>
+            <div className="cp-col-body">
+              <button
+                className={`cp-col-item ${selectedMarkalar.length === 0 ? 'active' : ''}`}
+                onClick={() => setSelectedMarkalar([])}
+              >
+                Tümü
+              </button>
+              {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map(m => {
+                const isActive = selectedMarkalar.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    className={`cp-col-item ${isActive ? 'active' : ''}`}
+                    onClick={() => setSelectedMarkalar(isActive ? [] : [m.id])}
+                  >
+                    {m.gorsel && <img src={m.gorsel} alt="" style={{ width: '14px', height: '14px', objectFit: 'contain', borderRadius: '3px', flexShrink: 0 }} />}
+                    {m.ad}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Ana Kategori sütunu ── */}
+          <div className="cp-col-panel">
+            <div className="cp-col-header">📂 Ana Kategori</div>
+            <div className="cp-col-body">
+              <button
+                className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
+                onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
+              >
+                Tümü
+              </button>
+              {orderedRoots.map(cat => {
+                const isActive = catColumnPath[0] === cat.id;
+                const hasChildren = categories.some(c => c.parentId === cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    className={`cp-col-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = [cat.id];
+                      setCatColumnPath(next);
+                      localStorage.setItem('cp_cat_path', JSON.stringify(next));
+                    }}
+                  >
+                    {cat.name}
+                    {hasChildren && <span className="cp-col-arrow">›</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Dinamik alt kategori sütunları ── */}
+          {catColumnPath.map((parentCatId, colIdx) => {
+            const children = [...categories.filter(c => c.parentId === parentCatId)].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+            if (children.length === 0) return null;
+            const levelLabel = colIdx === 0 ? '1. Alt Kategori' : colIdx === 1 ? '2. Alt Kategori' : `${colIdx + 1}. Alt Kategori`;
+            return (
+              <div key={parentCatId} className="cp-col-panel">
+                <div className="cp-col-header">📁 {levelLabel}</div>
+                <div className="cp-col-body">
+                  {children.map(child => {
+                    const isActive = catColumnPath[colIdx + 1] === child.id;
+                    const hasGrandChildren = categories.some(c => c.parentId === child.id);
+                    return (
+                      <button
+                        key={child.id}
+                        className={`cp-col-item ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          const next = [...catColumnPath.slice(0, colIdx + 1), child.id];
+                          setCatColumnPath(next);
+                          localStorage.setItem('cp_cat_path', JSON.stringify(next));
+                        }}
+                      >
+                        {child.name}
+                        {hasGrandChildren && <span className="cp-col-arrow">›</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ── Temizle (aktif filtre varsa) ── */}
+            {/* ── Temizle sütunu (aktif filtre varsa) ── */}
+            {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
+              <div className="cp-col-panel cp-clear-col">
+                <div className="cp-col-header" style={{ color: '#dc2626' }}>Filtreleri Sıfırla</div>
+                <div className="cp-col-body">
+                  <button
+                    className="cp-col-item"
+                    style={{ color: '#dc2626', fontWeight: '700' }}
+                    onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
+                  >✕ Temizle</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* MOBİL: aktif filtre özeti çipi (column browser kapalıyken) */}
+      {!catBrowserOpen && (catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 4px', flexWrap: 'wrap', marginBottom: '4px' }}>
+          {selectedMarkalar.map(id => {
+            const m = markalar.find(m => m.id === id);
+            return m ? <span key={id} className="cp-active-chip">{m.ad} <button onClick={() => setSelectedMarkalar([])} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'inherit', padding: 0 }}>✕</button></span> : null;
+          })}
+          {catColumnPath.map((catId, i) => {
+            const cat = categories.find(c => c.id === catId);
+            return cat ? <span key={catId} className="cp-active-chip cp-active-chip-cat">{i > 0 ? '› ' : ''}{cat.name}</span> : null;
+          })}
+          <button onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }} style={{ fontSize: '11px', border: 'none', background: '#fef2f2', color: '#dc2626', borderRadius: '10px', padding: '2px 8px', cursor: 'pointer', fontWeight: '700' }}>✕ Temizle</button>
         </div>
       )}
 
@@ -919,6 +1072,40 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       </div>
 
       <style>{`
+        /* ── Column Browser ── */
+        .cp-browser-anim-wrap { overflow: hidden; transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
+        .cp-browser-open { max-height: 520px; opacity: 1; pointer-events: auto; }
+        .cp-browser-closed { max-height: 0; opacity: 0; pointer-events: none; }
+        .cp-column-browser { display: flex; gap: 0; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(15,23,42,0.10); border: 1px solid #e2e8f0; margin-bottom: 16px; overflow-x: auto; scrollbar-width: thin; }
+        .cp-col-panel { min-width: 160px; max-width: 210px; flex-shrink: 0; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; }
+        .cp-col-panel:last-child { border-right: none; }
+        .cp-col-header { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 14px 9px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+        .cp-col-body { display: flex; flex-direction: column; gap: 2px; padding: 8px 8px; overflow-y: auto; max-height: 280px; }
+        .cp-col-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 10px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #374151; font-size: 13px; font-weight: 500; text-align: left; transition: background 0.12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cp-col-item:hover { background: #f1f5f9; }
+        .cp-col-item.active { background: rgba(34,197,94,0.12); color: var(--primary); font-weight: 700; }
+        .cp-col-arrow { margin-left: auto; color: #cbd5e1; font-size: 13px; flex-shrink: 0; }
+        .cp-col-item.active .cp-col-arrow { color: var(--primary); }
+        .cp-pin-float-btn { position: absolute; top: 0; right: 0; z-index: 3; padding: 10px 14px 9px; border: none; border-bottom: 1px solid #f1f5f9; border-left: 1px solid #f1f5f9; border-top-right-radius: 16px; background: #f8fafc; color: #94a3b8; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; transition: color 0.15s, background 0.15s; }
+        .cp-pin-float-btn:hover { color: #475569; background: #f1f5f9; }
+        .cp-pin-float-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.25); }
+        .cp-pin-col { min-width: 105px; max-width: 120px; background: #fafbfc; border-radius: 16px 0 0 16px; }
+        .cp-pin-col-btn { cursor: pointer; border: none; display: block; width: 100%; text-align: left; background: transparent; color: #94a3b8; transition: color 0.15s, background 0.15s; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 14px 9px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+        .cp-pin-col-btn:hover { color: #475569; background: #f1f5f9; }
+        .cp-pin-col-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); }
+        .cp-clear-col { min-width: 120px; max-width: 140px; }
+        .cp-active-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(34,197,94,0.1); color: var(--primary); border: 1px solid rgba(34,197,94,0.2); border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+        .cp-active-chip-cat { background: #eff6ff; color: #3b82f6; border-color: #bfdbfe; }
+        @media (max-width: 768px) {
+          .cp-browser-open { max-height: 720px; }
+          .cp-column-browser { flex-direction: column; }
+          .cp-pin-col { min-width: 100%; max-width: 100%; border-radius: 16px 16px 0 0; }
+          .cp-col-panel { min-width: 100%; max-width: 100%; border-right: none; border-bottom: 1px solid #f1f5f9; }
+          .cp-col-body { max-height: 140px; flex-direction: row; flex-wrap: wrap; }
+          .cp-col-item { width: auto; }
+        }
+        /* ── End Column Browser ── */
+
         @keyframes ping {
           75%, 100% { transform: scale(2); opacity: 0; }
         }
