@@ -107,29 +107,6 @@ export default function Products() {
     }).catch(() => {});
   }, []);
 
-  // Fiyat tanımlarını yükle
-  useEffect(() => {
-    fetch('/api/fiyat-tanimlari').then(r => r.ok ? r.json() : []).then(data => {
-      if (Array.isArray(data)) setFiyatTanimlari(data);
-    }).catch(() => {});
-  }, []);
-
-  // Aktif fiyat tabı değişince verileri çek
-  useEffect(() => {
-    if (activePriceTab === 'standart') { setTabFiyatlarMap({}); return; }
-    setTabFiyatlarLoading(true);
-    setTabFiyatlarMap({});
-    fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        if (Array.isArray(data)) {
-          const map = {};
-          data.forEach(f => { if (!map[f.urun_id]) map[f.urun_id] = []; map[f.urun_id].push(f); });
-          setTabFiyatlarMap(map);
-        }
-      }).catch(() => {}).finally(() => setTabFiyatlarLoading(false));
-  }, [activePriceTab]);
-
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
@@ -173,6 +150,29 @@ export default function Products() {
   const [kdvError, setKdvError] = useState('');
   const [imgPreview, setImgPreview] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
+
+  // Fiyat tanımlarını yükle
+  useEffect(() => {
+    fetch('/api/fiyat-tanimlari').then(r => r.ok ? r.json() : []).then(data => {
+      if (Array.isArray(data)) setFiyatTanimlari(data);
+    }).catch(() => {});
+  }, []);
+
+  // Aktif fiyat tabı değişince verileri çek
+  useEffect(() => {
+    if (activePriceTab === 'standart') { setTabFiyatlarMap({}); return; }
+    setTabFiyatlarLoading(true);
+    setTabFiyatlarMap({});
+    fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) {
+          const map = {};
+          data.forEach(f => { if (!map[f.urun_id]) map[f.urun_id] = []; map[f.urun_id].push(f); });
+          setTabFiyatlarMap(map);
+        }
+      }).catch(() => {}).finally(() => setTabFiyatlarLoading(false));
+  }, [activePriceTab]);
 
   // Floating tooltip for pm-item-name (avoids overflow clipping)
   const [pmTooltip, setPmTooltip] = useState(null); // { x, y } or null

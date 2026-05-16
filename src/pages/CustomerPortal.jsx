@@ -153,9 +153,14 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 };
 
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
-const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) => {
+const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi }) => {
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [showUnitDrop, setShowUnitDrop] = useState(false);
+  // Çoklu birim desteği: ozelFiyatlar bir dizi, seçilen indexe göre aktif satır
+  const ozelFiyat = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 0 ? ozelFiyatlar[selectedIdx] || ozelFiyatlar[0] : null;
+  const hasMultiUnit = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 1;
   // Özel fiyat varsa onu kullan (fiyat listesi sistemi), yoksa iskonto uygula
   const effectivePrice = ozelFiyat ? ozelFiyat.fiyat * ozelFiyat.carpan : p.price;
   // Sembol/kisaAd: ozelFiyat varsa önce fiyatlar tablosundan al, yoksa para_birimi_id=1 (TRY) varsay, en son ürün para birimine dön
@@ -209,7 +214,18 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
         <td className="cp-col-name" style={{ padding: '10px 10px' }}>
           <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-            <span className="badge-unit" style={{ cursor: 'default' }}>{effectiveUnit || 'Kg'}</span>
+            <span className="badge-unit" style={{ cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none', position: 'relative' }} onClick={(e) => { if (hasMultiUnit) { e.stopPropagation(); setShowUnitDrop(v => !v); } }}>
+            {effectiveUnit || 'Kg'}{hasMultiUnit && ' ▾'}
+            {showUnitDrop && hasMultiUnit && (
+              <div className="unit-dropdown" onClick={e => e.stopPropagation()}>
+                {ozelFiyatlar.map((f, i) => (
+                  <button key={f.id || i} className="unit-dropdown-item" data-active={i === selectedIdx} onClick={(e) => { e.stopPropagation(); setSelectedIdx(i); setShowUnitDrop(false); }}>
+                    {f.birim_adi || p.unit}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
             {effectiveKdvOrani != null && effectiveKdvDahil != null && (
               <span style={{
                 fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
@@ -261,7 +277,20 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyat, hasFiyatTipi }) =>
   return (
     <div className="product-card" {...hoverHandlers}>
       <div className="product-image-container">
-        <div className="card-unit-corner">{effectiveUnit || 'Kg'}</div>
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+          <div className="card-unit-corner" style={{ position: 'static', cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none' }} onClick={(e) => { e.stopPropagation(); if (hasMultiUnit) setShowUnitDrop(v => !v); }}>
+            {effectiveUnit || 'Kg'}{hasMultiUnit && ' ▾'}
+          </div>
+          {showUnitDrop && hasMultiUnit && (
+            <div className="unit-dropdown unit-dropdown-card" onClick={e => e.stopPropagation()}>
+              {ozelFiyatlar.map((f, i) => (
+                <button key={f.id || i} className="unit-dropdown-item" data-active={i === selectedIdx} onClick={(e) => { e.stopPropagation(); setSelectedIdx(i); setShowUnitDrop(false); }}>
+                  {f.birim_adi || p.unit}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {p.image ? (
           <img src={p.image} alt={p.name} className="product-image" />
         ) : (
@@ -451,8 +480,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
   const discount = parseDiscount(String(customer.discount || '0'));
 
-  // Müşteriye özel fiyat listesi (fiyat_tipi atanmışsa)
-  const [ozelFiyatlar, setOzelFiyatlar] = useState({}); // { urun_id: fiyat_row }
+  // Müşteriye özel fiyat listesi (fiyat_tipi atanmışsa) — { urun_id: [fiyat_row, ...] }
+  const [ozelFiyatlar, setOzelFiyatlar] = useState({});
   useEffect(() => {
     if (!customer.fiyatTipi) { setOzelFiyatlar({}); return; }
     fetch(`${API_URL}/fiyatlar/liste?fiyat_adi=${encodeURIComponent(customer.fiyatTipi)}`)
@@ -460,7 +489,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       .then(data => {
         if (!Array.isArray(data)) return;
         const map = {};
-        data.forEach(f => { map[f.urun_id] = f; });
+        data.forEach(f => { if (!map[f.urun_id]) map[f.urun_id] = []; map[f.urun_id].push(f); });
         setOzelFiyatlar(map);
       })
       .catch(() => {});
@@ -1370,7 +1399,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1383,7 +1412,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
                 </table>
               </div>
             )
@@ -1407,7 +1436,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1420,7 +1449,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyat={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
                   </table>
                 </div>
               )
