@@ -1031,12 +1031,7 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Nginx uyarısı */}
-          {gorselTipi === 'dosya' && (
-            <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: '9px', padding: '10px 12px', fontSize: '11px', color: '#92400e', lineHeight: '1.6' }}>
-              <strong>⚠️ Nginx Yapılandırması Gerekli:</strong> Görsellerin görünmesi için nginx config'e <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğu eklenmelidir.
-            </div>
-          )}
+
         </div>
       </div>
 

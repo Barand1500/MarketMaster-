@@ -488,48 +488,63 @@ app.get('/api/fiyatlar/adlar', (req, res) => {
 app.post('/api/fiyatlar', (req, res) => {
   const { fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
   if (!fiyat_adi || !urun_id || !birim_id) return res.status(400).json({ error: 'fiyat_adi, urun_id ve birim_id zorunlu' });
-  const sql = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod)
+  const sqlFull = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const vals = [
-    fiyat_adi,
-    urun_id,
-    birim_id,
-    parseFloat(carpan) || 1,
-    parseFloat(fiyat) || 0,
-    para_birimi_id || 1,
-    kdv_oran_id || null,
-    kdv_dahil != null ? parseInt(kdv_dahil) : null,
-    iskonto_tipi || null,
-    iskonto_orani != null ? parseFloat(iskonto_orani) : null,
-    barkod || null
+  const sqlNoKdv = `INSERT INTO fiyatlar (fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, iskonto_tipi, iskonto_orani, barkod)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const valsFull = [
+    fiyat_adi, urun_id, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
+    para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
+    iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null
   ];
-  db.query(sql, vals, (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ id: result.insertId, ...req.body });
+  const valsNoKdv = [
+    fiyat_adi, urun_id, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
+    para_birimi_id || 1, kdv_oran_id || null,
+    iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null
+  ];
+  db.query(sqlFull, valsFull, (err, result) => {
+    if (err && err.code === 'ER_BAD_FIELD_ERROR') {
+      // kdv_dahil kolonu henüz mevcut değil, migration bekliyor - kolonsuz dene
+      db.query(sqlNoKdv, valsNoKdv, (err2, result2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({ id: result2.insertId, ...req.body });
+      });
+    } else if (err) {
+      return res.status(500).json({ error: err.message });
+    } else {
+      res.json({ id: result.insertId, ...req.body });
+    }
   });
 });
 
 // Fiyat satırı güncelle
 app.put('/api/fiyatlar/:id', (req, res) => {
   const { fiyat_adi, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
-  const sql = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, kdv_dahil=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
+  const sqlUpdFull = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, kdv_dahil=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
                WHERE id=?`;
-  const vals = [
-    fiyat_adi,
-    birim_id,
-    parseFloat(carpan) || 1,
-    parseFloat(fiyat) || 0,
-    para_birimi_id || 1,
-    kdv_oran_id || null,
-    kdv_dahil != null ? parseInt(kdv_dahil) : null,
-    iskonto_tipi || null,
-    iskonto_orani != null ? parseFloat(iskonto_orani) : null,
-    barkod || null,
-    req.params.id
+  const sqlUpdNoKdv = `UPDATE fiyatlar SET fiyat_adi=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
+               WHERE id=?`;
+  const valsUpdFull = [
+    fiyat_adi, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
+    para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
+    iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null, req.params.id
   ];
-  db.query(sql, vals, (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+  const valsUpdNoKdv = [
+    fiyat_adi, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
+    para_birimi_id || 1, kdv_oran_id || null,
+    iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null, req.params.id
+  ];
+  db.query(sqlUpdFull, valsUpdFull, (err) => {
+    if (err && err.code === 'ER_BAD_FIELD_ERROR') {
+      db.query(sqlUpdNoKdv, valsUpdNoKdv, (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        res.json({ success: true });
+      });
+    } else if (err) {
+      return res.status(500).json({ error: err.message });
+    } else {
+      res.json({ success: true });
+    }
   });
 });
 

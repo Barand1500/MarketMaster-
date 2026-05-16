@@ -808,9 +808,9 @@ export default function Products() {
         {/* ===== Fiyat Listesi Tabları ===== */}
         {fiyatTanimlari.length > 0 && (
           <div style={{ display: 'flex', gap: '6px', padding: '10px 16px 0', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingBottom: '10px' }}>
-            <button onClick={() => { setActivePriceTab('standart'); setEditingChip(null); setChipForm({}); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === 'standart' ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === 'standart' ? 'var(--primary)' : '#f8fafc', color: activePriceTab === 'standart' ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Standart</button>
+            <button onClick={() => { setActivePriceTab('standart'); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === 'standart' ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === 'standart' ? 'var(--primary)' : '#f8fafc', color: activePriceTab === 'standart' ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Standart</button>
             {fiyatTanimlari.map(t => (
-              <button key={t.id} onClick={() => { setActivePriceTab(t.ad); setEditingChip(null); setChipForm({}); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.ad ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.ad ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.ad ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
+              <button key={t.id} onClick={() => { setActivePriceTab(t.ad); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.ad ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.ad ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.ad ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
             ))}
           </div>
         )}

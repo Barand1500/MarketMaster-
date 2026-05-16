@@ -569,7 +569,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       {/* COMPACT RESPONSIVE HEADER */}
       <div className="customer-header">
         <div className="header-left">
-          <div className="nav-logo" style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="nav-logo" style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            onClick={() => { setSearch(''); setSelectedCatId(null); setSelectedMarkalar([]); setShowBrandsView(false); setSortBy('default'); setShowCatPanel(false); }}>
             {siteSettings?.logo
               ? <img src={siteSettings.logo} alt="logo" style={{ height: '26px', width: '26px', objectFit: 'contain', borderRadius: '4px' }} />
               : siteSettings !== null ? <span>🍉</span> : null
