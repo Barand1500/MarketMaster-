@@ -324,10 +324,16 @@ db.query(`CREATE TABLE IF NOT EXISTS fiyat_tanimlari (
 
 // --- FİYAT TANIMLARI API ---
 app.get('/api/fiyat-tanimlari', (req, res) => {
-  db.query('SELECT * FROM fiyat_tanimlari ORDER BY ad', (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
-  });
+  db.query(
+    `SELECT ft.*, COUNT(m.id) AS kullanan_sayi
+     FROM fiyat_tanimlari ft
+     LEFT JOIN musteriler m ON m.fiyat_tipi = ft.ad
+     GROUP BY ft.id ORDER BY ft.ad`,
+    (err, results) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(results);
+    }
+  );
 });
 
 app.post('/api/fiyat-tanimlari', (req, res) => {
@@ -345,19 +351,37 @@ app.post('/api/fiyat-tanimlari', (req, res) => {
 app.put('/api/fiyat-tanimlari/:id', (req, res) => {
   const { ad, baslangic_tarihi, bitis_tarihi } = req.body;
   if (!ad || !ad.trim()) return res.status(400).json({ error: 'Ad zorunludur.' });
-  db.query('UPDATE fiyat_tanimlari SET ad=?, baslangic_tarihi=?, bitis_tarihi=? WHERE id=?',
-    [ad.trim(), baslangic_tarihi || null, bitis_tarihi || null, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true });
-    }
-  );
+  // Önce eski adı al, sonra CASCADE güncelle
+  db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const eskiAd = rows[0]?.ad;
+    db.query('UPDATE fiyat_tanimlari SET ad=?, baslangic_tarihi=?, bitis_tarihi=? WHERE id=?',
+      [ad.trim(), baslangic_tarihi || null, bitis_tarihi || null, req.params.id],
+      (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        if (eskiAd && eskiAd !== ad.trim()) {
+          // musteriler.fiyat_tipi cascade
+          db.query('UPDATE musteriler SET fiyat_tipi = ? WHERE fiyat_tipi = ?', [ad.trim(), eskiAd], () => {});
+          // fiyatlar.fiyat_adi cascade
+          db.query('UPDATE fiyatlar SET fiyat_adi = ? WHERE fiyat_adi = ?', [ad.trim(), eskiAd], () => {});
+        }
+        res.json({ success: true });
+      }
+    );
+  });
 });
 
 app.delete('/api/fiyat-tanimlari/:id', (req, res) => {
-  db.query('DELETE FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err) => {
+  db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    const ad = rows[0]?.ad;
+    db.query('DELETE FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      if (ad) {
+        db.query('UPDATE musteriler SET fiyat_tipi = NULL WHERE fiyat_tipi = ?', [ad], () => {});
+      }
+      res.json({ success: true });
+    });
   });
 });
 
@@ -476,11 +500,11 @@ app.get('/api/fiyatlar/liste', (req, res) => {
   });
 });
 
-// Mevcut fiyat_adi değerlerini listele (dropdown için)
+// Fiyat tanımlarını listele (dropdown için) - fiyat_tanimlari tablosundan
 app.get('/api/fiyatlar/adlar', (req, res) => {
-  db.query('SELECT DISTINCT fiyat_adi FROM fiyatlar ORDER BY fiyat_adi', (err, results) => {
+  db.query('SELECT ad FROM fiyat_tanimlari ORDER BY ad', (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(results.map(r => r.fiyat_adi));
+    res.json(results.map(r => r.ad));
   });
 });
 

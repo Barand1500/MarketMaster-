@@ -226,6 +226,29 @@ body {
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ===================== HELP MODAL ===================== */
+
+/* Bölüm yardım butonu — sadece masaüstü */
+.section-help-btn {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1.5px solid rgba(251, 191, 36, 0.4);
+  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.section-help-btn:hover {
+  background: rgba(251, 191, 36, 0.25);
+  border-color: rgba(251, 191, 36, 0.7);
+  transform: scale(1.05);
+}
+
 .help-modal {
   background: #fff;
   border-radius: 20px;

@@ -24,11 +24,12 @@ const Pr = ({ n, sembol, numStyle, symRatio = 0.62 }) => {
 };
 
 // Grid card fiyat bölümü — hover tüm kartı kapsar, hovered dışardan gelir
-const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel }) => {
+const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel, iskontoTipi }) => {
   const isTRY = !kisaAd || kisaAd === 'TRY';
   const showTL = hovered && !isTRY;
   const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
   const dispS = showTL ? '₺' : (sembol || '₺');
+  const indirimLabel = iskontoTipi === 'tutar' ? `${discount} ${dispS} İndirim` : `%${discount} İndirim`;
   return (
     <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
       {isOzel ? (
@@ -43,7 +44,7 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
             <span className="card-indirim-badge">
               <span className="card-indirim-pct">Sana Özel</span>
-              {discount > 0 && <span className="card-indirim-label">%{discount} İndirim</span>}
+              {discount > 0 && <span className="card-indirim-label">{indirimLabel}</span>}
             </span>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -62,7 +63,7 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
             <span className="card-indirim-badge">
               <span className="card-indirim-pct">Sana Özel</span>
-              <span className="card-indirim-label">%{discount} İndirim</span>
+              <span className="card-indirim-label">{indirimLabel}</span>
             </span>
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -84,11 +85,12 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
 
 // Liste görünümü fiyat satırı — hover tüm satırı kapsar, hovered dışardan gelir
 // hasExtraCols: tabloda İndirim ve Sana Özel kolonları gösteriliyorsa true — her satır tam 3 td emit etmeli
-const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel, hasExtraCols }) => {
+const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, kur, hovered, isOzel, hasExtraCols, iskontoTipi }) => {
   const isTRY = !kisaAd || kisaAd === 'TRY';
   const showTL = hovered && !isTRY;
   const dispN = (n) => showTL ? Math.round(n * (kur || 1) * 100) / 100 : n;
   const dispS = showTL ? '₺' : (sembol || '₺');
+  const indirimLabel = iskontoTipi === 'tutar' ? `${discount} ${dispS} İndirim` : `%${discount} İndirim`;
   if (isOzel) {
     return (
       <>
@@ -102,7 +104,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
         <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
             <span className="card-indirim-pct">Sana Özel</span>
-            {discount > 0 && <span className="card-indirim-label">%{discount} İndirim</span>}
+            {discount > 0 && <span className="card-indirim-label">{indirimLabel}</span>}
           </span>
         </td>
         <td className="cp-col-final" style={{ padding: '10px 16px 10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -128,7 +130,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
           {discount > 0 && (
             <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
               <span className="card-indirim-pct">İndirim</span>
-              <span className="card-indirim-label">%{discount} İndirim</span>
+              <span className="card-indirim-label">{indirimLabel}</span>
             </span>
           )}
         </td>
@@ -183,9 +185,12 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
     : p.kdvDahil;
   // Fiyat listesi iskontosu: fiyatlar tablosundaki iskonto_orani (ürüne özel)
   const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
+  const fiyatIskontoTipi = ozelFiyat ? (ozelFiyat.iskonto_tipi || 'oran') : 'oran';
   // hasFiyatTipi varsa customer iskontosu bypass — sadece fiyatlar.iskonto_orani kullanılır
   const effectiveDiscount = ozelFiyat ? fiyatIskontoOrani : (hasFiyatTipi ? 0 : discount);
-  const discountedPrice = effectivePrice * (1 - effectiveDiscount / 100);
+  const discountedPrice = (ozelFiyat && fiyatIskontoTipi === 'tutar')
+    ? Math.max(0, effectivePrice - fiyatIskontoOrani)
+    : effectivePrice * (1 - effectiveDiscount / 100);
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
   const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
   const lastPriceUpdate = p.lastPriceChange
@@ -248,6 +253,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
           hovered={hovered}
           isOzel={!!ozelFiyat}
           hasExtraCols={hasExtraCols}
+          iskontoTipi={fiyatIskontoTipi}
         />
         {/* Son Fiyat Güncelleme */}
         <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
@@ -308,6 +314,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
           kur={effectiveKur}
           hovered={hovered}
           isOzel={!!ozelFiyat}
+          iskontoTipi={fiyatIskontoTipi}
         />
         {effectiveKdvOrani != null && effectiveKdvDahil != null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
@@ -578,7 +585,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             {siteSettings?.site_adi ?? ''}
           </div>
           <div className="header-divider"></div>
-          <div className="customer-name-display">{customer.name}</div>
+          <div className="customer-name-display" onClick={() => setShowProfile(true)} style={{ cursor: 'pointer' }} title="Profil & Fatura">{customer.name}</div>
         </div>
 
         {/* FILTER AREA */}
@@ -789,19 +796,72 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setSearch(''); } }}
-                style={{ border: 'none', background: '#f1f5f9', borderRadius: '8px', padding: '6px 10px', fontSize: '13px', width: '100%', outline: 'none', fontWeight: '500' }}
+                style={{ border: 'none', background: '#f1f5f9', borderRadius: '8px', padding: '10px 12px', fontSize: '14px', width: '100%', outline: 'none', fontWeight: '500' }}
               />
             </div>
           </div>
         </div>
 
         <div className="info-right">
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowSortDrop(!showSortDrop)}
-              title="Sırala"
-              style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s', background: sortBy !== 'default' ? 'var(--primary)' : '#f1f5f9', color: sortBy !== 'default' ? '#fff' : '#64748b' }}
-            >↕</button>
+          <button
+            type="button"
+            className="update-time-box"
+            onClick={refreshProducts}
+            title="Ürünleri yenile"
+          >
+            <span className="pulse-dot"></span>
+            Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
+          </button>
+          <div className="kur-panel-wrap" ref={kurPanelRef} style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '0', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
+              <button
+                onClick={() => setViewMode('grid')}
+                title="Kart Görünümü"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px 0 0 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                  background: viewMode === 'grid' ? '#fff' : 'transparent',
+                  boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
+              >⊞</button>
+              <button
+                onClick={() => setViewMode('list')}
+                title="Liste Görünümü"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                  background: viewMode === 'list' ? '#fff' : 'transparent',
+                  boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
+              >☰</button>
+              <button
+                type="button"
+                onClick={() => { setShowKurPanel(v => !v); setShowSortDrop(false); }}
+                title="Döviz kurları"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', transition: 'all 0.15s',
+                  background: showKurPanel ? '#fff' : 'transparent',
+                  boxShadow: showKurPanel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: showKurPanel ? 'var(--primary)' : '#94a3b8' }}
+              >₺</button>
+              <button
+                onClick={() => { setShowSortDrop(v => !v); setShowKurPanel(false); }}
+                title="Sırala"
+                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0 7px 7px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                  background: sortBy !== 'default' ? 'var(--primary)' : (showSortDrop ? '#fff' : 'transparent'),
+                  boxShadow: showSortDrop ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  color: sortBy !== 'default' ? '#fff' : (showSortDrop ? 'var(--primary)' : '#94a3b8') }}
+              >↕</button>
+            </div>
+            {showKurPanel && (
+              <div className="kur-panel-dropdown">
+                <div className="kur-panel-title">Döviz Kurları</div>
+                {paraBirimleri.filter(pb => pb.id !== 1).map(pb => (
+                  <div key={pb.id} className="kur-panel-row">
+                    <span className="kur-panel-sym">{pb.sembol} {pb.kisa_ad}</span>
+                    <span className="kur-panel-val">{Number(pb.kur).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ₺</span>
+                  </div>
+                ))}
+                {paraBirimleri.filter(pb => pb.id !== 1).length === 0 && (
+                  <div className="kur-panel-empty">Döviz yok</div>
+                )}
+              </div>
+            )}
             {showSortDrop && (
               <>
                 <div className="dropdown-overlay" onClick={() => setShowSortDrop(false)} />
@@ -853,58 +913,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   )}
                 </div>
               </>
-            )}
-          </div>
-          <button
-            type="button"
-            className="update-time-box"
-            onClick={refreshProducts}
-            title="Ürünleri yenile"
-          >
-            <span className="pulse-dot"></span>
-            Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
-          </button>
-          <div className="kur-panel-wrap" ref={kurPanelRef} style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', gap: '0', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
-              <button
-                onClick={() => setViewMode('grid')}
-                title="Kart Görünümü"
-                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px 0 0 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
-                  background: viewMode === 'grid' ? '#fff' : 'transparent',
-                  boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
-              >⊞</button>
-              <button
-                onClick={() => setViewMode('list')}
-                title="Liste Görünümü"
-                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
-                  background: viewMode === 'list' ? '#fff' : 'transparent',
-                  boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
-              >☰</button>
-              <button
-                type="button"
-                onClick={() => setShowKurPanel(v => !v)}
-                title="Döviz kurları"
-                style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0 7px 7px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', transition: 'all 0.15s',
-                  background: showKurPanel ? '#fff' : 'transparent',
-                  boxShadow: showKurPanel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  color: showKurPanel ? 'var(--primary)' : '#94a3b8' }}
-              >₺</button>
-            </div>
-            {showKurPanel && (
-              <div className="kur-panel-dropdown">
-                <div className="kur-panel-title">Döviz Kurları</div>
-                {paraBirimleri.filter(pb => pb.id !== 1).map(pb => (
-                  <div key={pb.id} className="kur-panel-row">
-                    <span className="kur-panel-sym">{pb.sembol} {pb.kisa_ad}</span>
-                    <span className="kur-panel-val">{Number(pb.kur).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ₺</span>
-                  </div>
-                ))}
-                {paraBirimleri.filter(pb => pb.id !== 1).length === 0 && (
-                  <div className="kur-panel-empty">Döviz yok</div>
-                )}
-              </div>
             )}
           </div>
         </div>
@@ -1306,7 +1314,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{markalar.length} marka</div>
             </div>
             <button
-              onClick={() => setShowBrandsView(false)}
+              onClick={() => { setShowBrandsView(false); setSelectedMarkalar([]); }}
               style={{ padding: '6px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
             >✕ Kapat</button>
           </div>
@@ -1327,11 +1335,16 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <div
                     key={m.id}
                     className={`brand-card${isActive ? ' brand-card-active' : ''}`}
+                    style={{ position: 'relative' }}
                     onClick={() => {
-                      setSelectedMarkalar([m.id]);
-                      setShowBrandsView(false);
+                      setSelectedMarkalar(isActive ? [] : [m.id]);
                     }}
                   >
+                    {isActive && (
+                      <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'var(--primary)', color: '#fff', fontSize: '9px', fontWeight: '800', padding: '2px 6px', borderRadius: '8px', lineHeight: 1.4 }}>
+                        📍 Seçili
+                      </div>
+                    )}
                     {/* Logo veya baş harf */}
                     <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', background: m.gorsel ? '#f8fafc' : color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${m.gorsel ? '#e2e8f0' : color + '30'}`, flexShrink: 0 }}>
                       {m.gorsel
@@ -1348,6 +1361,43 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               })}
             </div>
           )}
+
+          {/* Seçili markanın ürünleri */}
+          {selectedMarkalar.length > 0 && (() => {
+            const activeMarka = markalar.find(m => m.id === selectedMarkalar[0]);
+            const markaProducts = products.filter(p => p.markaId === selectedMarkalar[0] || p.marka_id === selectedMarkalar[0]);
+            return (
+              <div key={selectedMarkalar[0]} style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', marginTop: '28px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
+                  <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
+                  {activeMarka?.ad || 'Marka Ürünleri'}
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{markaProducts.length} Ürün</span>
+                </h2>
+                {markaProducts.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
+                ) : viewMode === 'grid' ? (
+                  <div className="product-grid">
+                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}
+                  </div>
+                ) : (
+                  <div className="product-list-view">
+                    <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                      <thead><tr className="th-row">
+                        <th style={{ width: '52px' }}>Görsel</th>
+                        <th>Ürün Adı</th>
+                        <th style={{ textAlign: 'right' }}>Fiyat</th>
+                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                        <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
+                        <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                      </tr></thead>
+                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

@@ -15,14 +15,9 @@ export default function PageHeader({ title, sub, helpContent, helpContentMobile,
   }, []);
 
   useEffect(() => {
+    if (!showHelp) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'F1') {
-        e.preventDefault();
-        setShowHelp(prev => !prev);
-      }
-      if (e.key === 'Escape' && showHelp) {
-        setShowHelp(false);
-      }
+      if (e.key === 'Escape') setShowHelp(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);

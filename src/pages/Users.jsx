@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
+import SectionHelpButton from '../components/SectionHelpButton';
 import '../styles/ExcelTable.css';
 
 const AVAILABLE_PAGES = [
@@ -198,9 +199,31 @@ export default function Users() {
       <div className="card excel-card">
         <div className="table-header-toolbar">
           <h2 className="toolbar-title">Sistem Kullanıcıları <span className="count-badge">{users.length} Kişi</span></h2>
-          <div className="premium-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Kullanıcı ara..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <div className="premium-search">
+              <span className="search-icon">🔍</span>
+              <input type="text" placeholder="Kullanıcı ara..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <SectionHelpButton title="Kullanıcı Yönetimi" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Kullanıcı Nasıl Eklenir?</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>En üst satıra <strong>Ad Soyad</strong>, <strong>Kullanıcı Adı</strong> ve <strong>Şifre</strong> girin, hangi sayfalara girebileceğini seçin, <strong>EKLE</strong>'ye basın.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔒 Sayfa Erişim Yetkileri</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Her kullanıcı yalnızca izinli olduğu sayfalara girebilir. Yetki kutucuklarına tıklayarak anında değiştirebilirsiniz.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Bilgileri Güncellemek</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ad, kullanıcı adı veya şifre hücresine <strong>çift tıklayın</strong>, düzenleyin, Enter veya başka yere tıklayın — otomatik kaydedilir.</div>
+              </div>
+              <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #ef4444' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Admin Hesabı</div>
+                <div style={{ fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' }}><strong>admin</strong> hesabı silinemez ve yetkileri kısıtlanamaz. Her zaman tüm sayfalara erişir.</div>
+              </div>
+            </div>
+            } />
           </div>
         </div>
 

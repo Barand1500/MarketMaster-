@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
+import SectionHelpButton from '../components/SectionHelpButton';
 import '../styles/ExcelTable.css';
 
 function PaginationBar({ currentPage, totalPages, pageSize, totalCount, onPageChange, onPageSizeChange, label = 'kayıt', mobile }) {
@@ -274,9 +275,32 @@ export default function Customers() {
       <div className="card excel-card">
         <div className="table-header-toolbar">
           <h2 className="toolbar-title">Kayıtlı Müşteriler <span className="count-badge">{customers.length} Kişi</span></h2>
-          <div className="premium-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Müşteri ara..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <div className="premium-search">
+              <span className="search-icon">🔍</span>
+              <input type="text" placeholder="Müşteri ara..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <SectionHelpButton title="Müşteri Yönetimi" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Müşteri Eklemek</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tablonun en üst satırı yeni müşteri içindir. Ad, e-posta ve şifre alanlarını doldurup <strong>EKLE</strong>'ye basın.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Bilgi Değiştirmek</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Herhangi bir hücreye <strong>çift tıklayın</strong>, düzenle moduna geçer. Enter'a basin veya başka yere tıklayın, otomatik kaydedilir.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔑 Giriş Bilgileri</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteriler <strong>Ad</strong> veya <strong>E-posta</strong> + şifre ile giriş yapar. Göz (👁️) ikonuyla şifreyi görebilirsiniz.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>% İskonto (Özel İndirim)</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşteriye özel indirim oranıdır. Orn. <strong>10</strong> yazarsanız tüm fiyatlar %10 indirimli görünür.</div>
+              </div>
+              <div className="help-tip"><strong>💡 İpucu:</strong> Arama kutusuna yazarak müşterileri anlık filtreleyebilirsiniz.</div>
+            </div>
+            } />
           </div>
         </div>
 

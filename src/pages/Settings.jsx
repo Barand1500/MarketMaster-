@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
+import SectionHelpButton from '../components/SectionHelpButton';
 import '../styles/ExcelTable.css';
 
 const KUR_TURU_LABEL = {
@@ -25,7 +26,6 @@ export default function Settings() {
   const [gorselOnayModal, setGorselOnayModal] = useState(null); // { hedef }
   const [gorselMigrasyonSonuc, setGorselMigrasyonSonuc] = useState(null);
   const [gorselMigrasyonYukleniyor, setGorselMigrasyonYukleniyor] = useState(false);
-  const [showGorselHelp, setShowGorselHelp] = useState(false);
 
   // Sayfa yüklenince DB'den doğrudan oku (Ctrl+Shift+R sonrası doğru değeri göster)
   useEffect(() => {
@@ -510,38 +510,6 @@ export default function Settings() {
         <span style={{ fontSize: '18px' }}>💡</span>
         <div style={{ fontSize: '13px', color: '#166534' }}>Değişiklikler <strong>anında</strong> uygulanır. Sayfayı yenilemenize gerek yoktur.</div>
       </div>
-
-      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ fontWeight: '700', fontSize: '14px', color: '#0f172a' }}>💱 Para Birimi Yönetimi</div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <span style={{ background: '#eff6ff', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', flexShrink: 0 }}>➕</span>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '2px' }}>Para Birimi Ekle</div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>Ad, kısa ad (örn. USD) ve sembol girerek yeni para birimi tanımlayın. Kur tipini <strong>Manuel</strong> yaparsanız kuru kendiniz girersiniz; <strong>TCMB</strong> seçerseniz kur otomatik güncellenir.</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <span style={{ background: '#faf5ff', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', flexShrink: 0 }}>📡</span>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '2px' }}>Kur Türü</div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>API tipinde <strong>Döviz Alış / Döviz Satış / Efektif Alış / Efektif Satış</strong> seçeneklerinden birini seçin. Müşteri portalında fiyatın altında hangi kur türüyle hesaplandığı küçük yazıyla gösterilir.</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <span style={{ background: '#fff7ed', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', flexShrink: 0 }}>🔄</span>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '2px' }}>Kur Güncelleme</div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}><strong>TCMB Kurlarını Getir</strong> ile günün resmi kurlarını çekin. <strong>Tümünü Güncelle</strong> ile API tipi tüm para birimlerini tek seferde kaydedin.</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-          <span style={{ background: '#fff1f2', borderRadius: '8px', padding: '6px 10px', fontSize: '16px', flexShrink: 0 }}>⚠️</span>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '2px' }}>Para Birimi Silme</div>
-            <div style={{ fontSize: '12px', color: '#64748b' }}>Bir para birimini silerseniz o para birimiyle etiketlenmiş ürünlerin fiyatları otomatik olarak <strong>güncel kur × fiyat</strong> şeklinde <strong>Türk Lirası</strong>'na dönüştürülür.</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -549,7 +517,6 @@ export default function Settings() {
     <div className="page-container wide">
       <PageHeader
         title="⚙️ Site Ayarları"
-        helpContent={helpContent}
       />
 
       {/* Uyarı Bandı */}
@@ -572,6 +539,7 @@ export default function Settings() {
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
           <h2 className="toolbar-title">🎨 Görünüm Ayarları</h2>
+          <SectionHelpButton title="Görünüm Ayarları" content={helpContent} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '0 4px 8px' }}>
@@ -698,6 +666,18 @@ export default function Settings() {
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
           <h2 className="toolbar-title">💾 Veri Yedekleme</h2>
+          <SectionHelpButton title="Veri Yedekleme" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #4338ca' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗄️ SQL Yedek İndir</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Tüm veritabanını (tablolar, görseller, veriler) tek bir SQL dosyasına indirir. Sunucu göçü veya yedekleme için önerilir.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #0891b2' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔄 Geri Yükleme</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Yaptığınız SQL yedeğini aynı ekrandan geri yükleyebilirsiniz. Geri yükleme mevcut verilerin üzerine yazar.</div>
+              </div>
+            </div>
+          } />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '0 4px 8px' }}>
@@ -767,6 +747,26 @@ export default function Settings() {
             >
               {tumunuGuncelleYukleniyor ? '⏳ Güncelleniyor...' : '🔄 Tümünü Güncelle'}
             </button>
+            <SectionHelpButton title="Para Birimi Yönetimi" content={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Para Birimi Ekle</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Ad, kısa ad (örn. USD) ve sembol girerek yeni para birimi tanımlayın. Kur tipini <strong>Manuel</strong> yaparsınız kuru kendiniz girersiniz; <strong>TCMB</strong> seçerseniz kur otomatik güncellenir.</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📡 Kur Türü</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>API tipinde <strong>Döviz Alış / Döviz Satış / Efektif Alış / Efektif Satış</strong> seçeneklerinden birini seçin.</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #0891b2' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔄 Kur Güncelleme</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}><strong>Tümünü Güncelle</strong> ile API tipi tüm para birimlerini tek seferde TCMB'den çekin.</div>
+                </div>
+                <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #ef4444' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Para Birimi Silme</div>
+                  <div style={{ fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' }}>Bir para birimini silerseniz o para birimiyle etiketlenmiş ürünlerin fiyatları otomatik olarak <strong>Türk Lirası</strong>'na dönüştürülür.</div>
+                </div>
+              </div>
+            } />
           </div>
         </div>
 
@@ -942,11 +942,22 @@ export default function Settings() {
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '18px' }}>
           <h2 className="toolbar-title">🖼️ Görsel Saklama</h2>
-          <button
-            onClick={() => setShowGorselHelp(true)}
-            title="Nasıl çalışır?"
-            style={{ background: 'rgba(251,191,36,0.13)', border: '1.5px solid rgba(251,191,36,0.4)', borderRadius: '7px', width: '26px', height: '26px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s', marginLeft: 'auto' }}
-          >💡</button>
+          <SectionHelpButton title="Görsel Saklama" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '4px' }}>🗄️ Veritabanı Modu</div>
+                Görseller base64 formatında doğrudan veritabanına yazılır. Kurulum gerektirmez, taşınabilirdir. Ancak çok sayıda görsel olduğunda veritabanı boyutu büyüyebilir ve sayfa yükleme hızı düşebilir.
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>📁 Dosya Sistemi Modu</div>
+                Görseller sunucudaki <code style={{ background: '#dcfce7', padding: '1px 5px', borderRadius: '4px', fontSize: '12px' }}>/uploads/</code> klasörüne kaydedilir, veritabanında sadece dosya yolu tutulur. Veritabanı küçük kalır ve yükleme çok daha hızlı olur.
+              </div>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div style={{ fontWeight: '700', color: '#374151', marginBottom: '4px' }}>🔄 Yöntem Değiştirme</div>
+                Bir yöntemden diğerine geçerken <strong>mevcut görselleri taşı</strong> seçeneği ile tüm eski görseller yeni sisteme aktarılır.
+              </div>
+            </div>
+          } />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1038,60 +1049,39 @@ export default function Settings() {
       {/* FİYAT TANIMLARI KARTI */}
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '18px' }}>
-          <h2 className="toolbar-title">🏷️ Fiyat Tanımları</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 className="toolbar-title">🏷️ Fiyat Tanımları</h2>
+            <SectionHelpButton title="Fiyat Tanımları" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📌 Fiyat Tanımı Nedir?</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Müşterilere uygulanan özel fiyat gruplarıdır. Örneğin “Toptan”, “Bayi”, “VIP” gibi tanımlar oluşturabilirsiniz.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>➕ Yeni Tanım Ekleme</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>“+ Yeni” butonuna basın, ad ve geçerlilik tarihi aralığını girin. Müşteri sayfasından bu tanımı müşterilere atayabilirsiniz.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #ef4444' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🗑️ Silme</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Bir fiyat tanımı silindicinde o tanıma atanmış tüm müşterilerin fiyat tipi otomatik olarak temizlenir.</div>
+              </div>
+            </div>
+            } />
+          </div>
           <button
             onClick={() => { setFtAddForm({ ad: '', bas: '', bit: '' }); setFtAddErr(''); }}
             style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', marginLeft: 'auto', lineHeight: 1 }}
           >+ Yeni</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
           {fiyatTanimlari.length === 0 && !ftAddForm && (
-            <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Henüz fiyat tanımı eklenmemiş.</div>
+            <div style={{ gridColumn: '1/-1', color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Henüz fiyat tanımı eklenmemiş.</div>
           )}
           {fiyatTanimlari.map(ft => {
             const isInline = ftInline?.id === ft.id;
             return (
-              <div key={ft.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* İsim satırı */}
-                  {isInline && ftInline.editingField === 'ad' ? (
-                    <input
-                      autoFocus
-                      style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '2px 8px', width: '100%', outline: 'none' }}
-                      value={ftInline.adVal}
-                      onChange={e => setFtInline(s => ({ ...s, adVal: e.target.value }))}
-                      onBlur={saveFtInline}
-                      onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }}
-                    />
-                  ) : (
-                    <div
-                      onDoubleClick={() => setFtInline({ id: ft.id, editingField: 'ad', adVal: ft.ad, basVal: ft.baslangic_tarihi ? ft.baslangic_tarihi.slice(0, 10) : '', bitVal: ft.bitis_tarihi ? ft.bitis_tarihi.slice(0, 10) : '' })}
-                      style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a', cursor: 'text', padding: '2px 0' }}
-                      title="Çift tıklayarak düzenle"
-                    >{ft.ad}</div>
-                  )}
-                  {/* Tarih satırı */}
-                  {isInline && ftInline.editingField === 'tarihi' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                      <input type="date" style={{ fontSize: '11px', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '1px 6px', outline: 'none' }} value={ftInline.basVal} onChange={e => setFtInline(s => ({ ...s, basVal: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }} />
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>→</span>
-                      <input type="date" style={{ fontSize: '11px', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '1px 6px', outline: 'none' }} value={ftInline.bitVal} onChange={e => setFtInline(s => ({ ...s, bitVal: e.target.value }))} onBlur={saveFtInline} onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }} />
-                      <button onClick={saveFtInline} style={{ background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '5px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>✓</button>
-                      <button onClick={() => setFtInline(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', borderRadius: '5px', padding: '2px 8px', fontSize: '11px', cursor: 'pointer' }}>✕</button>
-                    </div>
-                  ) : (
-                    <div
-                      onDoubleClick={() => setFtInline({ id: ft.id, editingField: 'tarihi', adVal: ft.ad, basVal: ft.baslangic_tarihi ? ft.baslangic_tarihi.slice(0, 10) : '', bitVal: ft.bitis_tarihi ? ft.bitis_tarihi.slice(0, 10) : '' })}
-                      style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', cursor: 'text', minHeight: '16px' }}
-                      title="Çift tıklayarak tarihleri düzenle"
-                    >
-                      {(ft.baslangic_tarihi || ft.bitis_tarihi)
-                        ? `${ft.baslangic_tarihi ? new Date(ft.baslangic_tarihi).toLocaleDateString('tr-TR') : '—'} → ${ft.bitis_tarihi ? new Date(ft.bitis_tarihi).toLocaleDateString('tr-TR') : '—'}`
-                        : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Tarih aralığı yok</span>
-                      }
-                    </div>
-                  )}
-                </div>
+              <div key={ft.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 12px 12px', display: 'flex', flexDirection: 'column', gap: '6px', position: 'relative', minWidth: 0 }}>
+                {/* Sil butonu */}
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
@@ -1099,38 +1089,83 @@ export default function Settings() {
                     const r = await fetch(`/api/fiyat-tanimlari/${ft.id}`, { method: 'DELETE' });
                     if (r.ok) setFiyatTanimlari(prev => prev.filter(x => x.id !== ft.id));
                   }}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '2px 6px', flexShrink: 0 }}
+                  style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', lineHeight: 1, padding: '2px 4px', zIndex: 1 }}
                   title="Sil"
                 >×</button>
+                {/* İsim */}
+                {isInline && ftInline.editingField === 'ad' ? (
+                  <input
+                    autoFocus
+                    style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '3px 8px', width: '100%', outline: 'none', boxSizing: 'border-box' }}
+                    value={ftInline.adVal}
+                    onChange={e => setFtInline(s => ({ ...s, adVal: e.target.value }))}
+                    onBlur={saveFtInline}
+                    onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }}
+                  />
+                ) : (
+                  <div
+                    onDoubleClick={() => setFtInline({ id: ft.id, editingField: 'ad', adVal: ft.ad, basVal: ft.baslangic_tarihi ? ft.baslangic_tarihi.slice(0, 10) : '', bitVal: ft.bitis_tarihi ? ft.bitis_tarihi.slice(0, 10) : '' })}
+                    style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'text', paddingRight: '20px', lineHeight: 1.3 }}
+                    title="Çift tıklayarak düzenle"
+                  >{ft.ad}</div>
+                )}
+                {/* Tarih */}
+                {isInline && ftInline.editingField === 'tarihi' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input type="date" style={{ fontSize: '11px', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '2px 6px', outline: 'none', width: '100%', boxSizing: 'border-box' }} value={ftInline.basVal} onChange={e => setFtInline(s => ({ ...s, basVal: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }} />
+                    <input type="date" style={{ fontSize: '11px', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '2px 6px', outline: 'none', width: '100%', boxSizing: 'border-box' }} value={ftInline.bitVal} onChange={e => setFtInline(s => ({ ...s, bitVal: e.target.value }))} onBlur={saveFtInline} onKeyDown={e => { if (e.key === 'Enter') saveFtInline(); if (e.key === 'Escape') setFtInline(null); }} />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={saveFtInline} style={{ flex: 1, background: 'var(--primary)', border: 'none', color: '#fff', borderRadius: '5px', padding: '3px 0', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}>✓</button>
+                      <button onClick={() => setFtInline(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#64748b', borderRadius: '5px', padding: '3px 0', fontSize: '11px', cursor: 'pointer' }}>✕</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onDoubleClick={() => setFtInline({ id: ft.id, editingField: 'tarihi', adVal: ft.ad, basVal: ft.baslangic_tarihi ? ft.baslangic_tarihi.slice(0, 10) : '', bitVal: ft.bitis_tarihi ? ft.bitis_tarihi.slice(0, 10) : '' })}
+                    style={{ fontSize: '11px', color: '#94a3b8', cursor: 'text', lineHeight: 1.5 }}
+                    title="Çift tıklayarak tarihleri düzenle"
+                  >
+                    {(ft.baslangic_tarihi || ft.bitis_tarihi)
+                      ? <><span>{ft.baslangic_tarihi ? new Date(ft.baslangic_tarihi).toLocaleDateString('tr-TR') : '—'}</span><br /><span style={{ fontSize: '10px', color: '#cbd5e1' }}>→</span><span> {ft.bitis_tarihi ? new Date(ft.bitis_tarihi).toLocaleDateString('tr-TR') : '—'}</span></>
+                      : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Tarih aralığı yok</span>
+                    }
+                  </div>
+                )}
+                {/* Müşteri sayısı */}
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', marginTop: 'auto' }}>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '2px' }}>Kullanan Müşteri</div>
+                  <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', lineHeight: 1 }}>{ft.kullanan_sayi ?? 0}</div>
+                </div>
               </div>
             );
           })}
           {/* Satır içi yeni ekleme formu */}
           {ftAddForm && (
-            <div style={{ background: '#f0fdf4', border: '1.5px solid var(--primary)', borderRadius: '10px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ background: '#f0fdf4', border: '1.5px solid var(--primary)', borderRadius: '14px', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontWeight: '700', fontSize: '12px', color: 'var(--primary)', marginBottom: '2px' }}>Yeni Fiyat Tanımı</div>
               <input
                 autoFocus
-                style={{ fontSize: '13px', fontWeight: '700', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '5px 10px', outline: 'none', width: '100%' }}
-                placeholder="Fiyat tanımı adı... *"
+                style={{ fontSize: '13px', fontWeight: '700', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '5px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                placeholder="Tanım adı... *"
                 value={ftAddForm.ad}
                 onChange={e => setFtAddForm(s => ({ ...s, ad: e.target.value }))}
                 onKeyDown={e => { if (e.key === 'Enter') saveFtAdd(); if (e.key === 'Escape') setFtAddForm(null); }}
               />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Başlangıç:</span>
-                <input type="date" style={{ fontSize: '11px', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '2px 6px', outline: 'none' }} value={ftAddForm.bas} onChange={e => setFtAddForm(s => ({ ...s, bas: e.target.value }))} />
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Bitiş:</span>
-                <input type="date" style={{ fontSize: '11px', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '2px 6px', outline: 'none' }} value={ftAddForm.bit} onChange={e => setFtAddForm(s => ({ ...s, bit: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveFtAdd(); }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Başlangıç</label>
+                <input type="date" style={{ fontSize: '11px', border: '1px solid #d1fae5', borderRadius: '6px', padding: '4px 6px', outline: 'none', width: '100%', boxSizing: 'border-box', background: '#fff' }} value={ftAddForm.bas} onChange={e => setFtAddForm(s => ({ ...s, bas: e.target.value }))} />
+                <label style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Bitiş</label>
+                <input type="date" style={{ fontSize: '11px', border: '1px solid #d1fae5', borderRadius: '6px', padding: '4px 6px', outline: 'none', width: '100%', boxSizing: 'border-box', background: '#fff' }} value={ftAddForm.bit} onChange={e => setFtAddForm(s => ({ ...s, bit: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveFtAdd(); }} />
               </div>
               {ftAddErr && <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: '600' }}>❌ {ftAddErr}</div>}
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                 <button onClick={saveFtAdd} disabled={ftAddSaving} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '12px', cursor: 'pointer', opacity: ftAddSaving ? 0.7 : 1 }}>{ftAddSaving ? '...' : 'Kaydet'}</button>
-                <button onClick={() => { setFtAddForm(null); setFtAddErr(''); }} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}>İptal</button>
+                <button onClick={() => { setFtAddForm(null); setFtAddErr(''); }} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: '1px solid #d1fae5', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}>İptal</button>
               </div>
             </div>
           )}
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Ad veya tarihe çift tıklayarak düzenleyebilirsiniz.</div>
         </div>
+        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>Ad veya tarihe çift tıklayarak düzenleyebilirsiniz.</div>
       </div>
 
       {/* Para Birimi Silme Onay Modali */}
@@ -1156,82 +1191,6 @@ export default function Settings() {
               <button onClick={handlePbSilOnayla} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Sil</button>
               <button onClick={() => setPbSilOnay(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Görsel Saklama Bilgi Modali */}
-      {showGorselHelp && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGorselHelp(false)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
-            {/* Başlık */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>💡</div>
-              <div>
-                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>Görsel Saklama Nasıl Çalışır?</div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Saklama yöntemleri hakkında bilgi</div>
-              </div>
-              <button onClick={() => setShowGorselHelp(false)} style={{ marginLeft: 'auto', background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px', color: '#475569', fontWeight: '600' }}>✕</button>
-            </div>
-
-            {/* İçerik */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '4px' }}>🗄️ Veritabanı Modu</div>
-                Görseller base64 formatında doğrudan veritabanına yazılır. Kurulum gerektirmez, taşınabilirdir. Ancak çok sayıda görsel olduğunda veritabanı boyutu büyüyebilir ve sayfa yükleme hızı düşebilir.
-              </div>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>📁 Dosya Sistemi Modu</div>
-                Görseller sunucudaki <code style={{ background: '#dcfce7', padding: '1px 5px', borderRadius: '4px', fontSize: '12px' }}>/uploads/</code> klasörüne kaydedilir, veritabanında sadece dosya yolu tutulur. Veritabanı küçük kalır ve yükleme çok daha hızlı olur.
-              </div>
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#374151', marginBottom: '4px' }}>🔄 Yöntem Değiştirme</div>
-                Bir yöntemden diğerine geçerken <strong>mevcut görselleri taşı</strong> seçeneği ile tüm eski görseller yeni sisteme aktarabilirsin. Ya da sadece tercihi kaydedip yeni eklenen görsellerin yeni yöntemle saklanmasını sağlayabilirsin.
-              </div>
-              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#92400e' }}>
-                <strong>⚠️ Not:</strong> Dosya sistemi modunu kullanıyorsan nginx yapılandırmanızda <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğunun tanımlandığından emin olun.
-              </div>
-            </div>
-
-            <button onClick={() => setShowGorselHelp(false)} style={{ marginTop: '20px', width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>Anlaştım ✓</button>
-          </div>
-        </div>
-      )}
-
-      {/* Görsel Saklama Bilgi Modali */}
-      {showGorselHelp && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowGorselHelp(false)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
-            {/* Başlık */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>💡</div>
-              <div>
-                <div style={{ fontWeight: '800', fontSize: '15px', color: '#0f172a' }}>Görsel Saklama Nasıl Çalışır?</div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Saklama yöntemleri hakkında bilgi</div>
-              </div>
-              <button onClick={() => setShowGorselHelp(false)} style={{ marginLeft: 'auto', background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '13px', color: '#475569', fontWeight: '600' }}>✕</button>
-            </div>
-
-            {/* İçerik */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
-              <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#1d4ed8', marginBottom: '4px' }}>🗄️ Veritabanı Modu</div>
-                Görseller base64 formatında doğrudan veritabanına yazılır. Kurulum gerektirmez, taşınabilirdir. Ancak çok sayıda görsel olduğunda veritabanı boyutu büyüyebilir ve sayfa yükleme hızı düşebilir.
-              </div>
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#15803d', marginBottom: '4px' }}>📁 Dosya Sistemi Modu</div>
-                Görseller sunucudaki <code style={{ background: '#dcfce7', padding: '1px 5px', borderRadius: '4px', fontSize: '12px' }}>/uploads/</code> klasörüne kaydedilir, veritabanında sadece dosya yolu tutulur. Veritabanı küçük kalır ve yükleme çok daha hızlı olur.
-              </div>
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px' }}>
-                <div style={{ fontWeight: '700', color: '#374151', marginBottom: '4px' }}>🔄 Yöntem Değiştirme</div>
-                Bir yöntemden diğerine geçerken <strong>mevcut görselleri taşı</strong> seçeneği ile tüm eski görseller yeni sisteme aktarılır. Ya da sadece tercihi kaydedip yeni eklenen görsellerin yeni yöntemle saklanmasını sağlayabilirsin.
-              </div>
-              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: '#92400e' }}>
-                <strong>⚠️ Not:</strong> Dosya sistemi modunu kullanıyorsan nginx yapılandırmanızda <code style={{ background: '#fef3c7', padding: '1px 4px', borderRadius: '3px' }}>location /uploads/</code> bloğunun tanımlandığından emin olun.
-              </div>
-            </div>
-
-            <button onClick={() => setShowGorselHelp(false)} style={{ marginTop: '18px', width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>Anlaştım ✓</button>
           </div>
         </div>
       )}

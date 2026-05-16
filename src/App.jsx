@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getSections } from './utils/helpRegistry';
 import Login from './pages/Login';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
@@ -42,6 +43,22 @@ export default function App() {
   const { loading, apiError, clearApiError, siteSettings } = useData();
   const [session, setSessionState] = useState(getStoredSession);
   const [page, setPage] = useState('products');
+  const [showF1Help, setShowF1Help] = useState(false);
+  const [f1Sections, setF1Sections] = useState([]);
+
+  // F1 → tüm bölümlerin yardımını toplu göster
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        const secs = getSections();
+        if (secs.length > 0) { setF1Sections(secs); setShowF1Help(true); }
+      }
+      if (e.key === 'Escape') setShowF1Help(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Session değiştiğinde localStorage'a kaydet
   const setSession = (newSession) => {
@@ -145,9 +162,44 @@ export default function App() {
     }
   };
 
+  // F1 toplu yardım modalı
+  const f1Modal = showF1Help ? (
+    <div className="modal-overlay help-overlay" style={{ zIndex: 10000 }}>
+      <div className="help-modal" style={{ maxWidth: '640px' }} onClick={e => e.stopPropagation()}>
+        <div className="help-modal-head">
+          <div className="help-modal-icon">💡</div>
+          <div>
+            <div className="help-modal-title">Sayfa Rehberi</div>
+            <div className="help-modal-sub">Tüm bölümlerin açıklamaları</div>
+          </div>
+          <button className="help-modal-close" onClick={() => setShowF1Help(false)}>
+            ✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span>
+          </button>
+        </div>
+        <div className="help-modal-body" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
+          {f1Sections.map((sec, i) => (
+            <div key={sec.id}>
+              <div style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ width: '4px', height: '20px', background: 'var(--primary)', borderRadius: '2px', flexShrink: 0, display: 'inline-block' }} />
+                {sec.title}
+              </div>
+              {sec.content}
+              {i < f1Sections.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', margin: '20px 0' }} />}
+            </div>
+          ))}
+        </div>
+        <div className="help-modal-footer">
+          <div className="help-modal-shortcut">⌨️ <strong>F1</strong> veya <strong>ESC</strong> ile kapat</div>
+          <button className="help-modal-btn" onClick={() => setShowF1Help(false)}>Anladım ✓</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       {errorToast}
+      {f1Modal}
       <div className="app-container">
         <Navbar
           active={page}
