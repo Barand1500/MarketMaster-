@@ -214,7 +214,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
         <td className="cp-col-name" style={{ padding: '10px 10px' }}>
           <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-            <span className="badge-unit" style={{ cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none', position: 'relative' }} onClick={(e) => { if (hasMultiUnit) { e.stopPropagation(); setShowUnitDrop(v => !v); } }}>
+            <span className="badge-unit" tabIndex={0} style={{ cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none', position: 'relative', outline: 'none' }} onClick={(e) => { if (hasMultiUnit) { e.stopPropagation(); setShowUnitDrop(v => !v); } }} onBlur={() => setTimeout(() => setShowUnitDrop(false), 120)}>
             {effectiveUnit || 'Kg'}{hasMultiUnit && ' ▾'}
             {showUnitDrop && hasMultiUnit && (
               <div className="unit-dropdown" onClick={e => e.stopPropagation()}>
@@ -278,7 +278,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
     <div className="product-card" {...hoverHandlers}>
       <div className="product-image-container">
         <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
-          <div className="card-unit-corner" style={{ position: 'static', cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none' }} onClick={(e) => { e.stopPropagation(); if (hasMultiUnit) setShowUnitDrop(v => !v); }}>
+          <div className="card-unit-corner" tabIndex={0} style={{ position: 'static', cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none', outline: 'none' }} onClick={(e) => { e.stopPropagation(); if (hasMultiUnit) setShowUnitDrop(v => !v); }} onBlur={() => setTimeout(() => setShowUnitDrop(false), 120)}>
             {effectiveUnit || 'Kg'}{hasMultiUnit && ' ▾'}
           </div>
           {showUnitDrop && hasMultiUnit && (

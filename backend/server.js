@@ -276,6 +276,12 @@ db.query(`CREATE TABLE IF NOT EXISTS fiyatlar (
   else console.log('✅ Migration: fiyatlar tablosu hazir');
 });
 
+// Startup migration: fiyatlar.kdv_dahil kolonu (önceki sürümde eksikti)
+db.query('ALTER TABLE fiyatlar ADD COLUMN kdv_dahil TINYINT(1) NULL DEFAULT NULL', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration (fiyatlar.kdv_dahil):', err.message);
+  else if (!err) console.log('✅ Migration: fiyatlar.kdv_dahil kolonu eklendi');
+});
+
 // Startup migration: fiyat_tanimlari tablosu (gerekirse burada da çağrılır, CRUD bölümünde tanımlandı)
 db.query(`CREATE TABLE IF NOT EXISTS fiyat_tanimlari (
   id INT PRIMARY KEY AUTO_INCREMENT,

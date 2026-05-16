@@ -818,11 +818,11 @@ export default function Products() {
         <div className="table-wrap overflow-visible">
           {activePriceTab !== 'standart' ? (
             /* ===== FIYAT TANIMLARI TABLO GÖRÜNÜMÜ ===== */
-            <table className="excel-table">
+            <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
               <thead>
                 <tr className="th-row">
                   <th style={{ width: '80px' }}>Görsel</th>
-                  <th>Ürün Adı</th>
+                  <th style={{ width: '160px' }}>Ürün Adı</th>
                   <th style={{ width: '120px' }}>Birim</th>
                   <th style={{ width: '90px' }}>Çarpan</th>
                   <th style={{ width: '120px' }}>Fiyat</th>
@@ -849,17 +849,22 @@ export default function Products() {
                         <td><span className="edit-txt">{p.name}</span></td>
                         <td colSpan="6" style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Fiyat eklenmemiş</td>
                         <td style={{ textAlign: 'center' }}>
-                          <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: '', iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: 'rgba(0,184,148,0.08)', border: '1.5px dashed var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '3px 10px', fontSize: '13px', cursor: 'pointer', fontWeight: '700' }} title="Fiyat ekle">+</button>
+                          <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: '', iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer', fontWeight: '700', lineHeight: 1 }} title="Fiyat ekle">+</button>
                         </td>
                       </tr>
                     );
                   }
                   return allRows.map((f, idx) => {
-                    const isEditing = !f._isNew && editingChip?.fiyat_id === f.id;
                     const isNewRow = !!f._isNew;
-                    const showEdit = isEditing || (isNewRow && newRowForProduct === p.id);
+                    const openCellEdit = (field) => {
+                      if (f._isNew || editingChip?.fiyat_id === f.id) return;
+                      setEditingChip({ fiyat_id: f.id, urun_id: p.id, field });
+                      setChipForm({ birim_id: f.birim_id, carpan: String(f.carpan), fiyat: String(f.fiyat), para_birimi_id: f.para_birimi_id || 1, kdv_oran_id: f.kdv_oran_id || '', kdv_dahil: f.kdv_dahil ?? '', iskonto_tipi: f.iskonto_tipi || '', iskonto_orani: f.iskonto_orani || '', barkod: f.barkod || '' });
+                    };
+                    const cellEdit = (field) => isNewRow || (editingChip?.fiyat_id === f.id && editingChip?.field === field);
+                    const rowInEdit = isNewRow || (editingChip?.fiyat_id === f.id);
                     return (
-                      <tr key={f._isNew ? `new-${p.id}` : f.id} onDoubleClick={() => { if (!f._isNew && !isEditing) { setEditingChip({ fiyat_id: f.id, urun_id: p.id }); setChipForm({ birim_id: f.birim_id, carpan: f.carpan, fiyat: f.fiyat, para_birimi_id: f.para_birimi_id, kdv_oran_id: f.kdv_oran_id || '', kdv_dahil: f.kdv_dahil ?? '', iskonto_tipi: f.iskonto_tipi || '', iskonto_orani: f.iskonto_orani || '', barkod: f.barkod || '' }); } }}>
+                      <tr key={f._isNew ? `new-${p.id}` : f.id}>
                         {idx === 0 && (
                           <>
                             <td rowSpan={allRows.length} style={{ width: '80px', verticalAlign: 'middle' }}>
@@ -870,22 +875,22 @@ export default function Products() {
                             </td>
                           </>
                         )}
-                        <td>
-                          {showEdit ? (
+                        <td onDoubleClick={() => openCellEdit('birim')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('birim') ? (
                             <select className="lite-select" value={chipForm.birim_id} onChange={e => setChipForm(f2 => ({ ...f2, birim_id: e.target.value }))}>{units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
                           ) : (
                             <span style={{ fontSize: '12px', fontWeight: '600' }}>{f.birim_adi}</span>
                           )}
                         </td>
-                        <td>
-                          {showEdit ? (
-                            <input className="lite-input" type="number" min="0" step="0.0001" value={chipForm.carpan} onChange={e => setChipForm(f2 => ({ ...f2, carpan: e.target.value }))} style={{ width: '70px' }} />
+                        <td onDoubleClick={() => openCellEdit('carpan')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('carpan') ? (
+                            <input className="lite-input" type="number" min="0" step="0.0001" value={chipForm.carpan} onChange={e => setChipForm(f2 => ({ ...f2, carpan: e.target.value }))} style={{ width: '70px' }} onKeyDown={e => e.key === 'Enter' && saveChip()} />
                           ) : (
                             <span style={{ fontSize: '12px' }}>{parseFloat(f.carpan)}</span>
                           )}
                         </td>
-                        <td>
-                          {showEdit ? (
+                        <td onDoubleClick={() => openCellEdit('fiyat')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('fiyat') ? (
                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                               <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={chipForm.fiyat} onChange={e => setChipForm(f2 => ({ ...f2, fiyat: e.target.value }))} style={{ width: '80px' }} onKeyDown={e => e.key === 'Enter' && saveChip()} />
                               <select className="lite-select" value={chipForm.para_birimi_id} onChange={e => setChipForm(f2 => ({ ...f2, para_birimi_id: e.target.value }))} style={{ width: '60px' }}>{paraBirimleri.map(pb => <option key={pb.id} value={pb.id}>{pb.sembol}</option>)}</select>
@@ -894,8 +899,8 @@ export default function Products() {
                             <span className="edit-txt price" style={{ fontSize: '12px' }}>{Number(f.fiyat * f.carpan).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {f.sembol || '₺'}</span>
                           )}
                         </td>
-                        <td>
-                          {showEdit ? (
+                        <td onDoubleClick={() => openCellEdit('kdv')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('kdv') ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               <select className="lite-select" value={chipForm.kdv_oran_id} onChange={e => setChipForm(f2 => ({ ...f2, kdv_oran_id: e.target.value, kdv_dahil: '' }))}><option value="">KDV Yok</option>{kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}</select>
                               {chipForm.kdv_oran_id && (
@@ -906,8 +911,8 @@ export default function Products() {
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.kdv_oran != null ? `%${parseFloat(f.kdv_oran)}${f.kdv_dahil != null ? (f.kdv_dahil ? ' Dahil' : ' Hariç') : ''}` : '—'}</span>
                           )}
                         </td>
-                        <td>
-                          {showEdit ? (
+                        <td onDoubleClick={() => openCellEdit('iskonto')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('iskonto') ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               <select className="lite-select" value={chipForm.iskonto_tipi} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_tipi: e.target.value, iskonto_orani: '' }))}><option value="">—</option><option value="oran">% Oran</option><option value="tutar">Tutar</option></select>
                               {chipForm.iskonto_tipi && <input className="lite-input" type="number" min="0" step="0.01" value={chipForm.iskonto_orani} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_orani: e.target.value }))} />}
@@ -916,23 +921,37 @@ export default function Products() {
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.iskonto_tipi ? `${f.iskonto_tipi === 'oran' ? '%' : ''}${f.iskonto_orani}` : '—'}</span>
                           )}
                         </td>
-                        <td>
-                          {showEdit ? (
-                            <input className="lite-input" placeholder="Barkod..." value={chipForm.barkod} onChange={e => setChipForm(f2 => ({ ...f2, barkod: e.target.value }))} />
+                        <td onDoubleClick={() => openCellEdit('barkod')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
+                          {cellEdit('barkod') ? (
+                            <input className="lite-input" placeholder="Barkod..." value={chipForm.barkod} onChange={e => setChipForm(f2 => ({ ...f2, barkod: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} />
                           ) : (
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.barkod || '—'}</span>
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          {showEdit ? (
+                          {rowInEdit ? (
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
-                              <button onClick={() => { if (isNewRow) { const body = { fiyat_adi: activePriceTab, urun_id: p.id, birim_id: parseInt(chipForm.birim_id)||units[0]?.id||1, carpan: parseFloat(chipForm.carpan)||1, fiyat: parseFloat(chipForm.fiyat)||0, para_birimi_id: parseInt(chipForm.para_birimi_id)||1, kdv_oran_id: chipForm.kdv_oran_id?parseInt(chipForm.kdv_oran_id):null, kdv_dahil: chipForm.kdv_oran_id?(chipForm.kdv_dahil!=null&&chipForm.kdv_dahil!==''?parseInt(chipForm.kdv_dahil):null):null, iskonto_tipi: chipForm.iskonto_tipi||null, iskonto_orani: chipForm.iskonto_orani?parseFloat(chipForm.iskonto_orani):null, barkod: chipForm.barkod?.trim()||null }; setChipSaving(true); fetch('/api/fiyatlar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(async()=>{ const data=await fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`).then(r=>r.ok?r.json():[]); if(Array.isArray(data)){const map={};data.forEach(f2=>{if(!map[f2.urun_id])map[f2.urun_id]=[];map[f2.urun_id].push(f2);});setTabFiyatlarMap(map);} setNewRowForProduct(null); setChipForm({}); }).finally(()=>setChipSaving(false)); } else { setEditingChip({ fiyat_id: f.id, urun_id: p.id }); saveChip(); } }} disabled={chipSaving} style={{ background:'var(--primary)', border:'none', color:'#fff', borderRadius:'6px', padding:'3px 8px', fontSize:'11px', cursor:'pointer', fontWeight:'700' }}>✓</button>
+                              <button onClick={() => {
+                                if (isNewRow) {
+                                  const selectedBirimId = parseInt(chipForm.birim_id) || units[0]?.id || 1;
+                                  const existingBirimIds = (tabFiyatlarMap[p.id] || []).map(r => r.birim_id);
+                                  if (existingBirimIds.includes(selectedBirimId)) {
+                                    alert('Bu ürün için bu birim zaten eklenmiş! Lütfen farklı bir birim seçin.');
+                                    return;
+                                  }
+                                  const body = { fiyat_adi: activePriceTab, urun_id: p.id, birim_id: selectedBirimId, carpan: parseFloat(chipForm.carpan)||1, fiyat: parseFloat(chipForm.fiyat)||0, para_birimi_id: parseInt(chipForm.para_birimi_id)||1, kdv_oran_id: chipForm.kdv_oran_id?parseInt(chipForm.kdv_oran_id):null, kdv_dahil: chipForm.kdv_oran_id?(chipForm.kdv_dahil!=null&&chipForm.kdv_dahil!==''?parseInt(chipForm.kdv_dahil):null):null, iskonto_tipi: chipForm.iskonto_tipi||null, iskonto_orani: chipForm.iskonto_orani?parseFloat(chipForm.iskonto_orani):null, barkod: chipForm.barkod?.trim()||null };
+                                  setChipSaving(true);
+                                  fetch('/api/fiyatlar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(async()=>{ const data=await fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`).then(r=>r.ok?r.json():[]); if(Array.isArray(data)){const map={};data.forEach(f2=>{if(!map[f2.urun_id])map[f2.urun_id]=[];map[f2.urun_id].push(f2);});setTabFiyatlarMap(map);} setNewRowForProduct(null); setChipForm({}); }).finally(()=>setChipSaving(false));
+                                } else {
+                                  saveChip();
+                                }
+                              }} disabled={chipSaving} style={{ background:'var(--primary)', border:'none', color:'#fff', borderRadius:'6px', padding:'3px 8px', fontSize:'11px', cursor:'pointer', fontWeight:'700' }}>✓</button>
                               <button onClick={() => { if (isNewRow) { setNewRowForProduct(null); setChipForm({}); } else { setEditingChip(null); setChipForm({}); } }} style={{ background:'#f1f5f9', border:'none', color:'#374151', borderRadius:'6px', padding:'3px 8px', fontSize:'11px', cursor:'pointer' }}>✕</button>
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                               {idx === allRows.length - 1 && !hasNewRow && (
-                                <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil:'', iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }} style={{ background:'rgba(0,184,148,0.08)', border:'1.5px dashed var(--primary)', color:'var(--primary)', borderRadius:'7px', padding:'2px 8px', fontSize:'13px', cursor:'pointer', fontWeight:'700' }} title="Yeni birim/fiyat satırı ekle">+</button>
+                                <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil:'', iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '3px 10px', fontSize: '13px', cursor: 'pointer', fontWeight: '700', lineHeight: 1 }} title="Yeni birim/fiyat satırı ekle">+</button>
                               )}
                               <button onClick={() => deleteChip(f.id)} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'16px', padding:'0 4px' }} title="Sil">🗑</button>
                             </div>
