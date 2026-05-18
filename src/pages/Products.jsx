@@ -145,6 +145,12 @@ export default function Products() {
   const [chipSaving, setChipSaving] = useState(false);
   const [newRowForProduct, setNewRowForProduct] = useState(null); // urun_id
 
+  // Fiyat Tanımı hızlı ekleme modalı
+  const [ftModal, setFtModal] = useState(false);
+  const [ftForm, setFtForm] = useState({ ad: '', bas: '', bit: '' });
+  const [ftSaving, setFtSaving] = useState(false);
+  const [ftErr, setFtErr] = useState('');
+
   // KDV modal state
   const [kdvModalDahil, setKdvModalDahil] = useState(true);
   const [kdvEditDahil, setKdvEditDahil] = useState(true);
@@ -279,6 +285,7 @@ export default function Products() {
 
   const saveChip = async () => {
     if (!editingChip) return;
+    const savedChipId = editingChip.fiyat_id; // capture before async
     const fiyatVal = parseFloat(chipForm.fiyat);
     if (isNaN(fiyatVal) || fiyatVal < 0) {
       alert('Lütfen geçerli bir fiyat girin (0 veya daha büyük olmalı).');
@@ -307,11 +314,26 @@ export default function Products() {
       }
       if (res.ok) {
         await refreshTabFiyatlar();
-        setEditingChip(null);
-        setChipForm({});
+        setEditingChip(prev => prev?.fiyat_id === savedChipId ? null : prev);
+        setChipForm(prev => editingChip?.fiyat_id === savedChipId ? {} : prev);
       }
     } catch {}
     setChipSaving(false);
+  };
+
+  const saveFtQuick = async () => {
+    if (!ftForm.ad.trim()) { setFtErr('Fiyat tanımı adı zorunludur.'); return; }
+    setFtSaving(true); setFtErr('');
+    try {
+      const r = await fetch('/api/fiyat-tanimlari', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ad: ftForm.ad.trim(), baslangic_tarihi: ftForm.bas || null, bitis_tarihi: ftForm.bit || null }) });
+      if (r.ok) {
+        const fresh = await fetch('/api/fiyat-tanimlari').then(x => x.ok ? x.json() : []);
+        if (Array.isArray(fresh)) setFiyatTanimlari(fresh);
+        setFtModal(false);
+        setFtForm({ ad: '', bas: '', bit: '' });
+      } else { setFtErr('Kaydedilemedi.'); }
+    } catch { setFtErr('Kaydedilemedi.'); }
+    setFtSaving(false);
   };
 
   const deleteChip = async (fiyat_id) => {
@@ -364,13 +386,14 @@ export default function Products() {
   useEffect(() => {
     const handler = (e) => {
       if (e.key !== 'Escape') return;
+      if (ftModal) { setFtModal(false); return; }
       if (showModal) { setShowModal(null); return; }
       if (showExcelModal) { setShowExcelModal(false); return; }
       if (showMobileAdd) { setShowMobileAdd(false); return; }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [showModal, showExcelModal, showMobileAdd]);
+  }, [showModal, showExcelModal, showMobileAdd, ftModal]);
 
   const handleFile = (e, setter, isEdit = false) => {
     const file = e.target.files[0];
@@ -837,14 +860,19 @@ export default function Products() {
         </div>
 
         {/* ===== Fiyat Listesi Tabları ===== */}
-        {fiyatTanimlari.length > 0 && (
-          <div style={{ display: 'flex', gap: '6px', padding: '10px 16px 0', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingBottom: '10px' }}>
-            <button onClick={() => { setActivePriceTab('standart'); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === 'standart' ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === 'standart' ? 'var(--primary)' : '#f8fafc', color: activePriceTab === 'standart' ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Varsayılan</button>
-            {fiyatTanimlari.map(t => (
-              <button key={t.id} onClick={() => { setActivePriceTab(t.ad); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.ad ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.ad ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.ad ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '6px', padding: '10px 16px 0', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingBottom: '10px', alignItems: 'center' }}>
+          <button onClick={() => { setActivePriceTab('standart'); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === 'standart' ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === 'standart' ? 'var(--primary)' : '#f8fafc', color: activePriceTab === 'standart' ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Varsayılan</button>
+          {fiyatTanimlari.map(t => (
+            <button key={t.id} onClick={() => { setActivePriceTab(t.ad); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.ad ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.ad ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.ad ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
+          ))}
+          <button
+            onClick={() => { setFtForm({ ad: '', bas: '', bit: '' }); setFtErr(''); setFtModal(true); }}
+            title="Yeni fiyat tanımı ekle"
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', lineHeight: 1, cursor: 'pointer', padding: '2px 8px', borderRadius: '7px', fontWeight: '400', transition: 'color 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--primary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; }}
+          >+</button>
+        </div>
 
         <div className="table-wrap overflow-visible">
           {activePriceTab !== 'standart' ? (
@@ -854,10 +882,10 @@ export default function Products() {
                 <tr className="th-row">
                   <th style={{ width: '80px' }}>Görsel</th>
                   <th style={{ width: '160px' }}>Ürün Adı</th>
-                  <th style={{ width: '120px' }}>Birim</th>
+                  <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('units'); }} {...makeMiniAddHandlers('Birim ekle')}>+</button></th>
                   <th style={{ width: '90px' }}>Çarpan</th>
                   <th style={{ width: '120px' }}>Fiyat</th>
-                  <th style={{ width: '100px' }}>KDV</th>
+                  <th style={{ width: '100px' }}>KDV <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('kdv'); }} {...makeMiniAddHandlers('KDV oranı ekle')}>+</button></th>
                   <th style={{ width: '110px' }}>İskonto</th>
                   <th style={{ width: '130px' }}>Barkod</th>
                   <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
@@ -880,7 +908,7 @@ export default function Products() {
                         <td><span className="edit-txt">{p.name}</span></td>
                         <td colSpan="6" style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Fiyat eklenmemiş</td>
                         <td style={{ textAlign: 'center' }}>
-                          <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: '', iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer', fontWeight: '700', lineHeight: 1 }} title="Fiyat ekle">+</button>
+                          <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: null, iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer', fontWeight: '700', lineHeight: 1 }} title="Fiyat ekle">+</button>
                         </td>
                       </tr>
                     );
@@ -890,7 +918,7 @@ export default function Products() {
                     const openCellEdit = (field) => {
                       if (f._isNew || editingChip?.fiyat_id === f.id) return;
                       setEditingChip({ fiyat_id: f.id, urun_id: p.id, field });
-                      setChipForm({ birim_id: f.birim_id, carpan: String(f.carpan), fiyat: String(f.fiyat), para_birimi_id: f.para_birimi_id || 1, kdv_oran_id: f.kdv_oran_id || '', kdv_dahil: f.kdv_dahil ?? '', iskonto_tipi: f.iskonto_tipi || '', iskonto_orani: f.iskonto_orani || '', barkod: f.barkod || '' });
+                      setChipForm({ birim_id: f.birim_id, carpan: String(f.carpan), fiyat: String(f.fiyat), para_birimi_id: f.para_birimi_id || 1, kdv_oran_id: f.kdv_oran_id || '', kdv_dahil: f.kdv_dahil != null ? f.kdv_dahil : (f.kdv_oran_id ? 1 : null), iskonto_tipi: f.iskonto_tipi || '', iskonto_orani: f.iskonto_orani || '', barkod: f.barkod || '' });
                     };
                     const cellEdit = (field) => isNewRow || (editingChip?.fiyat_id === f.id && editingChip?.field === field);
                     const rowInEdit = isNewRow || (editingChip?.fiyat_id === f.id);
@@ -922,9 +950,13 @@ export default function Products() {
                         </td>
                         <td onDoubleClick={() => openCellEdit('fiyat')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('fiyat') ? (
-                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                              <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={chipForm.fiyat} onChange={e => setChipForm(f2 => ({ ...f2, fiyat: e.target.value }))} style={{ width: '80px' }} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />
-                              <select className="lite-select" value={chipForm.para_birimi_id} onChange={e => setChipForm(f2 => ({ ...f2, para_birimi_id: e.target.value }))} style={{ width: '60px' }}>{paraBirimleri.map(pb => <option key={pb.id} value={pb.id}>{pb.sembol}</option>)}</select>
+                            <div>
+                              <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={chipForm.fiyat} onChange={e => setChipForm(f2 => ({ ...f2, fiyat: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />
+                              {paraBirimleri.length > 1 && (
+                                <div style={{ marginTop: '3px' }}>
+                                  <PbSelect value={chipForm.para_birimi_id} onChange={id => setChipForm(f2 => ({ ...f2, para_birimi_id: id }))} options={paraBirimleri} />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="edit-txt price" style={{ fontSize: '12px' }}>{Number(f.fiyat * f.carpan).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {f.sembol || '₺'}</span>
@@ -932,14 +964,24 @@ export default function Products() {
                         </td>
                         <td onDoubleClick={() => openCellEdit('kdv')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('kdv') ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              <select className="lite-select" value={chipForm.kdv_oran_id} onChange={e => setChipForm(f2 => ({ ...f2, kdv_oran_id: e.target.value, kdv_dahil: '' }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}><option value="">KDV Yok</option>{kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}</select>
+                            <div>
+                              <select className="lite-select" value={chipForm.kdv_oran_id} onChange={e => setChipForm(f2 => ({ ...f2, kdv_oran_id: e.target.value, kdv_dahil: e.target.value ? 1 : null }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}><option value="">KDV Yok</option>{kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}</select>
                               {chipForm.kdv_oran_id && (
-                                <select className="lite-select" value={chipForm.kdv_dahil ?? ''} onChange={e => setChipForm(f2 => ({ ...f2, kdv_dahil: e.target.value !== '' ? parseInt(e.target.value) : null }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}><option value="">— Seç —</option><option value="1">Dahil</option><option value="0">Hariç</option></select>
+                                <button
+                                  style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${chipForm.kdv_dahil == 0 ? '#fecaca' : '#bbf7d0'}`, background: chipForm.kdv_dahil == 0 ? '#fef2f2' : '#f0fdf4', color: chipForm.kdv_dahil == 0 ? '#dc2626' : '#16a34a', cursor: 'pointer', fontWeight: 700 }}
+                                  onMouseDown={e => e.preventDefault()}
+                                  onClick={() => setChipForm(f2 => ({ ...f2, kdv_dahil: f2.kdv_dahil == 0 ? 1 : 0 }))}
+                                >
+                                  {chipForm.kdv_dahil == 0 ? 'Hariç' : 'Dahil'}
+                                </button>
                               )}
                             </div>
+                          ) : f.kdv_oran != null ? (
+                            <span className="badge-unit" style={{ background: f.kdv_dahil == 0 ? '#fef2f2' : '#f0fdf4', color: f.kdv_dahil == 0 ? '#dc2626' : '#16a34a', border: `1px solid ${f.kdv_dahil == 0 ? '#fecaca' : '#bbf7d0'}` }}>
+                              %{parseFloat(f.kdv_oran)} {f.kdv_dahil == 0 ? 'Hariç' : 'Dahil'}
+                            </span>
                           ) : (
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>{f.kdv_oran != null ? `%${parseFloat(f.kdv_oran)}${f.kdv_dahil != null ? (f.kdv_dahil ? ' Dahil' : ' Hariç') : ''}` : '—'}</span>
+                            <span className="no-data">YOK</span>
                           )}
                         </td>
                         <td onDoubleClick={() => openCellEdit('iskonto')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
@@ -959,9 +1001,9 @@ export default function Products() {
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.barkod || '—'}</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           {isNewRow ? (
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                               <button onClick={() => {
                                 const selectedBirimId = parseInt(chipForm.birim_id) || units[0]?.id || 1;
                                 const existingBirimIds = (tabFiyatlarMap[p.id] || []).map(r => r.birim_id);
@@ -972,17 +1014,23 @@ export default function Products() {
                                 const body = { fiyat_adi: activePriceTab, urun_id: p.id, birim_id: selectedBirimId, carpan: parseFloat(chipForm.carpan)||1, fiyat: parseFloat(chipForm.fiyat)||0, para_birimi_id: parseInt(chipForm.para_birimi_id)||1, kdv_oran_id: chipForm.kdv_oran_id?parseInt(chipForm.kdv_oran_id):null, kdv_dahil: chipForm.kdv_oran_id?(chipForm.kdv_dahil!=null&&chipForm.kdv_dahil!==''?parseInt(chipForm.kdv_dahil):null):null, iskonto_tipi: chipForm.iskonto_tipi||null, iskonto_orani: chipForm.iskonto_orani?parseFloat(chipForm.iskonto_orani):null, barkod: chipForm.barkod?.trim()||null };
                                 setChipSaving(true);
                                 fetch('/api/fiyatlar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(async()=>{ const data=await fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`).then(r=>r.ok?r.json():[]); if(Array.isArray(data)){const map={};data.forEach(f2=>{if(!map[f2.urun_id])map[f2.urun_id]=[];map[f2.urun_id].push(f2);});setTabFiyatlarMap(map);} setNewRowForProduct(null); setChipForm({}); }).finally(()=>setChipSaving(false));
-                              }} disabled={chipSaving} style={{ background:'var(--primary)', border:'none', color:'#fff', borderRadius:'6px', width:'28px', height:'28px', fontSize:'13px', cursor:'pointer', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✓</button>
-                              <button onClick={() => { setNewRowForProduct(null); setChipForm({}); }} style={{ background:'#f1f5f9', border:'none', color:'#374151', borderRadius:'6px', width:'28px', height:'28px', fontSize:'13px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✕</button>
+                              }} disabled={chipSaving} style={{ background:'var(--primary)', border:'none', color:'#fff', borderRadius:'7px', width:'28px', height:'28px', fontSize:'14px', cursor:'pointer', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center' }}>✓</button>
+                              <button onClick={() => { setNewRowForProduct(null); setChipForm({}); }} style={{ background:'#f1f5f9', border:'none', color:'#64748b', borderRadius:'7px', width:'28px', height:'28px', fontSize:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
-                              {idx === allRows.length - 1 && !hasNewRow ? (
-                                <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil:'', iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', width:'28px', height:'28px', fontSize: '16px', cursor: 'pointer', fontWeight: '700', lineHeight: 1, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} title="Yeni birim/fiyat satırı ekle">+</button>
-                              ) : (
-                                <div style={{ width:'28px', height:'28px', flexShrink:0 }} />
+                              <button
+                                onClick={() => setConfirmModal({ message: `Bu fiyat satırını silmek istiyor musunuz?`, onConfirm: () => deleteChip(f.id) })}
+                                style={{ background: '#fef2f2', border: '1.5px solid #fecaca', color: '#ef4444', borderRadius: '7px', width: '28px', height: '28px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                title="Sil"
+                              >🗑</button>
+                              {idx === allRows.length - 1 && !hasNewRow && (
+                                <button
+                                  onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil: null, iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }}
+                                  style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', width: '28px', height: '28px', fontSize: '18px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                  title="Yeni birim/fiyat satırı ekle"
+                                >+</button>
                               )}
-                              <button onClick={() => deleteChip(f.id)} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'16px', padding:'0', width:'28px', height:'28px', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }} title="Sil">🗑</button>
                             </div>
                           )}
                         </td>
@@ -1139,7 +1187,7 @@ export default function Products() {
                     </td>
                     <td onDoubleClick={() => setEditing({ id: p.id, field: 'name' })}>
                       {editing?.id === p.id && editing?.field === 'stok_kodu' ? (
-                        <input autoFocus className="inline-edit" defaultValue={p.stokKodu || ''} placeholder="Stok Kodu / Barkod..." onFocus={e => e.target.select()} onBlur={async (e) => { const result = await updateProduct(p.id, { stok_kodu: e.target.value.trim() || null }); if (result?.status === 409) alert('Bu stok kodu zaten kullanılıyor.'); setEditing(null); }} onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditing(null); }} style={{ marginBottom: 3, fontSize: 11 }} />
+                        <input autoFocus className="inline-edit" defaultValue={p.stokKodu || ''} placeholder="Stok Kodu / Barkod..." onFocus={e => e.target.select()} onBlur={async (e) => { const val = e.target.value.trim(); const result = await updateProduct(p.id, { stok_kodu: val || null }); if (result?.status === 409) alert('Bu stok kodu zaten kullanılıyor.'); setEditing(prev => (prev?.id === p.id && prev?.field === 'stok_kodu') ? null : prev); }} onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditing(null); }} style={{ marginBottom: 3, fontSize: 11 }} />
                       ) : (
                         <div onDoubleClick={e => { e.stopPropagation(); setEditing({ id: p.id, field: 'stok_kodu' }); }} style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2, cursor: 'pointer', minHeight: 14 }} {...pmTooltipHandlers}>
                           {p.stokKodu ? p.stokKodu : <span style={{ opacity: 0.4 }}>stok kodu yok</span>}
@@ -1967,6 +2015,52 @@ export default function Products() {
           >✕</button>
         </div>
       )}
+      {/* ===== FİYAT TANIMI HIZLI EKLEME MODALI ===== */}
+      {ftModal && (
+        <div className="modal-overlay">
+          <div className="pm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="pm-header">
+              <h3>🏷️ Yeni Fiyat Tanımı</h3>
+              <button className="pm-close" onClick={() => setFtModal(false)}>✕ <span style={{ fontSize: '10px', opacity: 0.6 }}>ESC</span></button>
+            </div>
+            <div className="pm-body">
+              <div className="pm-add-form">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '5px' }}>Tanım Adı *</label>
+                    <input
+                      autoFocus
+                      type="text"
+                      className="lite-input"
+                      placeholder="Ör: Toptan, VIP, Bayi..."
+                      value={ftForm.ad}
+                      onChange={e => { setFtForm(p => ({ ...p, ad: e.target.value })); setFtErr(''); }}
+                      onKeyDown={e => e.key === 'Enter' && saveFtQuick()}
+                      style={{ width: '100%', boxSizing: 'border-box', fontSize: '14px', fontWeight: '600' }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '5px' }}>Başlangıç Tarihi</label>
+                      <input type="date" className="lite-input" value={ftForm.bas} onChange={e => setFtForm(p => ({ ...p, bas: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', fontSize: '12px' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '5px' }}>Bitiş Tarihi</label>
+                      <input type="date" className="lite-input" value={ftForm.bit} onChange={e => setFtForm(p => ({ ...p, bit: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', fontSize: '12px' }} />
+                    </div>
+                  </div>
+                  {ftErr && <div style={{ color: '#ef4444', fontSize: '12px', fontWeight: '600', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '8px 12px' }}>{ftErr}</div>}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    <button onClick={() => setFtModal(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#374151', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}>İptal</button>
+                    <button onClick={saveFtQuick} disabled={ftSaving} style={{ flex: 2, padding: '10px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: ftSaving ? 'wait' : 'pointer', opacity: ftSaving ? 0.7 : 1 }}>{ftSaving ? 'Kaydediliyor...' : '+ Ekle'}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
           onClick={() => setConfirmModal(null)}
