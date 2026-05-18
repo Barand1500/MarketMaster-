@@ -76,11 +76,15 @@ CREATE TABLE IF NOT EXISTS personel_yetkileri (
 );
 
 -- 8. FIYAT_GECMISI
+-- Hem urunler.fiyat değişimlerini hem de fiyatlar tablosu değişimlerini tutar (grafik/istatistik altyapısı)
 CREATE TABLE IF NOT EXISTS fiyat_gecmisi (
     id INT PRIMARY KEY AUTO_INCREMENT,
     urun_id INT NOT NULL,
     eski_fiyat DECIMAL(10, 2) NOT NULL,
     yeni_fiyat DECIMAL(10, 2) NOT NULL,
     degisim_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    degisim_tipi ENUM('urun_fiyati', 'fiyat_satiri') NOT NULL DEFAULT 'urun_fiyati',
+    fiyat_id INT NULL DEFAULT NULL,          -- fiyatlar.id (fiyat_satiri tipi için)
+    fiyat_tanimi_id INT NULL DEFAULT NULL,   -- fiyat_tanimlari.id (fiyat_satiri tipi için)
     FOREIGN KEY (urun_id) REFERENCES urunler(id) ON DELETE CASCADE
 );

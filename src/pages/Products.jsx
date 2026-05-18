@@ -170,7 +170,7 @@ export default function Products() {
     if (activePriceTab === 'standart') { setTabFiyatlarMap({}); return; }
     setTabFiyatlarLoading(true);
     setTabFiyatlarMap({});
-    fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`)
+    fetch(`/api/fiyatlar/liste?fiyat_tanimi_id=${activePriceTab}`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         if (Array.isArray(data)) {
@@ -275,7 +275,7 @@ export default function Products() {
   };
 
   const refreshTabFiyatlar = async () => {
-    const data = await fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`).then(r => r.ok ? r.json() : []);
+    const data = await fetch(`/api/fiyatlar/liste?fiyat_tanimi_id=${activePriceTab}`).then(r => r.ok ? r.json() : []);
     if (Array.isArray(data)) {
       const map = {};
       data.forEach(f => { if (!map[f.urun_id]) map[f.urun_id] = []; map[f.urun_id].push(f); });
@@ -283,10 +283,11 @@ export default function Products() {
     }
   };
 
-  const saveChip = async () => {
+  const saveChip = async (overrides = {}, keepOpen = false) => {
     if (!editingChip) return;
     const savedChipId = editingChip.fiyat_id; // capture before async
-    const fiyatVal = parseFloat(chipForm.fiyat);
+    const form = { ...chipForm, ...overrides };
+    const fiyatVal = parseFloat(form.fiyat);
     if (isNaN(fiyatVal) || fiyatVal < 0) {
       alert('Lütfen geçerli bir fiyat girin (0 veya daha büyük olmalı).');
       return;
@@ -294,17 +295,17 @@ export default function Products() {
     setChipSaving(true);
     try {
       const body = {
-        fiyat_adi: activePriceTab,
+        fiyat_tanimi_id: activePriceTab,
         urun_id: editingChip.urun_id,
-        birim_id: parseInt(chipForm.birim_id) || units[0]?.id || 1,
-        carpan: parseFloat(chipForm.carpan) || 1,
+        birim_id: parseInt(form.birim_id) || units[0]?.id || 1,
+        carpan: parseFloat(form.carpan) || 1,
         fiyat: fiyatVal,
-        para_birimi_id: parseInt(chipForm.para_birimi_id) || 1,
-        kdv_oran_id: chipForm.kdv_oran_id ? parseInt(chipForm.kdv_oran_id) : null,
-        kdv_dahil: chipForm.kdv_oran_id ? (chipForm.kdv_dahil != null && chipForm.kdv_dahil !== '' ? parseInt(chipForm.kdv_dahil) : null) : null,
-        iskonto_tipi: chipForm.iskonto_tipi || null,
-        iskonto_orani: chipForm.iskonto_orani ? parseFloat(chipForm.iskonto_orani) : null,
-        barkod: chipForm.barkod?.trim() || null,
+        para_birimi_id: parseInt(form.para_birimi_id) || 1,
+        kdv_oran_id: form.kdv_oran_id ? parseInt(form.kdv_oran_id) : null,
+        kdv_dahil: form.kdv_oran_id ? (form.kdv_dahil != null && form.kdv_dahil !== '' ? parseInt(form.kdv_dahil) : null) : null,
+        iskonto_tipi: form.iskonto_tipi || null,
+        iskonto_orani: form.iskonto_orani ? parseFloat(form.iskonto_orani) : null,
+        barkod: form.barkod?.trim() || null,
       };
       let res;
       if (editingChip.fiyat_id) {
@@ -314,8 +315,10 @@ export default function Products() {
       }
       if (res.ok) {
         await refreshTabFiyatlar();
-        setEditingChip(prev => prev?.fiyat_id === savedChipId ? null : prev);
-        setChipForm(prev => editingChip?.fiyat_id === savedChipId ? {} : prev);
+        if (!keepOpen) {
+          setEditingChip(prev => prev?.fiyat_id === savedChipId ? null : prev);
+          setChipForm(prev => editingChip?.fiyat_id === savedChipId ? {} : prev);
+        }
       }
     } catch {}
     setChipSaving(false);
@@ -863,7 +866,7 @@ export default function Products() {
         <div style={{ display: 'flex', gap: '6px', padding: '10px 16px 0', flexWrap: 'wrap', borderTop: '1px solid #f1f5f9', marginTop: '4px', paddingBottom: '10px', alignItems: 'center' }}>
           <button onClick={() => { setActivePriceTab('standart'); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === 'standart' ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === 'standart' ? 'var(--primary)' : '#f8fafc', color: activePriceTab === 'standart' ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Varsayılan</button>
           {fiyatTanimlari.map(t => (
-            <button key={t.id} onClick={() => { setActivePriceTab(t.ad); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.ad ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.ad ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.ad ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
+            <button key={t.id} onClick={() => { setActivePriceTab(t.id); setEditingChip(null); setChipForm({}); setNewRowForProduct(null); }} style={{ padding: '6px 16px', borderRadius: '8px', border: activePriceTab === t.id ? 'none' : '1.5px solid #e2e8f0', background: activePriceTab === t.id ? 'var(--primary)' : '#f8fafc', color: activePriceTab === t.id ? '#fff' : '#64748b', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>{t.ad}</button>
           ))}
           <button
             onClick={() => { setFtForm({ ad: '', bas: '', bit: '' }); setFtErr(''); setFtModal(true); }}
@@ -908,7 +911,10 @@ export default function Products() {
                         <td><span className="edit-txt">{p.name}</span></td>
                         <td colSpan="6" style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Fiyat eklenmemiş</td>
                         <td style={{ textAlign: 'center' }}>
-                          <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: null, iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer', fontWeight: '700', lineHeight: 1 }} title="Fiyat ekle">+</button>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                            <button onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id || 1, carpan: '1', fiyat: '', para_birimi_id: 1, kdv_oran_id: '', kdv_dahil: null, iskonto_tipi: '', iskonto_orani: '', barkod: '' }); }} style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', width: '28px', height: '28px', fontSize: '18px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title="Fiyat ekle">+</button>
+                            <div style={{ width: '28px', height: '28px', flexShrink: 0 }} />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -970,7 +976,11 @@ export default function Products() {
                                 <button
                                   style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${chipForm.kdv_dahil == 0 ? '#fecaca' : '#bbf7d0'}`, background: chipForm.kdv_dahil == 0 ? '#fef2f2' : '#f0fdf4', color: chipForm.kdv_dahil == 0 ? '#dc2626' : '#16a34a', cursor: 'pointer', fontWeight: 700 }}
                                   onMouseDown={e => e.preventDefault()}
-                                  onClick={() => setChipForm(f2 => ({ ...f2, kdv_dahil: f2.kdv_dahil == 0 ? 1 : 0 }))}
+                                  onClick={() => {
+                                    const newDahil = chipForm.kdv_dahil == 0 ? 1 : 0;
+                                    setChipForm(f2 => ({ ...f2, kdv_dahil: newDahil }));
+                                    if (!isNewRow) saveChip({ kdv_dahil: newDahil }, true);
+                                  }}
                                 >
                                   {chipForm.kdv_dahil == 0 ? 'Hariç' : 'Dahil'}
                                 </button>
@@ -1011,26 +1021,28 @@ export default function Products() {
                                   alert('Bu ürün için bu birim zaten eklenmiş! Lütfen farklı bir birim seçin.');
                                   return;
                                 }
-                                const body = { fiyat_adi: activePriceTab, urun_id: p.id, birim_id: selectedBirimId, carpan: parseFloat(chipForm.carpan)||1, fiyat: parseFloat(chipForm.fiyat)||0, para_birimi_id: parseInt(chipForm.para_birimi_id)||1, kdv_oran_id: chipForm.kdv_oran_id?parseInt(chipForm.kdv_oran_id):null, kdv_dahil: chipForm.kdv_oran_id?(chipForm.kdv_dahil!=null&&chipForm.kdv_dahil!==''?parseInt(chipForm.kdv_dahil):null):null, iskonto_tipi: chipForm.iskonto_tipi||null, iskonto_orani: chipForm.iskonto_orani?parseFloat(chipForm.iskonto_orani):null, barkod: chipForm.barkod?.trim()||null };
+                                const body = { fiyat_tanimi_id: activePriceTab, urun_id: p.id, birim_id: selectedBirimId, carpan: parseFloat(chipForm.carpan)||1, fiyat: parseFloat(chipForm.fiyat)||0, para_birimi_id: parseInt(chipForm.para_birimi_id)||1, kdv_oran_id: chipForm.kdv_oran_id?parseInt(chipForm.kdv_oran_id):null, kdv_dahil: chipForm.kdv_oran_id?(chipForm.kdv_dahil!=null&&chipForm.kdv_dahil!==''?parseInt(chipForm.kdv_dahil):null):null, iskonto_tipi: chipForm.iskonto_tipi||null, iskonto_orani: chipForm.iskonto_orani?parseFloat(chipForm.iskonto_orani):null, barkod: chipForm.barkod?.trim()||null };
                                 setChipSaving(true);
-                                fetch('/api/fiyatlar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.ok?r.json():null).then(async()=>{ const data=await fetch(`/api/fiyatlar/liste?fiyat_adi=${encodeURIComponent(activePriceTab)}`).then(r=>r.ok?r.json():[]); if(Array.isArray(data)){const map={};data.forEach(f2=>{if(!map[f2.urun_id])map[f2.urun_id]=[];map[f2.urun_id].push(f2);});setTabFiyatlarMap(map);} setNewRowForProduct(null); setChipForm({}); }).finally(()=>setChipSaving(false));
+                                fetch('/api/fiyatlar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{ if(!r.ok){ const e=await r.json().catch(()=>({})); alert('Fiyat eklenemedi: '+(e.error||r.status)); return; } const data=await fetch(`/api/fiyatlar/liste?fiyat_tanimi_id=${activePriceTab}`).then(r2=>r2.ok?r2.json():[]); if(Array.isArray(data)){const map={};data.forEach(f2=>{if(!map[f2.urun_id])map[f2.urun_id]=[];map[f2.urun_id].push(f2);});setTabFiyatlarMap(map);} setNewRowForProduct(null); setChipForm({}); }).finally(()=>setChipSaving(false));
                               }} disabled={chipSaving} style={{ background:'var(--primary)', border:'none', color:'#fff', borderRadius:'7px', width:'28px', height:'28px', fontSize:'14px', cursor:'pointer', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center' }}>✓</button>
                               <button onClick={() => { setNewRowForProduct(null); setChipForm({}); }} style={{ background:'#f1f5f9', border:'none', color:'#64748b', borderRadius:'7px', width:'28px', height:'28px', fontSize:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
                             </div>
                           ) : (
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
-                              <button
-                                onClick={() => setConfirmModal({ message: `Bu fiyat satırını silmek istiyor musunuz?`, onConfirm: () => deleteChip(f.id) })}
-                                style={{ background: '#fef2f2', border: '1.5px solid #fecaca', color: '#ef4444', borderRadius: '7px', width: '28px', height: '28px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                title="Sil"
-                              >🗑</button>
-                              {idx === allRows.length - 1 && !hasNewRow && (
+                              {idx === allRows.length - 1 && !hasNewRow ? (
                                 <button
                                   onClick={() => { setNewRowForProduct(p.id); setChipForm({ birim_id: units[0]?.id||1, carpan:'1', fiyat:'', para_birimi_id:1, kdv_oran_id:'', kdv_dahil: null, iskonto_tipi:'', iskonto_orani:'', barkod:'' }); }}
                                   style={{ background: '#e8fef5', border: '1.5px solid var(--primary)', color: 'var(--primary)', borderRadius: '7px', width: '28px', height: '28px', fontSize: '18px', cursor: 'pointer', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                                   title="Yeni birim/fiyat satırı ekle"
                                 >+</button>
+                              ) : (
+                                <div style={{ width: '28px', height: '28px', flexShrink: 0 }} />
                               )}
+                              <button
+                                onClick={() => setConfirmModal({ message: `Bu fiyat satırını silmek istiyor musunuz?`, onConfirm: () => deleteChip(f.id) })}
+                                style={{ background: '#fef2f2', border: '1.5px solid #fecaca', color: '#ef4444', borderRadius: '7px', width: '28px', height: '28px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                title="Sil"
+                              >🗑</button>
                             </div>
                           )}
                         </td>
