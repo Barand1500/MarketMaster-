@@ -98,7 +98,7 @@ export function DataProvider({ children }) {
             discount: c.iskonto_orani || '0', 
             address: c.adres,
             createdAt: c.kayit_tarihi,
-            fiyatTipi: c.fiyat_tipi || null
+            fiyatTanimlariId: c.fiyat_tanimlari_id ? parseInt(c.fiyat_tanimlari_id) : null
           })) : []);
           setUsers(Array.isArray(staff) ? staff.map(s => ({ 
             id: s.id, 
@@ -514,7 +514,7 @@ export function DataProvider({ children }) {
           sifre: customer.password,
           iskonto_orani: customer.discount,
           adres: customer.address,
-          fiyat_tipi: customer.fiyatTipi || null
+          fiyat_tanimlari_id: customer.fiyatTanimlariId || null
         })
       });
       if (!res.ok) {
@@ -534,7 +534,7 @@ export function DataProvider({ children }) {
         discount: data.iskonto_orani || '0', 
         address: data.adres,
         createdAt: data.kayit_tarihi,
-        fiyatTipi: data.fiyat_tipi || null
+        fiyatTanimlariId: data.fiyat_tanimlari_id ? parseInt(data.fiyat_tanimlari_id) : null
       }]);
     } catch (e) { setApiError(e.message || 'Müşteri eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -547,7 +547,7 @@ export function DataProvider({ children }) {
       eposta: updates.email !== undefined ? updates.email : current.email,
       iskonto_orani: updates.discount !== undefined ? updates.discount : current.discount,
       adres: updates.address !== undefined ? updates.address : current.address,
-      fiyat_tipi: updates.fiyatTipi !== undefined ? updates.fiyatTipi : current.fiyatTipi
+      fiyat_tanimlari_id: updates.fiyatTanimlariId !== undefined ? updates.fiyatTanimlariId : current.fiyatTanimlariId
     };
     // Yeni sifre gonderilmisse ekle (hash backend'de yapilir)
     if (updates.password) fullData.sifre = updates.password;

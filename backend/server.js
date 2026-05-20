@@ -269,7 +269,7 @@ db.query('ALTER TABLE urunler ADD COLUMN stok_kodu VARCHAR(100) NULL UNIQUE', (e
 // Startup migration: fiyatlar tablosu
 db.query(`CREATE TABLE IF NOT EXISTS fiyatlar (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  fiyat_tanimi_id INT NULL,
+  fiyat_adi VARCHAR(100) NOT NULL,
   urun_id INT NOT NULL,
   birim_id INT NOT NULL,
   carpan DECIMAL(10,4) NOT NULL DEFAULT 1,
@@ -296,14 +296,10 @@ db.query('ALTER TABLE fiyatlar ADD COLUMN kdv_dahil TINYINT(1) NULL DEFAULT NULL
   else if (!err) console.log('✅ Migration: fiyatlar.kdv_dahil kolonu eklendi');
 });
 
-// Migration: fiyatlar.fiyat_tanimi_id - ekle
+// Migration: fiyatlar.fiyat_tanimi_id - fiyat_tanimlari FK altyapısı
 db.query('ALTER TABLE fiyatlar ADD COLUMN fiyat_tanimi_id INT NULL DEFAULT NULL', (err) => {
   if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration (fiyatlar.fiyat_tanimi_id):', err.message);
   else if (!err) console.log('✅ Migration: fiyatlar.fiyat_tanimi_id kolonu eklendi');
-});
-// Migration: fiyat_adi kolonu nullable yap (DROP öncesi gerekli)
-db.query('ALTER TABLE fiyatlar MODIFY COLUMN fiyat_adi VARCHAR(100) NULL DEFAULT NULL', (err) => {
-  if (err && err.code !== 'ER_BAD_FIELD_ERROR') console.warn('Migration (fiyat_adi nullable):', err.message);
 });
 
 // Startup migration: fiyat_tanimlari tablosu (gerekirse burada da çağrılır, CRUD bölümünde tanımlandı)
@@ -348,18 +344,11 @@ db.query(`CREATE TABLE IF NOT EXISTS fiyat_tanimlari (
     // Backfill: fiyat_adi metninden fiyat_tanimlari girişleri oluştur ve FK'yı doldur
     // fiyat_tanimlari kesin var olduğunda çalıştır
     db.query('INSERT IGNORE INTO fiyat_tanimlari (ad) SELECT DISTINCT fiyat_adi FROM fiyatlar WHERE fiyat_adi IS NOT NULL AND fiyat_adi != ""', (err2) => {
-      const dropFiyatAdi = () => {
-        db.query('ALTER TABLE fiyatlar DROP COLUMN fiyat_adi', (e) => {
-          if (!e) console.log('✅ Migration: fiyatlar.fiyat_adi kolonu kaldırıldı');
-        });
-      };
-      if (err2) {
-        dropFiyatAdi(); // kolon zaten yoksa DROP hatasızı atar
-      } else {
+      if (err2) console.warn('Backfill (fiyat_tanimlari insert):', err2.message);
+      else {
         db.query('UPDATE fiyatlar f JOIN fiyat_tanimlari ft ON ft.ad = f.fiyat_adi SET f.fiyat_tanimi_id = ft.id WHERE f.fiyat_tanimi_id IS NULL', (err3) => {
           if (err3) console.warn('Backfill (fiyatlar.fiyat_tanimi_id update):', err3.message);
           else console.log('✅ Migration: fiyatlar.fiyat_tanimi_id backfill tamamlandi');
-          dropFiyatAdi();
         });
       }
     });
@@ -371,7 +360,7 @@ app.get('/api/fiyat-tanimlari', (req, res) => {
   db.query(
     `SELECT ft.*, COUNT(m.id) AS kullanan_sayi
      FROM fiyat_tanimlari ft
-     LEFT JOIN musteriler m ON m.fiyat_tipi = ft.ad
+     LEFT JOIN musteriler m ON m.fiyat_tanimlari_id = ft.id
      GROUP BY ft.id ORDER BY ft.ad`,
     (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -403,10 +392,6 @@ app.put('/api/fiyat-tanimlari/:id', (req, res) => {
       [ad.trim(), baslangic_tarihi || null, bitis_tarihi || null, req.params.id],
       (err2) => {
         if (err2) return res.status(500).json({ error: err2.message });
-        if (eskiAd && eskiAd !== ad.trim()) {
-          // musteriler.fiyat_tipi cascade
-          db.query('UPDATE musteriler SET fiyat_tipi = ? WHERE fiyat_tipi = ?', [ad.trim(), eskiAd], () => {});
-        }
         res.json({ success: true });
       }
     );
@@ -417,16 +402,10 @@ app.delete('/api/fiyat-tanimlari/:id', (req, res) => {
   db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const ad = rows[0]?.ad;
-    // Önce bağlı fiyatları sil
-    db.query('DELETE FROM fiyatlar WHERE fiyat_tanimi_id = ?', [parseInt(req.params.id)], (errF) => {
-      if (errF) return res.status(500).json({ error: errF.message });
-      db.query('DELETE FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err2) => {
-        if (err2) return res.status(500).json({ error: err2.message });
-        if (ad) {
-          db.query('UPDATE musteriler SET fiyat_tipi = NULL WHERE fiyat_tipi = ?', [ad], () => {});
-        }
-        res.json({ success: true });
-      });
+    db.query('DELETE FROM fiyat_tanimlari WHERE id = ?', [req.params.id], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      db.query('UPDATE musteriler SET fiyat_tanimlari_id = NULL WHERE fiyat_tanimlari_id = ?', [req.params.id], () => {});
+      res.json({ success: true });
     });
   });
 });
@@ -526,29 +505,49 @@ app.get('/api/fiyatlar', (req, res) => {
 
 // Tüm fiyatları listele (opsiyonel: fiyat_tanimi_id veya fiyat_adi filtresi)
 app.get('/api/fiyatlar/liste', (req, res) => {
-  const { fiyat_tanimi_id } = req.query;
-  let sql = `
-    SELECT f.*,
-      u.urun_adi,
-      b.birim_adi,
-      pb.sembol, pb.kisa_ad, pb.kur,
-      k.oran AS kdv_oran,
-      ft.ad AS fiyat_tanimi_adi
-    FROM fiyatlar f
-    LEFT JOIN urunler u ON f.urun_id = u.id
-    LEFT JOIN birimler b ON f.birim_id = b.id
-    LEFT JOIN para_birimleri pb ON f.para_birimi_id = pb.id
-    LEFT JOIN kdv_oranlari k ON f.kdv_oran_id = k.id
-    LEFT JOIN fiyat_tanimlari ft ON f.fiyat_tanimi_id = ft.id
-  `;
-  const params = [];
-  if (fiyat_tanimi_id) { sql += ' WHERE f.fiyat_tanimi_id = ?'; params.push(parseInt(fiyat_tanimi_id)); }
-  sql += ' ORDER BY u.urun_adi, f.fiyat_tanimi_id, f.carpan';
-  db.query(sql, params, (err, results) => {
-    if (err && err.code === 'ER_BAD_FIELD_ERROR') return res.json([]); // migration henüz tamamlanmadı
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
-  });
+  const { fiyat_adi, fiyat_tanimi_id } = req.query;
+  const runQuery = (useNewCol) => {
+    let sql = `
+      SELECT f.*,
+        u.urun_adi,
+        b.birim_adi,
+        pb.sembol, pb.kisa_ad, pb.kur,
+        k.oran AS kdv_oran
+        ${useNewCol ? ', ft.ad AS fiyat_tanimi_adi' : ''}
+      FROM fiyatlar f
+      LEFT JOIN urunler u ON f.urun_id = u.id
+      LEFT JOIN birimler b ON f.birim_id = b.id
+      LEFT JOIN para_birimleri pb ON f.para_birimi_id = pb.id
+      LEFT JOIN kdv_oranlari k ON f.kdv_oran_id = k.id
+      ${useNewCol ? 'LEFT JOIN fiyat_tanimlari ft ON f.fiyat_tanimi_id = ft.id' : ''}
+    `;
+    const params = [];
+    if (fiyat_tanimi_id) {
+      if (useNewCol) { sql += ' WHERE f.fiyat_tanimi_id = ?'; params.push(parseInt(fiyat_tanimi_id)); }
+      else { sql += ' WHERE f.fiyat_adi = ?'; params.push(req._fiyatAdiForFallback || ''); }
+    } else if (fiyat_adi) {
+      sql += ' WHERE f.fiyat_adi = ?'; params.push(fiyat_adi);
+    }
+    sql += useNewCol ? ' ORDER BY u.urun_adi, f.fiyat_tanimi_id, f.carpan' : ' ORDER BY u.urun_adi, f.fiyat_adi, f.carpan';
+    db.query(sql, params, (err, results) => {
+      if (err && err.code === 'ER_BAD_FIELD_ERROR' && useNewCol) {
+        // fiyat_tanimi_id kolonu henüz yok, eski yapıyla dene
+        if (fiyat_tanimi_id) {
+          // tanım adını bul, fiyat_adi ile filtrele
+          db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [parseInt(fiyat_tanimi_id)], (err2, rows) => {
+            req._fiyatAdiForFallback = rows?.[0]?.ad || '';
+            runQuery(false);
+          });
+        } else {
+          runQuery(false);
+        }
+        return;
+      }
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(results);
+    });
+  };
+  runQuery(true);
 });
 
 // Fiyat tanımlarını listele (dropdown için) - fiyat_tanimlari tablosundan
@@ -561,50 +560,71 @@ app.get('/api/fiyatlar/adlar', (req, res) => {
 
 // Yeni fiyat satırı ekle
 app.post('/api/fiyatlar', (req, res) => {
-  const { fiyat_tanimi_id, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  const { fiyat_tanimi_id, fiyat_adi, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
   if (!urun_id || !birim_id) return res.status(400).json({ error: 'urun_id ve birim_id zorunlu' });
-  if (!fiyat_tanimi_id) return res.status(400).json({ error: 'fiyat_tanimi_id zorunlu' });
+  if (!fiyat_tanimi_id && !fiyat_adi) return res.status(400).json({ error: 'fiyat_tanimi_id veya fiyat_adi zorunlu' });
 
-  const sql = `INSERT INTO fiyatlar (fiyat_tanimi_id, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod)
+  const doInsert = (resolvedAdi, resolvedTanimiId) => {
+    const sqlFull = `INSERT INTO fiyatlar (fiyat_tanimi_id, urun_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const vals = [
-    parseInt(fiyat_tanimi_id), urun_id, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
-    para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
-    iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null
-  ];
-  db.query(sql, vals, (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ id: result.insertId, ...req.body });
-  });
+    const valsFull = [
+      resolvedTanimiId || null, urun_id, birim_id, parseFloat(carpan) || 1, parseFloat(fiyat) || 0,
+      para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
+      iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null
+    ];
+    db.query(sqlFull, valsFull, (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: result.insertId, ...req.body });
+    });
+  };
+
+  if (fiyat_tanimi_id) {
+    db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [parseInt(fiyat_tanimi_id)], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      doInsert(rows?.[0]?.ad || fiyat_adi || '', parseInt(fiyat_tanimi_id));
+    });
+  } else {
+    doInsert(fiyat_adi, null);
+  }
 });
 
 // Fiyat satırı güncelle
 app.put('/api/fiyatlar/:id', (req, res) => {
-  const { fiyat_tanimi_id, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
+  const { fiyat_tanimi_id, fiyat_adi, birim_id, carpan, fiyat, para_birimi_id, kdv_oran_id, kdv_dahil, iskonto_tipi, iskonto_orani, barkod } = req.body;
   // Önce mevcut fiyatı al (fiyat_gecmisi için)
   db.query('SELECT fiyat, urun_id FROM fiyatlar WHERE id = ?', [req.params.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const eskiFiyat = rows?.[0]?.fiyat;
     const urunId = rows?.[0]?.urun_id;
-    const yeniFiyat = parseFloat(fiyat) || 0;
-    const resolvedTanimiId = fiyat_tanimi_id ? parseInt(fiyat_tanimi_id) : null;
 
-    const sql = `UPDATE fiyatlar SET fiyat_tanimi_id=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, kdv_dahil=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
+    const doUpdate = (resolvedAdi, resolvedTanimiId) => {
+      const yeniFiyat = parseFloat(fiyat) || 0;
+      const sqlUpdFull = `UPDATE fiyatlar SET fiyat_tanimi_id=?, birim_id=?, carpan=?, fiyat=?, para_birimi_id=?, kdv_oran_id=?, kdv_dahil=?, iskonto_tipi=?, iskonto_orani=?, barkod=?
                WHERE id=?`;
-    const vals = [
-      resolvedTanimiId, birim_id, parseFloat(carpan) || 1, yeniFiyat,
-      para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
-      iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null, req.params.id
-    ];
-    db.query(sql, vals, (err2) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      // Fiyat değiştiyse fiyat_gecmisi'ne kaydet
-      if (eskiFiyat !== undefined && parseFloat(eskiFiyat) !== yeniFiyat) {
-        db.query('INSERT INTO fiyat_gecmisi (urun_id, fiyat_id, fiyat_tanimi_id, eski_fiyat, yeni_fiyat, degisim_tipi) VALUES (?, ?, ?, ?, ?, ?)',
-          [urunId, parseInt(req.params.id), resolvedTanimiId, eskiFiyat, yeniFiyat, 'fiyat_satiri'], () => {});
-      }
-      res.json({ success: true });
-    });
+      const valsUpdFull = [
+        resolvedTanimiId || null, birim_id, parseFloat(carpan) || 1, yeniFiyat,
+        para_birimi_id || 1, kdv_oran_id || null, kdv_dahil != null ? parseInt(kdv_dahil) : null,
+        iskonto_tipi || null, iskonto_orani != null ? parseFloat(iskonto_orani) : null, barkod || null, req.params.id
+      ];
+      db.query(sqlUpdFull, valsUpdFull, (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        // Fiyat değiştiyse fiyat_gecmisi'ne kaydet
+        if (eskiFiyat !== undefined && parseFloat(eskiFiyat) !== yeniFiyat) {
+          db.query('INSERT INTO fiyat_gecmisi (urun_id, fiyat_id, fiyat_tanimi_id, eski_fiyat, yeni_fiyat, degisim_tipi) VALUES (?, ?, ?, ?, ?, ?)',
+            [urunId, parseInt(req.params.id), resolvedTanimiId || null, eskiFiyat, yeniFiyat, 'fiyat_satiri'], () => {});
+        }
+        res.json({ success: true });
+      });
+    };
+
+    if (fiyat_tanimi_id) {
+      db.query('SELECT ad FROM fiyat_tanimlari WHERE id = ?', [parseInt(fiyat_tanimi_id)], (err, rows2) => {
+        if (err) return res.status(500).json({ error: err.message });
+        doUpdate(rows2?.[0]?.ad || fiyat_adi || '', parseInt(fiyat_tanimi_id));
+      });
+    } else {
+      doUpdate(fiyat_adi || '', null);
+    }
   });
 });
 
@@ -876,10 +896,21 @@ app.delete('/api/urunler/:id', (req, res) => {
   });
 });
 
-// Startup migration: musteriler.fiyat_tipi kolonu
-db.query("ALTER TABLE musteriler ADD COLUMN fiyat_tipi VARCHAR(100) NULL DEFAULT NULL", (err) => {
-  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (musteriler.fiyat_tipi):', err.message);
-  else if (!err) console.log('✅ Migration: musteriler.fiyat_tipi kolonu eklendi');
+// Startup migration: musteriler.fiyat_tanimlari_id FK kolonu
+db.query("ALTER TABLE musteriler ADD COLUMN fiyat_tanimlari_id INT NULL DEFAULT NULL", (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') console.warn('Migration uyarisi (musteriler.fiyat_tanimlari_id):', err.message);
+  else {
+    if (!err) console.log('✅ Migration: musteriler.fiyat_tanimlari_id kolonu eklendi');
+    // Backfill: fiyat_tipi metin değerinden FK'yı doldur
+    db.query('UPDATE musteriler m JOIN fiyat_tanimlari ft ON ft.ad = m.fiyat_tipi SET m.fiyat_tanimlari_id = ft.id WHERE m.fiyat_tipi IS NOT NULL AND m.fiyat_tanimlari_id IS NULL', (e2) => {
+      if (!e2) console.log('✅ Migration: musteriler.fiyat_tanimlari_id backfill tamamlandı');
+      // fiyat_tipi kolonunu kaldır (zaten yoksa sessizce geç)
+      db.query('ALTER TABLE musteriler DROP COLUMN fiyat_tipi', (e3) => {
+        if (e3 && e3.code !== 'ER_CANT_DROP_FIELD_OR_KEY' && e3.code !== 'ER_BAD_FIELD_ERROR') console.warn('Migration uyarisi (fiyat_tipi drop):', e3.message);
+        else if (!e3) console.log('✅ Migration: musteriler.fiyat_tipi kolonu kaldırıldı');
+      });
+    });
+  }
 });
 
 // --- MUSTERILER API ---
@@ -891,11 +922,11 @@ app.get('/api/musteriler', (req, res) => {
 });
 
 app.post('/api/musteriler', (req, res) => {
-  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi } = req.body;
+  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tanimlari_id } = req.body;
   if (!ad_soyad || !ad_soyad.trim()) return res.status(400).json({ error: 'Müşteri adı zorunludur.' });
   const iskonto = iskonto_orani || '0';
-  db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto, adres, fiyat_tipi || null], (err, result) => {
+  db.query('INSERT INTO musteriler (ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tanimlari_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto, adres, fiyat_tanimlari_id ? parseInt(fiyat_tanimlari_id) : null], (err, result) => {
     if (err) {
       if (err.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
@@ -907,7 +938,7 @@ app.post('/api/musteriler', (req, res) => {
 });
 
 app.put('/api/musteriler/:id', (req, res) => {
-  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi } = req.body;
+  const { ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tanimlari_id } = req.body;
   const handleDbErr = (err, res) => {
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'Bu TC/VKN numarası başka bir müşteriye kayıtlıdır. Lütfen TC/VKN numaranızı kontrol ediniz.' });
@@ -915,14 +946,14 @@ app.put('/api/musteriler/:id', (req, res) => {
     return res.status(500).json({ error: err.message });
   };
   if (sifre) {
-    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, sifre=?, iskonto_orani=?, adres=?, fiyat_tipi=? WHERE id=?',
-      [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tipi || null, req.params.id], (err) => {
+    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, sifre=?, iskonto_orani=?, adres=?, fiyat_tanimlari_id=? WHERE id=?',
+      [ad_soyad, vkn_tc, telefon, eposta, sifre, iskonto_orani, adres, fiyat_tanimlari_id ? parseInt(fiyat_tanimlari_id) : null, req.params.id], (err) => {
       if (err) return handleDbErr(err, res);
       res.json({ success: true });
     });
   } else {
-    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, iskonto_orani=?, adres=?, fiyat_tipi=? WHERE id=?',
-      [ad_soyad, vkn_tc, telefon, eposta, iskonto_orani, adres, fiyat_tipi || null, req.params.id], (err) => {
+    db.query('UPDATE musteriler SET ad_soyad=?, vkn_tc=?, telefon=?, eposta=?, iskonto_orani=?, adres=?, fiyat_tanimlari_id=? WHERE id=?',
+      [ad_soyad, vkn_tc, telefon, eposta, iskonto_orani, adres, fiyat_tanimlari_id ? parseInt(fiyat_tanimlari_id) : null, req.params.id], (err) => {
       if (err) return handleDbErr(err, res);
       res.json({ success: true });
     });

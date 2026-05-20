@@ -515,8 +515,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   // Müşteriye özel fiyat listesi (fiyat_tipi atanmışsa) — { urun_id: [fiyat_row, ...] }
   const [ozelFiyatlar, setOzelFiyatlar] = useState({});
   useEffect(() => {
-    if (!customer.fiyatTipi) { setOzelFiyatlar({}); return; }
-    fetch(`${API_URL}/fiyatlar/liste?fiyat_adi=${encodeURIComponent(customer.fiyatTipi)}`)
+    if (!customer.fiyatTanimlariId) { setOzelFiyatlar({}); return; }
+    fetch(`${API_URL}/fiyatlar/liste?fiyat_tanimi_id=${customer.fiyatTanimlariId}`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         if (!Array.isArray(data)) return;
@@ -525,7 +525,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         setOzelFiyatlar(map);
       })
       .catch(() => {});
-  }, [customer.fiyatTipi]);
+  }, [customer.fiyatTanimlariId]);
 
   // Kategori yardımcı fonksiyonları
   const getAllDescendantIds = (catId) => {
@@ -575,7 +575,19 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const applySorting = (arr) => {
     if (sortBy === 'default') return arr;
     const sorted = [...arr];
-    const tlPrice = (p) => p.price * (p.pbKur || 1);
+    const tlPrice = (p) => {
+      const oz = ozelFiyatlar[p.id];
+      const ozelFiyat = Array.isArray(oz) && oz.length > 0 ? oz[0] : null;
+      const basePrice = ozelFiyat ? Math.max(0, ozelFiyat.fiyat * ozelFiyat.carpan) : p.price;
+      const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
+      const fiyatIskontoTipi = ozelFiyat ? (ozelFiyat.iskonto_tipi || 'oran') : 'oran';
+      const effDiscount = ozelFiyat ? fiyatIskontoOrani : (customer.fiyatTanimlariId ? 0 : discount);
+      const discountedPrice = (ozelFiyat && fiyatIskontoTipi === 'tutar')
+        ? Math.max(0, basePrice - fiyatIskontoOrani)
+        : Math.max(0, basePrice * (1 - effDiscount / 100));
+      const kur = ozelFiyat ? (parseFloat(ozelFiyat.kur) || 1) : (p.pbKur || 1);
+      return discountedPrice * kur;
+    };
     if (sortBy === 'a-z') sorted.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
     else if (sortBy === 'z-a') sorted.sort((a, b) => b.name.localeCompare(a.name, 'tr'));
     else if (sortBy === 'price-asc') sorted.sort((a, b) => tlPrice(a) - tlPrice(b));
@@ -968,7 +980,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               title="Ürün ara"
             >🔍</button>
             {/* İndirim badge: arama açıkken ve fiyat tipi atanmışsa gizle */}
-            {discount > 0 && !showSearch && !customer.fiyatTipi && (
+            {discount > 0 && !showSearch && !customer.fiyatTanimlariId && (
               <div className="discount-badge-premium">
                 <span className="badge-icon">✨</span>
                 <span className="badge-text">
@@ -1610,7 +1622,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
                 ) : viewMode === 'grid' ? (
                   <div className="product-grid">
-                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}
+                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}
                   </div>
                 ) : (
                   <div className="product-list-view">
@@ -1624,7 +1636,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                         <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                         <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                       </tr></thead>
-                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
                     </table>
                   </div>
                 )}
@@ -1683,7 +1695,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
+            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1696,7 +1708,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
                 </table>
               </div>
             )
@@ -1720,7 +1732,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1733,7 +1745,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTipi} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
                   </table>
                 </div>
               )

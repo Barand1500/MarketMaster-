@@ -928,8 +928,9 @@ export default function Products() {
                     };
                     const cellEdit = (field) => isNewRow || (editingChip?.fiyat_id === f.id && editingChip?.field === field);
                     const rowInEdit = isNewRow || (editingChip?.fiyat_id === f.id);
+                    const blurSave = () => { if (isNewRow) return; setTimeout(() => { const row = document.querySelector(`[data-editrow="${f.id}"]`); if (!row?.contains(document.activeElement)) saveChip(); }, 0); };
                     return (
-                      <tr key={f._isNew ? `new-${p.id}` : f.id}>
+                      <tr key={f._isNew ? `new-${p.id}` : f.id} data-editrow={rowInEdit && !isNewRow ? String(f.id) : undefined}>
                         {idx === 0 && (
                           <>
                             <td rowSpan={allRows.length} style={{ width: '80px', verticalAlign: 'middle' }}>
@@ -942,14 +943,14 @@ export default function Products() {
                         )}
                         <td onDoubleClick={() => openCellEdit('birim')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('birim') ? (
-                            <select className="lite-select" value={chipForm.birim_id} onChange={e => setChipForm(f2 => ({ ...f2, birim_id: e.target.value }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}>{units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
+                            <select className="lite-select" value={chipForm.birim_id} onChange={e => setChipForm(f2 => ({ ...f2, birim_id: e.target.value }))} onBlur={blurSave}>{units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
                           ) : (
                             <span style={{ fontSize: '12px', fontWeight: '600' }}>{f.birim_adi}</span>
                           )}
                         </td>
                         <td onDoubleClick={() => openCellEdit('carpan')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('carpan') ? (
-                            <input className="lite-input" type="number" min="0" step="0.0001" value={chipForm.carpan} onChange={e => setChipForm(f2 => ({ ...f2, carpan: e.target.value }))} style={{ width: '70px' }} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />
+                            <input className="lite-input" type="number" min="0" step="0.0001" value={chipForm.carpan} onChange={e => setChipForm(f2 => ({ ...f2, carpan: e.target.value }))} style={{ width: '70px' }} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={blurSave} />
                           ) : (
                             <span style={{ fontSize: '12px' }}>{parseFloat(f.carpan)}</span>
                           )}
@@ -957,7 +958,7 @@ export default function Products() {
                         <td onDoubleClick={() => openCellEdit('fiyat')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('fiyat') ? (
                             <div>
-                              <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={chipForm.fiyat} onChange={e => setChipForm(f2 => ({ ...f2, fiyat: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />
+                              <input className="lite-input" type="number" min="0" step="0.01" placeholder="0.00" value={chipForm.fiyat} onChange={e => setChipForm(f2 => ({ ...f2, fiyat: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={blurSave} />
                               {paraBirimleri.length > 1 && (
                                 <div style={{ marginTop: '3px' }}>
                                   <PbSelect value={chipForm.para_birimi_id} onChange={id => setChipForm(f2 => ({ ...f2, para_birimi_id: id }))} options={paraBirimleri} />
@@ -971,7 +972,7 @@ export default function Products() {
                         <td onDoubleClick={() => openCellEdit('kdv')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('kdv') ? (
                             <div>
-                              <select className="lite-select" value={chipForm.kdv_oran_id} onChange={e => setChipForm(f2 => ({ ...f2, kdv_oran_id: e.target.value, kdv_dahil: e.target.value ? 1 : null }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}><option value="">KDV Yok</option>{kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}</select>
+                              <select className="lite-select" value={chipForm.kdv_oran_id} onChange={e => setChipForm(f2 => ({ ...f2, kdv_oran_id: e.target.value, kdv_dahil: e.target.value ? 1 : null }))} onBlur={blurSave}><option value="">KDV Yok</option>{kdvOranlari.map(k => <option key={k.id} value={k.id}>%{parseFloat(k.oran)}</option>)}</select>
                               {chipForm.kdv_oran_id && (
                                 <button
                                   style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${chipForm.kdv_dahil == 0 ? '#fecaca' : '#bbf7d0'}`, background: chipForm.kdv_dahil == 0 ? '#fef2f2' : '#f0fdf4', color: chipForm.kdv_dahil == 0 ? '#dc2626' : '#16a34a', cursor: 'pointer', fontWeight: 700 }}
@@ -997,8 +998,8 @@ export default function Products() {
                         <td onDoubleClick={() => openCellEdit('iskonto')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('iskonto') ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              <select className="lite-select" value={chipForm.iskonto_tipi} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_tipi: e.target.value, iskonto_orani: '' }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }}><option value="">—</option><option value="oran">% Oran</option><option value="tutar">Tutar</option></select>
-                              {chipForm.iskonto_tipi && <input className="lite-input" type="number" min="0" step="0.01" value={chipForm.iskonto_orani} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_orani: e.target.value }))} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />}
+                              <select className="lite-select" value={chipForm.iskonto_tipi} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_tipi: e.target.value, iskonto_orani: '' }))} onBlur={blurSave}><option value="">—</option><option value="oran">% Oran</option><option value="tutar">Tutar</option></select>
+                              {chipForm.iskonto_tipi && <input className="lite-input" type="number" min="0" step="0.01" value={chipForm.iskonto_orani} onChange={e => setChipForm(f2 => ({ ...f2, iskonto_orani: e.target.value }))} onBlur={blurSave} />}
                             </div>
                           ) : (
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.iskonto_tipi ? `${f.iskonto_tipi === 'oran' ? '%' : ''}${f.iskonto_orani}` : '—'}</span>
@@ -1006,7 +1007,7 @@ export default function Products() {
                         </td>
                         <td onDoubleClick={() => openCellEdit('barkod')} style={{ cursor: rowInEdit ? 'default' : 'text' }}>
                           {cellEdit('barkod') ? (
-                            <input className="lite-input" placeholder="Barkod..." value={chipForm.barkod} onChange={e => setChipForm(f2 => ({ ...f2, barkod: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={e => { if (!isNewRow && !e.currentTarget.closest('tr')?.contains(e.relatedTarget)) saveChip(); }} />
+                            <input className="lite-input" placeholder="Barkod..." value={chipForm.barkod} onChange={e => setChipForm(f2 => ({ ...f2, barkod: e.target.value }))} onKeyDown={e => e.key === 'Enter' && saveChip()} onBlur={blurSave} />
                           ) : (
                             <span style={{ fontSize: '11px', color: '#64748b' }}>{f.barkod || '—'}</span>
                           )}
