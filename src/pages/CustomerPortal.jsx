@@ -946,52 +946,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       >
         <div style={{ position: 'relative' }}>
 
-          {/* ¦¦ Sabitle ve Temizle butonları (alt alta) ¦¦ */}
-          <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
-            <button
-              className={`cp-pin-inline-btn ${pinnedPath ? 'pinned' : ''}`}
-              title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle — panel her zaman açık kalsın'}
-              onClick={() => {
-                if (pinnedPath) {
-                  catBrowserPinnedRef.current = false;
-                  setPinnedPath(null); setPinnedBrands(null);
-                  localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
-                } else {
-                  catBrowserPinnedRef.current = true;
-                  const p = { cats: catColumnPath, brands: selectedMarkalar };
-                  setPinnedPath(p); setPinnedBrands(selectedMarkalar);
-                  localStorage.setItem('cp_pinned_path', JSON.stringify(p));
-                  localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
-                }
-              }}
-            >
-              {pinnedPath ? '📌 Sabitli' : '📍 Sabitle'}
-            </button>
-
-            {/* Temizle butonu (filtre aktifse göster) */}
-            {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
-              <button
-                onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
-                style={{
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  color: '#dc2626',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  width: '100%'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#fee2e2'}
-                onMouseLeave={(e) => e.target.style.background = '#fef2f2'}
-              >
-                ✕ Temizle
-              </button>
-            )}
-          </div>
-
           <div className="cp-column-browser">
 
             {/* ¦¦ Markalar sütunu ¦¦ */}
@@ -1023,12 +977,46 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           {/* ¦¦ Ana Kategori sütunu ¦¦ */}
           <div className="cp-col-panel">
             <div className="cp-col-body">
-              <button
-                className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
-                onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
-              >
-                Tümü
-              </button>
+              {/* İlk satır: Tümü + Sabitle/Temizle */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 8px 8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                <button
+                  className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
+                  style={{ flex: 1, margin: 0 }}
+                  onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
+                >
+                  Tümü
+                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    className={`cp-small-action-btn ${pinnedPath ? 'pinned' : ''}`}
+                    title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle'}
+                    onClick={() => {
+                      if (pinnedPath) {
+                        catBrowserPinnedRef.current = false;
+                        setPinnedPath(null); setPinnedBrands(null);
+                        localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
+                      } else {
+                        catBrowserPinnedRef.current = true;
+                        const p = { cats: catColumnPath, brands: selectedMarkalar };
+                        setPinnedPath(p); setPinnedBrands(selectedMarkalar);
+                        localStorage.setItem('cp_pinned_path', JSON.stringify(p));
+                        localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
+                      }
+                    }}
+                  >
+                    {pinnedPath ? '📌' : '📍'}
+                  </button>
+                  {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
+                    <button
+                      className="cp-small-action-btn clear"
+                      title="Filtreleri temizle"
+                      onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
               {orderedRoots.filter(cat => catHasProds(cat.id, selectedMarkalar)).map(cat => {
                 const isActive = catColumnPath[0] === cat.id;
                 const hasChildren = categories.some(c => c.parentId === cat.id && catHasProds(c.id, selectedMarkalar));
@@ -1274,9 +1262,11 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .cp-brand-check { margin-left: auto; color: var(--primary); font-size: 16px; line-height: 1; flex-shrink: 0; }
         .cp-col-arrow { margin-left: auto; color: #cbd5e1; font-size: 13px; flex-shrink: 0; }
         .cp-col-item.active .cp-col-arrow { color: var(--primary); }
-        .cp-pin-inline-btn { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #64748b; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
-        .cp-pin-inline-btn:hover { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
-        .cp-pin-inline-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.4); }
+        .cp-small-action-btn { font-size: 18px; padding: 6px 8px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; line-height: 1; min-width: 32px; }
+        .cp-small-action-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .cp-small-action-btn.pinned { background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.4); }
+        .cp-small-action-btn.clear { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+        .cp-small-action-btn.clear:hover { background: #fee2e2; }
         .cp-pin-col { min-width: 105px; max-width: 120px; background: #fafbfc; border-radius: 16px 0 0 16px; }
         .cp-pin-col-btn { cursor: pointer; border: none; display: block; width: 100%; text-align: left; background: transparent; color: #94a3b8; transition: color 0.15s, background 0.15s; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 14px 9px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
         .cp-pin-col-btn:hover { color: #475569; background: #f1f5f9; }
