@@ -37,13 +37,6 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
     <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
       {isOzel ? (
         <>
-          {discount > 0 && (
-            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-              <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-                <Pr n={dispN(crossedPrice)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', textDecoration: 'line-through' }} symRatio={0.75} />
-              </span>
-            </div>
-          )}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
             <span className="card-indirim-badge">
               <span className="card-indirim-pct">Sana Özel</span>
@@ -99,11 +92,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
     return (
       <>
         <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          {discount > 0 && (
-            <span key={showTL ? 'tl-base' : 'orig-base'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
-              <Pr n={dispN(crossedPrice)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700', textDecoration: 'line-through' }} symRatio={0.75} />
-            </span>
-          )}
+          {/* Üstü çizili fiyat kaldırıldı */}
         </td>
         <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
@@ -1854,22 +1843,33 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {!showBrandsView && displayCategories.map((cat, catIdx) => {
-        // Kategorinin tüm alt kategorilerindeki ürünleri de göster
-        const categoryAndDescendants = [cat.id, ...getAllDescendantIds(cat.id)];
+        // ✅ SADECE direkt atanan kategorideki ürünleri göster (alt kategoriler dahil DEĞİL)
         const catProducts = (selectedCatId !== null && cat.id === selectedCatId)
           ? visibleProducts
-          : visibleProducts.filter(p => p.categoryIds.some(cid => categoryAndDescendants.includes(cid)));
+          : visibleProducts.filter(p => p.categoryIds.includes(cat.id));
         if (catProducts.length === 0) return null;
+        
+        // Kategori breadcrumb için parent zincirini oluştur (Meyveler > Tropikal)
+        const getCategoryPath = (catId) => {
+          const path = [];
+          let current = categories.find(c => c.id === catId);
+          while (current) {
+            path.unshift(current.name);
+            current = current.parentId ? categories.find(c => c.id === current.parentId) : null;
+          }
+          return path.join(' > ');
+        };
+        const categoryPathLabel = getCategoryPath(cat.id);
+        
         const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => {
-          const cDescendants = [c.id, ...getAllDescendantIds(c.id)];
-          return filteredProducts.filter(p => p.categoryIds.some(cid => cDescendants.includes(cid))).length === 0;
+          return filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0;
         });
 
         return (
           <div key={cat.id} className="customer-category-section" style={viewMode === 'list' ? { marginBottom: '51px' } : {}}>
             <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
               <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
-              {cat.name}
+              {categoryPathLabel}
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'

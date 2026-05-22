@@ -97,6 +97,30 @@ function PbSelect({ value, onChange, options, mobile }) {
   );
 }
 
+// Bileşik iskonto ifadesini etkin tek değere çevirir: "20+20" → 36 (oran), tutar için toplar
+const calcIskontoEfektif = (expr, tipi) => {
+  if (expr == null || expr === '') return null;
+  const parts = String(expr).split('+').map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n >= 0);
+  if (parts.length === 0) return null;
+  if (tipi === 'tutar') return parts.reduce((s, n) => s + n, 0);
+  return Math.round((1 - parts.reduce((prod, r) => prod * (1 - r / 100), 1)) * 10000) / 100;
+};
+
+// Admin tarafı iskonto görüntüleme: "20+20" → "20+20 (%36)", "15" → "%15", "10" (tutar) → "10₺"
+const formatIskontoDisplay = (expr, tipi) => {
+  if (expr == null || expr === '') return null;
+  const str = String(expr).trim();
+  const parts = str.split('+').map(s => s.trim()).filter(s => s !== '' && !isNaN(parseFloat(s)));
+  if (parts.length === 0) return null;
+  if (parts.length > 1) {
+    const eff = calcIskontoEfektif(str, tipi);
+    const display = tipi === 'tutar' ? `${eff}₺` : `%${eff}`;
+    const full = tipi === 'tutar' ? `${str} (${eff}₺)` : `${str} (%${eff})`;
+    return <span title={full} style={{ cursor: 'help', borderBottom: '1px dotted currentColor' }}>{display}</span>;
+  }
+  return tipi === 'tutar' ? `${parts[0]}₺` : `%${parts[0]}`;
+};
+
 export default function Products() {
   const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, markalar, addMarka, updateMarka, deleteMarka, kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari, siteSettings } = useData();
 
@@ -111,7 +135,7 @@ export default function Products() {
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
+  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -209,6 +233,11 @@ export default function Products() {
   const [modalParent, setModalParent] = useState('');
   const [modalError, setModalError] = useState('');
   const [editingCatId, setEditingCatId] = useState(null);
+
+  // İskonto inline edit states
+  const [iskEdit, setIskEdit] = useState(null); // { id, tipi, orani } — standart tab row
+  const [catIskontoEdit, setCatIskontoEdit] = useState(null); // { id, tipi, orani } — kategori modal
+  const [markaIskontoEdit, setMarkaIskontoEdit] = useState(null); // { id, tipi, orani } — marka modal
 
   const openModal = (type) => {
     setShowModal(type);
@@ -419,8 +448,9 @@ export default function Products() {
     if (!newRow.name.trim() || !newRow.price) return;
     const pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
-    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null });
-    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
+    const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
+    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
+    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
   };
 
@@ -623,7 +653,45 @@ export default function Products() {
               {c.parentId && <div className="pm-item-path">{c.path}</div>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          {/* İskonto + Sil — gruplanmış sağ taraf */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {catIskontoEdit?.id === c.id ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <select
+                  className="lite-select"
+                  style={{ width: 66, fontSize: 11, padding: '2px 4px' }}
+                  value={catIskontoEdit.tipi}
+                  onChange={e => setCatIskontoEdit(prev => ({ ...prev, tipi: e.target.value }))}
+                  onMouseDown={e => e.stopPropagation()}
+                >
+                  <option value="oran">% Oran</option>
+                  <option value="tutar">₺ Tutar</option>
+                </select>
+                <input
+                  autoFocus
+                  type="text"
+                  className="inline-edit"
+                  style={{ width: 66, fontSize: 11 }}
+                  value={catIskontoEdit.orani}
+                  onChange={e => setCatIskontoEdit(prev => ({ ...prev, orani: e.target.value }))}
+                  onBlur={(e) => {
+                    if (e.relatedTarget?.tagName === 'SELECT') return;
+                    const str = catIskontoEdit.orani?.trim() || null;
+                    updateCategory(c.id, c.name, c.parentId ? String(c.parentId) : null, str, str ? catIskontoEdit.tipi : null);
+                    setCatIskontoEdit(null);
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setCatIskontoEdit(null); }}
+                />
+              </div>
+            ) : (
+              <span
+                onDoubleClick={() => setCatIskontoEdit({ id: c.id, tipi: c.iskontoTipi || 'oran', orani: c.iskontoOrani != null ? String(c.iskontoOrani) : '' })}
+                title="İskonto — düzenlemek için çift tıkla"
+                style={{ fontSize: 11, cursor: 'pointer', padding: '2px 6px', borderRadius: 6, background: c.iskontoOrani ? '#fefce8' : '#f1f5f9', color: c.iskontoOrani ? '#ca8a04' : '#94a3b8', border: `1px solid ${c.iskontoOrani ? '#fde68a' : '#e2e8f0'}`, whiteSpace: 'nowrap' }}
+              >
+                {c.iskontoOrani != null ? formatIskontoDisplay(c.iskontoOrani, c.iskontoTipi) : '—'}
+              </span>
+            )}
             <button className="pm-item-del" onClick={() => {
               setConfirmModal({ message: `"${c.name}" kategorisini silmek istiyor musunuz?`, onConfirm: () => deleteCategory(c.id) });
             }}>✕</button>
@@ -747,7 +815,45 @@ export default function Products() {
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          {/* İskonto + Sil — gruplanmış sağ taraf */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {markaIskontoEdit?.id === m.id ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <select
+                  className="lite-select"
+                  style={{ width: 66, fontSize: 11, padding: '2px 4px' }}
+                  value={markaIskontoEdit.tipi}
+                  onChange={e => setMarkaIskontoEdit(prev => ({ ...prev, tipi: e.target.value }))}
+                  onMouseDown={e => e.stopPropagation()}
+                >
+                  <option value="oran">% Oran</option>
+                  <option value="tutar">₺ Tutar</option>
+                </select>
+                <input
+                  autoFocus
+                  type="text"
+                  className="inline-edit"
+                  style={{ width: 66, fontSize: 11 }}
+                  value={markaIskontoEdit.orani}
+                  onChange={e => setMarkaIskontoEdit(prev => ({ ...prev, orani: e.target.value }))}
+                  onBlur={(e) => {
+                    if (e.relatedTarget?.tagName === 'SELECT') return;
+                    const str = markaIskontoEdit.orani?.trim() || null;
+                    updateMarka(m.id, m.ad, m.gorsel, null, str, str ? markaIskontoEdit.tipi : null);
+                    setMarkaIskontoEdit(null);
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setMarkaIskontoEdit(null); }}
+                />
+              </div>
+            ) : (
+              <span
+                onDoubleClick={() => setMarkaIskontoEdit({ id: m.id, tipi: m.iskontoTipi || 'oran', orani: m.iskontoOrani != null ? String(m.iskontoOrani) : '' })}
+                title="İskonto — düzenlemek için çift tıkla"
+                style={{ fontSize: 11, cursor: 'pointer', padding: '2px 6px', borderRadius: 6, background: m.iskontoOrani ? '#fefce8' : '#f1f5f9', color: m.iskontoOrani ? '#ca8a04' : '#94a3b8', border: `1px solid ${m.iskontoOrani ? '#fde68a' : '#e2e8f0'}`, whiteSpace: 'nowrap' }}
+              >
+                {m.iskontoOrani != null ? formatIskontoDisplay(m.iskontoOrani, m.iskontoTipi) : '—'}
+              </span>
+            )}
             <button className="pm-item-del" onClick={() => {
               setConfirmModal({ message: `"${m.ad}" markasını silmek istiyor musunuz?`, onConfirm: () => deleteMarka(m.id) });
             }}>✕</button>
@@ -1065,6 +1171,7 @@ export default function Products() {
                 <th style={{ width: '120px' }}>Birim <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('units'); }} {...makeMiniAddHandlers('Birim ekle')}>+</button></th>
                 <th style={{ width: '230px' }}>Kategoriler <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('categories'); }} {...makeMiniAddHandlers('Kategori ekle')}>+</button></th>
                 <th style={{ width: '150px' }}>Marka <button className="mini-add-btn" onClick={() => { clearTimeout(pmTooltipTimer.current); setPmTooltip(null); openModal('markalar'); }} {...makeMiniAddHandlers('Marka ekle')}>+</button></th>
+                <th style={{ width: '110px' }}>İskonto</th>
                 <th style={{ width: '90px', textAlign: 'center' }}>Stok</th>
                 <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
               </tr>
@@ -1158,6 +1265,16 @@ export default function Products() {
                       <option key={m.id} value={m.id}>{m.ad}</option>
                     ))}
                   </select>
+                </td>
+                {/* İskonto — add row */}
+                <td>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <select className="lite-select" style={{ fontSize: 11 }} value={newRow.iskonto_tipi} onChange={e => setNewRow(p => ({ ...p, iskonto_tipi: e.target.value }))}>
+                      <option value="oran">% Oran</option>
+                      <option value="tutar">₺ Tutar</option>
+                    </select>
+                    <input type="number" min="0" className="inline-edit" placeholder="0" style={{ fontSize: 11 }} value={newRow.iskonto_orani} onChange={e => setNewRow(p => ({ ...p, iskonto_orani: e.target.value }))} />
+                  </div>
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   <button 
@@ -1287,16 +1404,24 @@ export default function Products() {
                     <td onDoubleClick={(e) => { e.stopPropagation(); setEditing({ id: p.id, field: 'categoryIds' }); setCatSearch(''); }}>
                       <div className="cat-drop-wrapper" ref={isEditingCats ? editDropRef : null}>
                         <div className="badge-group" style={{ cursor: 'default' }}>
-                          {p.categoryIds.length > 0 ? p.categoryIds.map(cid => {
-                            const cat = categories.find(c => c.id === cid);
-                            if (!cat) return null;
-                            return (
-                              <span key={cid} className="badge-cat" title={getCategoryPath(cat)}>
-                                {cat.parentId ? <span style={{ color: '#94a3b8', marginRight: 2 }}>↳</span> : null}
-                                {cat.name}
-                              </span>
-                            );
-                          }) : <span className="no-data">YOK</span>}
+                          {p.categoryIds.length > 0 ? (() => {
+                            // ✅ Sadece en alt kategorileri göster (üst kategorisi de listede varsa gösterme)
+                            const leafCategories = p.categoryIds.filter(cid => {
+                              const cat = categories.find(c => c.id === cid);
+                              if (!cat || !cat.parentId) return true; // Üst kategori yoksa göster
+                              return !p.categoryIds.includes(cat.parentId); // Parent listede değilse göster
+                            });
+                            return leafCategories.map(cid => {
+                              const cat = categories.find(c => c.id === cid);
+                              if (!cat) return null;
+                              return (
+                                <span key={cid} className="badge-cat" title={getCategoryPath(cat)}>
+                                  {cat.parentId ? <span style={{ color: '#94a3b8', marginRight: 2 }}>↳</span> : null}
+                                  {cat.name}
+                                </span>
+                              );
+                            });
+                          })() : <span className="no-data">YOK</span>}
                         </div>
                         {isEditingCats && (
                           <CatDropPanel
@@ -1339,6 +1464,42 @@ export default function Products() {
                         </div>
                       ) : (
                         <span className="no-data">YOK</span>
+                      )}
+                    </td>
+                    {/* İskonto */}
+                    <td onDoubleClick={() => { setIskEdit({ id: p.id, tipi: p.iskontoTipi || 'oran', orani: p.iskontoOrani != null ? String(p.iskontoOrani) : '' }); }}>
+                      {iskEdit?.id === p.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <select
+                            className="lite-select"
+                            value={iskEdit.tipi}
+                            onChange={e => setIskEdit(prev => ({ ...prev, tipi: e.target.value }))}
+                            onMouseDown={e => e.stopPropagation()}
+                          >
+                            <option value="oran">% Oran</option>
+                            <option value="tutar">₺ Tutar</option>
+                          </select>
+                          <input
+                            ref={el => { if (el) setTimeout(() => el.focus(), 0); }}
+                            type="text"
+                            className="inline-edit"
+                            value={iskEdit.orani}
+                            onChange={e => setIskEdit(prev => ({ ...prev, orani: e.target.value }))}
+                            onBlur={(e) => {
+                              if (e.relatedTarget?.tagName === 'SELECT') return;
+                              const str = iskEdit.orani?.trim() || null;
+                              updateProduct(p.id, { iskonto_orani: str, iskonto_tipi: str ? iskEdit.tipi : null });
+                              setIskEdit(null);
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setIskEdit(null); }}
+                          />
+                        </div>
+                      ) : p.iskontoOrani != null ? (
+                        <span className="badge-unit" style={{ background: '#fefce8', color: '#ca8a04', border: '1px solid #fde68a', cursor: 'pointer' }}>
+                          {formatIskontoDisplay(p.iskontoOrani, p.iskontoTipi)}
+                        </span>
+                      ) : (
+                        <span className="no-data" style={{ cursor: 'pointer' }}>—</span>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -1701,8 +1862,9 @@ export default function Products() {
                 if (!newRow.name.trim() || !newRow.price) return;
                 const _pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
                 const _kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
-                addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: _pb?.sembol || '₺', pbKisaAd: _pb?.kisa_ad || 'TRY', pbKur: parseFloat(_pb?.kur) || 1, kdv_orani: _kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null });
-                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true });
+                const _iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
+                addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: _pb?.sembol || '₺', pbKisaAd: _pb?.kisa_ad || 'TRY', pbKur: parseFloat(_pb?.kur) || 1, kdv_orani: _kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null, iskonto_orani: _iskOrani, iskonto_tipi: _iskOrani ? newRow.iskonto_tipi : null });
+                setNewRow({ name: '', price: '', unit: units[0]?.name || 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
                 setShowMobileAdd(false);
               }}>Ekle</button>
             </div>

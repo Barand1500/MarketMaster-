@@ -840,11 +840,13 @@ app.post('/api/urunler', (req, res) => {
       }
       const urunId = result.insertId;
       if (Array.isArray(kategori_ids) && kategori_ids.length > 0) {
-        // ✅ Üst kategorileri otomatik ekle (örn. "Barkod Okuyucular" seçilince "OT/VT Ürünleri" de eklenir)
-        expandCategoryIds(kategori_ids, (fullIds) => {
-          const values = fullIds.map(kid => [urunId, kid]);
-          db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
-        });
+        // ❌ Üst kategori otomatik ekleme KAPALI (sadece seçilen kategoriler kaydedilir)
+        // expandCategoryIds(kategori_ids, (fullIds) => {
+        //   const values = fullIds.map(kid => [urunId, kid]);
+        //   db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+        // });
+        const values = kategori_ids.map(kid => [urunId, kid]);
+        db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
       }
       res.json({ id: urunId, urun_adi, fiyat: price, birim_id: bId, gorsel_yolu, kategori_ids, stok_durumu: stok, para_birimi_id: pbId, stok_kodu: stokKodu });
     });
@@ -924,11 +926,13 @@ app.put('/api/urunler/:id', (req, res) => {
             }
             db.query('DELETE FROM urun_kategori_iliskisi WHERE urun_id = ?', [req.params.id], () => {
               if (kategori_ids.length > 0) {
-                // ✅ Üst kategorileri otomatik ekle
-                expandCategoryIds(kategori_ids, (fullIds) => {
-                  const values = fullIds.map(kid => [req.params.id, kid]);
-                  db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
-                });
+                // ❌ Üst kategori otomatik ekleme KAPALI (sadece seçilen kategoriler kaydedilir)
+                // expandCategoryIds(kategori_ids, (fullIds) => {
+                //   const values = fullIds.map(kid => [req.params.id, kid]);
+                //   db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+                // });
+                const values = kategori_ids.map(kid => [req.params.id, kid]);
+                db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
               }
             });
             res.json({ success: true });
