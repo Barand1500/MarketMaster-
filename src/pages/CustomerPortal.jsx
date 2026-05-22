@@ -708,11 +708,22 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const fmtNum = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
   const fmtTL = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ?';
 
-  // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
+  // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse TÜM kategorileri göster
   const roots = categories.filter(c => !c.parentId);
 
   // Sıra uygulanmış ana kategoriler (alfabetik)
   const orderedRoots = [...roots].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  
+  // Kategori breadcrumb yolu oluştur (Meyveler > Tropikal)
+  const getCategoryPathForSort = (catId) => {
+    const path = [];
+    let current = categories.find(c => c.id === catId);
+    while (current) {
+      path.unshift(current.name);
+      current = current.parentId ? categories.find(c => c.id === current.parentId) : null;
+    }
+    return path.join(' > ');
+  };
 
   // Stokta olan tüm ürünler (filtre uygulanmadan)
   const baseProducts = products.filter(p => p.inStock !== false);
@@ -735,8 +746,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   };
 
   const displayCategories = selectedCatId !== null
-    ? (categories.find(c => c.id === selectedCatId) ? [categories.find(c => c.id === selectedCatId)] : orderedRoots)
-    : orderedRoots;
+    ? (categories.find(c => c.id === selectedCatId) ? [categories.find(c => c.id === selectedCatId)] : 
+       [...categories].sort((a, b) => getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr')))
+    : [...categories].sort((a, b) => getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr'));
 
   // Kategori ilişkisi olmayan ürünleri kontrol et
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
