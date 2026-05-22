@@ -37,6 +37,11 @@ const GridPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
     <div style={{ marginTop: 'auto', paddingTop: '8px', width: '100%' }}>
       {isOzel ? (
         <>
+          <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+            <span key={showTL ? 'tl-base-ozel' : 'orig-base-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+              <Pr n={dispN(crossedPrice)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600' }} symRatio={0.75} />
+            </span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
             <span className="card-indirim-badge">
               <span className="card-indirim-pct">Sana Özel</span>
@@ -92,7 +97,9 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
     return (
       <>
         <td className="cp-col-price-base" style={{ padding: '10px 10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          {/* Üstü çizili fiyat kaldırıldı */}
+          <span key={showTL ? 'tl-base-ozel' : 'orig-base-ozel'} style={{ display: 'inline-block', animation: 'priceFadeIn 0.2s ease' }}>
+            <Pr n={dispN(crossedPrice)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
+          </span>
         </td>
         <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
