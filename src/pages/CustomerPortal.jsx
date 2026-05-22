@@ -981,12 +981,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 8px 8px 0', borderBottom: '1px solid #f1f5f9' }}>
                 <button
                   className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
-                  style={{ flex: 1, margin: 0 }}
+                  style={{ margin: 0 }}
                   onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
                 >
                   Tümü
                 </button>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: 'auto' }}>
                   <button
                     className={`cp-small-action-btn ${pinnedPath ? 'pinned' : ''}`}
                     title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle'}
