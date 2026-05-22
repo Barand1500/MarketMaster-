@@ -966,11 +966,34 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             {pinnedPath ? '📌 Sabitli' : '📍 Sabitle'}
           </button>
 
+          {/* ¦¦ Temizle butonu (sabitle altında) ¦¦ */}
+          {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
+            <div style={{ marginTop: '12px', marginBottom: '8px', paddingLeft: '10px' }}>
+              <button
+                onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#dc2626',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#fee2e2'}
+                onMouseLeave={(e) => e.target.style.background = '#fef2f2'}
+              >
+                ✕ Temizle
+              </button>
+            </div>
+          )}
+
           <div className="cp-column-browser">
 
             {/* ¦¦ Markalar sütunu ¦¦ */}
           <div className="cp-col-panel">
-            <div className="cp-col-header">🏷️ Markalar</div>
             <div className="cp-col-body">
               <button
                 className={`cp-col-item ${selectedMarkalar.length === 0 ? 'active' : ''}`}
@@ -997,7 +1020,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           {/* ¦¦ Ana Kategori sütunu ¦¦ */}
           <div className="cp-col-panel">
-            <div className="cp-col-header">📂 Ana Kategori</div>
             <div className="cp-col-body">
               <button
                 className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
@@ -1035,7 +1057,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             const levelLabel = colIdx === 0 ? '1. Alt Kategori' : colIdx === 1 ? '2. Alt Kategori' : `${colIdx + 1}. Alt Kategori`;
             return (
               <div key={parentCatId} className="cp-col-panel">
-                <div className="cp-col-header">📁 {levelLabel}</div>
                 <div className="cp-col-body">
                   {children.map(child => {
                     const isActive = catColumnPath[colIdx + 1] === child.id;
@@ -1060,20 +1081,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             );
           })}
 
-          {/* ¦¦ Temizle (aktif filtre varsa) ¦¦ */}
-            {/* ¦¦ Temizle sütunu (aktif filtre varsa) ¦¦ */}
-            {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
-              <div className="cp-col-panel cp-clear-col">
-                <div className="cp-col-header" style={{ color: '#dc2626' }}>Filtreleri Sıfırla</div>
-                <div className="cp-col-body">
-                  <button
-                    className="cp-col-item"
-                    style={{ color: '#dc2626', fontWeight: '700' }}
-                    onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
-                  >✕ Temizle</button>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
