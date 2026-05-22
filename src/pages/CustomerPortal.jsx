@@ -176,19 +176,46 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
   // Çoklu birim desteği: ozelFiyatlar bir dizi, seçilen indexe göre aktif satır
   const ozelFiyat = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 0 ? ozelFiyatlar[selectedIdx] || ozelFiyatlar[0] : null;
   const hasMultiUnit = Array.isArray(ozelFiyatlar) && ozelFiyatlar.length > 1;
-  // Özel fiyat varsa onu kullan (0 TL de geçerli — bedava ürün olabilir), negatif olamaz
-  const effectivePrice = ozelFiyat ? Math.max(0, ozelFiyat.fiyat * ozelFiyat.carpan) : p.price;
-  // Sembol/kisaAd: ozelFiyat varsa önce fiyatlar tablosundan al, yoksa para_birimi_id=1 (TRY) varsay, en son ürün para birimine dön
-  const effectiveSembol = ozelFiyat
-    ? (ozelFiyat.sembol || (ozelFiyat.para_birimi_id === 1 ? '₺' : (p.pbSembol || '₺')))
-    : p.pbSembol;
-  const effectiveKisaAd = ozelFiyat
-    ? (ozelFiyat.kisa_ad || (ozelFiyat.para_birimi_id === 1 ? 'TRY' : (p.pbKisaAd || 'TRY')))
-    : p.pbKisaAd;
-  const effectiveKur = ozelFiyat ? (parseFloat(ozelFiyat.kur) || 1) : p.pbKur;
-  const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
-  // isTRY: özel fiyatın para birimine göre hesapla (ürünün değil)
+  
+  // ===== ESKİ MANTIK (YEDEK) =====
+  // const effectivePrice = ozelFiyat ? Math.max(0, ozelFiyat.fiyat * ozelFiyat.carpan) : p.price;
+  // const effectiveSembol = ozelFiyat
+  //   ? (ozelFiyat.sembol || (ozelFiyat.para_birimi_id === 1 ? '₺' : (p.pbSembol || '₺')))
+  //   : p.pbSembol;
+  // const effectiveKisaAd = ozelFiyat
+  //   ? (ozelFiyat.kisa_ad || (ozelFiyat.para_birimi_id === 1 ? 'TRY' : (p.pbKisaAd || 'TRY')))
+  //   : p.pbKisaAd;
+  // const effectiveKur = ozelFiyat ? (parseFloat(ozelFiyat.kur) || 1) : p.pbKur;
+  // const isTRY = !effectiveKisaAd || effectiveKisaAd === 'TRY';
+  
+  // ===== YENİ MANTIK: HER ZAMAN ÜRÜNÜN PARA BİRİMİNİ KULLAN =====
+  // Para birimi her zaman ürünün para birimi
+  const effectiveSembol = p.pbSembol;
+  const effectiveKisaAd = p.pbKisaAd;
+  const effectiveKur = p.pbKur;
   const isTRY = !effectiveKisaAd || effectiveKisaAd === 'TRY';
+  
+  // Özel fiyat varsa ve farklı para birimindeyse, ürünün para birimine çevir
+  const effectivePrice = ozelFiyat 
+    ? (() => {
+        const ozelFiyatTutari = ozelFiyat.fiyat * ozelFiyat.carpan;
+        const ozelKur = parseFloat(ozelFiyat.kur) || 1;
+        const urunKur = p.pbKur || 1;
+        
+        // Özel fiyatın para birimi ile ürünün para birimi aynıysa direkt kullan
+        if (ozelFiyat.para_birimi_id === p.para_birimi_id) {
+          return Math.max(0, ozelFiyatTutari);
+        }
+        
+        // Farklı para birimiyse çevir: önce TL'ye çevir, sonra ürün para birimine
+        // Örnek: 380 ₺ (ozelKur=1) → 380 TL → 380/34 = 11.18 $
+        const tlTutar = ozelFiyat.para_birimi_id === 1 ? ozelFiyatTutari : ozelFiyatTutari * ozelKur;
+        const urunParaBirimiTutar = p.para_birimi_id === 1 ? tlTutar : tlTutar / urunKur;
+        return Math.max(0, urunParaBirimiTutar);
+      })()
+    : p.price;
+  
+  const effectiveUnit = ozelFiyat ? (ozelFiyat.birim_adi || p.unit) : p.unit;
   // KDV: ozelFiyat varsa fiyatlar tablosundaki kdv_oran/kdv_dahil kullan, yoksa ürünün KDV'sine dön
   const effectiveKdvOrani = ozelFiyat
     ? (ozelFiyat.kdv_oran != null ? ozelFiyat.kdv_oran : p.kdvOrani)
