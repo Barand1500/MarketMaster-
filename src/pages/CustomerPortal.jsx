@@ -946,30 +946,30 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       >
         <div style={{ position: 'relative' }}>
 
-          {/* ¦¦ Sabitle butonu — sağ üst köşe, header hizasında ¦¦ */}
-          <button
-            className={`cp-pin-float-btn ${pinnedPath ? 'pinned' : ''}`}
-            title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle — panel her zaman açık kalsın'}
-            onClick={() => {
-              if (pinnedPath) {
-                catBrowserPinnedRef.current = false;
-                setPinnedPath(null); setPinnedBrands(null);
-                localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
-              } else {
-                catBrowserPinnedRef.current = true;
-                const p = { cats: catColumnPath, brands: selectedMarkalar };
-                setPinnedPath(p); setPinnedBrands(selectedMarkalar);
-                localStorage.setItem('cp_pinned_path', JSON.stringify(p));
-                localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
-              }
-            }}
-          >
-            {pinnedPath ? '📌 Sabitli' : '📍 Sabitle'}
-          </button>
+          {/* ¦¦ Sabitle ve Temizle butonları (alt alta) ¦¦ */}
+          <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+            <button
+              className={`cp-pin-inline-btn ${pinnedPath ? 'pinned' : ''}`}
+              title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle — panel her zaman açık kalsın'}
+              onClick={() => {
+                if (pinnedPath) {
+                  catBrowserPinnedRef.current = false;
+                  setPinnedPath(null); setPinnedBrands(null);
+                  localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
+                } else {
+                  catBrowserPinnedRef.current = true;
+                  const p = { cats: catColumnPath, brands: selectedMarkalar };
+                  setPinnedPath(p); setPinnedBrands(selectedMarkalar);
+                  localStorage.setItem('cp_pinned_path', JSON.stringify(p));
+                  localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
+                }
+              }}
+            >
+              {pinnedPath ? '📌 Sabitli' : '📍 Sabitle'}
+            </button>
 
-          {/* ¦¦ Temizle butonu (sabitle altında) ¦¦ */}
-          {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
-            <div style={{ marginTop: '12px', marginBottom: '8px', paddingLeft: '10px' }}>
+            {/* Temizle butonu (filtre aktifse göster) */}
+            {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
               <button
                 onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
                 style={{
@@ -979,17 +979,18 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
                   borderRadius: '8px',
-                  padding: '6px 12px',
+                  padding: '8px 12px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  width: '100%'
                 }}
                 onMouseEnter={(e) => e.target.style.background = '#fee2e2'}
                 onMouseLeave={(e) => e.target.style.background = '#fef2f2'}
               >
                 ✕ Temizle
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="cp-column-browser">
 
@@ -1273,9 +1274,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .cp-brand-check { margin-left: auto; color: var(--primary); font-size: 16px; line-height: 1; flex-shrink: 0; }
         .cp-col-arrow { margin-left: auto; color: #cbd5e1; font-size: 13px; flex-shrink: 0; }
         .cp-col-item.active .cp-col-arrow { color: var(--primary); }
-        .cp-pin-float-btn { position: absolute; top: 0; right: 0; z-index: 3; padding: 10px 14px 9px; border: none; border-bottom: 1px solid #f1f5f9; border-left: 1px solid #f1f5f9; border-top-right-radius: 16px; background: #fff; color: #94a3b8; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; transition: color 0.15s, background 0.15s; }
-        .cp-pin-float-btn:hover { color: #475569; background: #f1f5f9; }
-        .cp-pin-float-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.25); }
+        .cp-pin-inline-btn { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #64748b; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
+        .cp-pin-inline-btn:hover { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
+        .cp-pin-inline-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.4); }
         .cp-pin-col { min-width: 105px; max-width: 120px; background: #fafbfc; border-radius: 16px 0 0 16px; }
         .cp-pin-col-btn { cursor: pointer; border: none; display: block; width: 100%; text-align: left; background: transparent; color: #94a3b8; transition: color 0.15s, background 0.15s; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 10px 14px 9px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
         .cp-pin-col-btn:hover { color: #475569; background: #f1f5f9; }
