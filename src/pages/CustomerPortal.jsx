@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import '../styles/ExcelTable.css';
@@ -158,8 +158,17 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
   );
 };
 
+// Bileşik iskonto ifadesini etkin tek değere çevirir: "20+20" → 36 (oran için) veya 25 (tutar için)
+const calcIskontoEfektif = (expr, tipi) => {
+  if (expr == null || expr === '') return 0;
+  const parts = String(expr).split('+').map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
+  if (parts.length === 0) return 0;
+  if (tipi === 'tutar') return parts.reduce((s, n) => s + n, 0);
+  return Math.round((1 - parts.reduce((prod, r) => prod * (1 - r / 100), 1)) * 10000) / 100;
+};
+
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
-const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi }) => {
+const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, categories, markalar, iskontoSirasi }) => {
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -190,10 +199,50 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
   // Fiyat listesi iskontosu: fiyatlar tablosundaki iskonto_orani (ürüne özel)
   const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
   const fiyatIskontoTipi = ozelFiyat ? (ozelFiyat.iskonto_tipi || 'oran') : 'oran';
-  // hasFiyatTipi varsa customer iskontosu bypass — sadece fiyatlar.iskonto_orani kullanılır
-  const effectiveDiscount = ozelFiyat ? fiyatIskontoOrani : (hasFiyatTipi ? 0 : discount);
-  const discountedPrice = (ozelFiyat && fiyatIskontoTipi === 'tutar')
-    ? Math.max(0, effectivePrice - fiyatIskontoOrani)
+  // 6-seviye kaskad iskonto (ozelFiyat yoksa)
+  // iskontoSirasi prop: JSON string of ['urun','kategori','marka','musteri'] or undefined
+  const resolvedOrder = (() => {
+    if (!iskontoSirasi) return ['urun', 'kategori', 'marka', 'musteri'];
+    try {
+      const arr = JSON.parse(iskontoSirasi);
+      if (Array.isArray(arr) && arr.length === 4) return arr;
+    } catch {}
+    return ['urun', 'kategori', 'marka', 'musteri'];
+  })();
+  let cascadeDiscount = 0;
+  let cascadeDiscountTipi = 'oran';
+  if (!ozelFiyat) {
+    for (const level of resolvedOrder) {
+      if (level === 'urun' && calcIskontoEfektif(p.iskontoOrani, p.iskontoTipi || 'oran') > 0) {
+        cascadeDiscount = calcIskontoEfektif(p.iskontoOrani, p.iskontoTipi || 'oran');
+        cascadeDiscountTipi = p.iskontoTipi || 'oran';
+        break;
+      } else if (level === 'kategori') {
+        const catId = p.categoryIds?.[0];
+        const cat = catId && categories ? categories.find(c => c.id === catId) : null;
+        if (calcIskontoEfektif(cat?.iskontoOrani, cat?.iskontoTipi || 'oran') > 0) {
+          cascadeDiscount = calcIskontoEfektif(cat.iskontoOrani, cat.iskontoTipi || 'oran');
+          cascadeDiscountTipi = cat.iskontoTipi || 'oran';
+          break;
+        }
+      } else if (level === 'marka') {
+        const marka = markalar ? markalar.find(m => m.id === p.markaId) : null;
+        if (calcIskontoEfektif(marka?.iskontoOrani, marka?.iskontoTipi || 'oran') > 0) {
+          cascadeDiscount = calcIskontoEfektif(marka.iskontoOrani, marka.iskontoTipi || 'oran');
+          cascadeDiscountTipi = marka.iskontoTipi || 'oran';
+          break;
+        }
+      } else if (level === 'musteri' && discount > 0) {
+        cascadeDiscount = discount;
+        cascadeDiscountTipi = 'oran';
+        break;
+      }
+    }
+  }
+  const effectiveDiscount = ozelFiyat ? fiyatIskontoOrani : cascadeDiscount;
+  const effectiveDiscountTipi = ozelFiyat ? fiyatIskontoTipi : cascadeDiscountTipi;
+  const discountedPrice = effectiveDiscountTipi === 'tutar'
+    ? Math.max(0, effectivePrice - effectiveDiscount)
     : Math.max(0, effectivePrice * (1 - effectiveDiscount / 100));
   // Toplam indirim yüzdesı: özel fiyat varsa her zaman orijinal ürün fiyatı bazlı %
   const totalDiscountPct = (ozelFiyat && p.price > 0 && discountedPrice < p.price)
@@ -211,7 +260,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
     onTouchStart: () => { setHovered(true); clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => setHovered(false), 2000); },
   };
 
-  const hasExtraCols = hasFiyatTipi || discount > 0;
+  const hasExtraCols = hasFiyatTipi || discount > 0 || effectiveDiscount > 0;
 
   if (viewMode === 'list') {
     return (
@@ -263,7 +312,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
           hovered={hovered}
           isOzel={!!ozelFiyat}
           hasExtraCols={hasExtraCols}
-          iskontoTipi={fiyatIskontoTipi}
+          iskontoTipi={effectiveDiscountTipi}
         />
         {/* Son Fiyat Güncelleme */}
         <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
@@ -325,7 +374,7 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi })
           kur={effectiveKur}
           hovered={hovered}
           isOzel={!!ozelFiyat}
-          iskontoTipi={fiyatIskontoTipi}
+          iskontoTipi={effectiveDiscountTipi}
         />
         {effectiveKdvOrani != null && effectiveKdvDahil != null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
@@ -379,7 +428,7 @@ const formatPhone = (val) => {
   return formatPhoneDynamic(val);
 };
 
-// Zincirleme iskonto: "20+20" → 36, "10" → 10
+// Zincirleme iskonto: "20+20" › 36, "10" › 10
 const parseDiscount = (text) => {
   const str = String(text || '0').trim();
   if (str.includes('+')) {
@@ -396,6 +445,7 @@ const parseDiscount = (text) => {
 
 export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) {
   const { categories, products, markalar, updateCustomer, refetchProducts, siteSettings } = useData();
+
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef(null);
@@ -410,6 +460,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   const [catSearch, setCatSearch] = useState('');
   const [selectedMarkalar, setSelectedMarkalar] = useState([]);
   const [showBrandsView, setShowBrandsView] = useState(false);
+  // Sonsuz kaydırma
+  const [visibleCount, setVisibleCount] = useState(24);
+  const sentinelRef = useRef(null);
   // Column browser state
   const [catColumnPath, setCatColumnPath] = useState(() => {
     try { return JSON.parse(localStorage.getItem('cp_cat_path') || '[]'); } catch { return []; }
@@ -477,6 +530,21 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showKurPanel]);
+
+  // Sonsuz kaydırma: filtre değişince sayacı sıfırla
+  useEffect(() => { setVisibleCount(24); }, [search, selectedCatId, selectedMarkalar.length, showBrandsView]);
+
+  // Sonsuz kaydırma: sentinel görününce daha fazla yükle
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) setVisibleCount(c => c + 20); },
+      { rootMargin: '400px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // 60 Saniyede bir urunleri yeniden cek
   useEffect(() => {
@@ -564,8 +632,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
   const sortOptions = [
     { value: 'default', label: 'Varsayılan' },
-    { value: 'a-z', label: '🔤 A → Z' },
-    { value: 'z-a', label: '🔤 Z → A' },
+    { value: 'a-z', label: '🔤 A › Z' },
+    { value: 'z-a', label: '🔤 Z › A' },
     { value: 'price-asc', label: '💰 En Düşük Fiyat' },
     { value: 'price-desc', label: '💰 En Yüksek Fiyat' },
     { value: 'newest', label: '🆕 En Yeni Eklenen' },
@@ -581,9 +649,33 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       const basePrice = ozelFiyat ? Math.max(0, ozelFiyat.fiyat * ozelFiyat.carpan) : p.price;
       const fiyatIskontoOrani = ozelFiyat && ozelFiyat.iskonto_orani ? parseFloat(ozelFiyat.iskonto_orani) : 0;
       const fiyatIskontoTipi = ozelFiyat ? (ozelFiyat.iskonto_tipi || 'oran') : 'oran';
-      const effDiscount = ozelFiyat ? fiyatIskontoOrani : (customer.fiyatTanimlariId ? 0 : discount);
-      const discountedPrice = (ozelFiyat && fiyatIskontoTipi === 'tutar')
-        ? Math.max(0, basePrice - fiyatIskontoOrani)
+      let effDiscount = 0;
+      let effTipi = 'oran';
+      if (ozelFiyat) {
+        effDiscount = fiyatIskontoOrani;
+        effTipi = fiyatIskontoTipi;
+      } else if (p.iskontoOrani != null && p.iskontoOrani > 0) {
+        effDiscount = p.iskontoOrani;
+        effTipi = p.iskontoTipi || 'oran';
+      } else {
+        const catId = p.categoryIds?.[0];
+        const cat = catId ? categories.find(c => c.id === catId) : null;
+        if (cat?.iskontoOrani > 0) {
+          effDiscount = cat.iskontoOrani;
+          effTipi = cat.iskontoTipi || 'oran';
+        } else {
+          const marka = markalar.find(m => m.id === p.markaId);
+          if (marka?.iskontoOrani > 0) {
+            effDiscount = marka.iskontoOrani;
+            effTipi = marka.iskontoTipi || 'oran';
+          } else {
+            effDiscount = customer.fiyatTanimlariId ? 0 : discount;
+            effTipi = 'oran';
+          }
+        }
+      }
+      const discountedPrice = effTipi === 'tutar'
+        ? Math.max(0, basePrice - effDiscount)
         : Math.max(0, basePrice * (1 - effDiscount / 100));
       const kur = ozelFiyat ? (parseFloat(ozelFiyat.kur) || 1) : (p.pbKur || 1);
       return discountedPrice * kur;
@@ -598,7 +690,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   };
 
   const fmtNum = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
-  const fmtTL = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+  const fmtTL = (n) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ?';
 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse ana kategorileri (roots) göster
   const roots = categories.filter(c => !c.parentId);
@@ -632,7 +724,10 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
   // Kategori ilişkisi olmayan ürünleri kontrol et
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
-  const hasNoCategoryRelations = filteredProducts.length > 0 && filteredProducts.every(p => !p.categoryIds || p.categoryIds.length === 0);
+  const hasNoCategoryRelations = filteredProducts.length > 0 && (categories.length === 0 || filteredProducts.every(p => !p.categoryIds || p.categoryIds.length === 0));
+  // Görüntülenecek ürünler (sonsuz kaydırma dilimi)
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredProducts.length;
 
   return (
     <div className="page-container wide" style={{ paddingTop: 0 }}>
@@ -654,6 +749,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         {/* FILTER AREA */}
         <div className="header-center">
 
+          {categories.length > 0 && (
           <button
             onClick={() => setCatBrowserOpen(v => !v)}
             className="header-filter-btn"
@@ -661,7 +757,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           >
             📂 Kategoriler
           </button>
+          )}
 
+          {markalar.length > 0 && (
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowBrandsView(v => !v)}
@@ -677,6 +775,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               )}
             </button>
           </div>
+          )}
 
         </div>
 
@@ -819,7 +918,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       >
         <div style={{ position: 'relative' }}>
 
-          {/* ── Sabitle butonu — sağ üst köşe, header hizasında ── */}
+          {/* ¦¦ Sabitle butonu — sağ üst köşe, header hizasında ¦¦ */}
           <button
             className={`cp-pin-float-btn ${pinnedPath ? 'pinned' : ''}`}
             title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle — panel her zaman açık kalsın'}
@@ -842,7 +941,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           <div className="cp-column-browser">
 
-            {/* ── Markalar sütunu ── */}
+            {/* ¦¦ Markalar sütunu ¦¦ */}
           <div className="cp-col-panel">
             <div className="cp-col-header">🏷️ Markalar</div>
             <div className="cp-col-body">
@@ -869,7 +968,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </div>
           </div>
 
-          {/* ── Ana Kategori sütunu ── */}
+          {/* ¦¦ Ana Kategori sütunu ¦¦ */}
           <div className="cp-col-panel">
             <div className="cp-col-header">📂 Ana Kategori</div>
             <div className="cp-col-body">
@@ -900,7 +999,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             </div>
           </div>
 
-          {/* ── Dinamik alt kategori sütunları ── */}
+          {/* ¦¦ Dinamik alt kategori sütunları ¦¦ */}
           {catColumnPath.map((parentCatId, colIdx) => {
             const children = [...categories.filter(c => c.parentId === parentCatId)]
               .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
@@ -934,8 +1033,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             );
           })}
 
-          {/* ── Temizle (aktif filtre varsa) ── */}
-            {/* ── Temizle sütunu (aktif filtre varsa) ── */}
+          {/* ¦¦ Temizle (aktif filtre varsa) ¦¦ */}
+            {/* ¦¦ Temizle sütunu (aktif filtre varsa) ¦¦ */}
             {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
               <div className="cp-col-panel cp-clear-col">
                 <div className="cp-col-header" style={{ color: '#dc2626' }}>Filtreleri Sıfırla</div>
@@ -1109,7 +1208,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                         onClick={() => { setSortBy('default'); setShowSortDrop(false); }}
                         style={{ width: '100%', padding: '7px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
                       >
-                        ✕ Sıralamayı Sıfırla
+                        ? Sıralamayı Sıfırla
                       </button>
                     </div>
                   )}
@@ -1121,7 +1220,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       </div>
 
       <style>{`
-        /* ── Column Browser ── */
+        /* ¦¦ Column Browser ¦¦ */
         .cp-browser-anim-wrap { overflow: hidden; transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
         .cp-browser-open { max-height: 520px; opacity: 1; pointer-events: auto; }
         .cp-browser-closed { max-height: 0; opacity: 0; pointer-events: none; }
@@ -1156,7 +1255,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           .cp-col-body { max-height: 140px; flex-direction: row; flex-wrap: wrap; }
           .cp-col-item { width: auto; }
         }
-        /* ── End Column Browser ── */
+        /* ¦¦ End Column Browser ¦¦ */
 
         @keyframes ping {
           75%, 100% { transform: scale(2); opacity: 0; }
@@ -1292,7 +1391,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .customer-category-section { padding-bottom: 0; margin-bottom: 0; }
         .category-divider { height: 2px; background: linear-gradient(to right, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent); margin: 36px 0; border-radius: 2px; }
 
-        /* ── Tablet (769px – 1024px) ─────────────────────────── */
+        /* ¦¦ Tablet (769px – 1024px) ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦ */
         @media (min-width: 769px) and (max-width: 1024px) {
           .customer-header { padding: 10px 16px; gap: 10px; }
           .customer-name-display { max-width: 160px; }
@@ -1305,7 +1404,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           .info-strip { flex-direction: row; align-items: center; }
         }
 
-        /* ── Geniş Mobil (641px – 768px) ────────────────────── */
+        /* ¦¦ Geniş Mobil (641px – 768px) ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦ */
         @media (min-width: 641px) and (max-width: 768px) {
           .portal-content { padding: 10px 12px; }
           /* Grid: 3 sütun (dar değil) */
@@ -1525,6 +1624,9 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           from { opacity: 0; transform: translateY(18px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
         .brand-card {
           background: #fff;
           border-radius: 16px;
@@ -1622,7 +1724,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
                 ) : viewMode === 'grid' ? (
                   <div className="product-grid">
-                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}
+                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}
                   </div>
                 ) : (
                   <div className="product-list-view">
@@ -1636,7 +1738,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                         <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                         <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                       </tr></thead>
-                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
+                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
                     </table>
                   </div>
                 )}
@@ -1695,7 +1797,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</div>
+            ? <div className="product-grid">{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1708,7 +1810,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                     <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(filteredProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
+                  <tbody>{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
                 </table>
               </div>
             )
@@ -1717,12 +1819,16 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       )}
 
       {!showBrandsView && displayCategories.map((cat, catIdx) => {
-        // Seçili kategori ise tüm filtredProducts (alt kategoriler dahil) göster
+        // Kategorinin tüm alt kategorilerindeki ürünleri de göster
+        const categoryAndDescendants = [cat.id, ...getAllDescendantIds(cat.id)];
         const catProducts = (selectedCatId !== null && cat.id === selectedCatId)
-          ? filteredProducts
-          : filteredProducts.filter(p => p.categoryIds.includes(cat.id));
+          ? visibleProducts
+          : visibleProducts.filter(p => p.categoryIds.some(cid => categoryAndDescendants.includes(cid)));
         if (catProducts.length === 0) return null;
-        const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0);
+        const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => {
+          const cDescendants = [c.id, ...getAllDescendantIds(c.id)];
+          return filteredProducts.filter(p => p.categoryIds.some(cid => cDescendants.includes(cid))).length === 0;
+        });
 
         return (
           <div key={cat.id} className="customer-category-section" style={viewMode === 'list' ? { marginBottom: '51px' } : {}}>
@@ -1732,7 +1838,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1745,7 +1851,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
                       <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
                   </table>
                 </div>
               )
@@ -1754,6 +1860,15 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           </div>
         );
       })}
+
+      {/* Sonsuz kaydırma: yükleniyor göstergesi + sentinel */}
+      {!showBrandsView && hasMore && (
+        <div style={{ textAlign: 'center', padding: '24px 0 8px', color: '#94a3b8', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <span style={{ width: 16, height: 16, border: '2px solid #e2e8f0', borderTop: '2px solid var(--primary)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+          Yükleniyor...
+        </div>
+      )}
+      <div ref={sentinelRef} style={{ height: '1px' }} />
       {/* LOGOUT CONFIRM MODAL */}
       {showLogoutConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -1876,7 +1991,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                           onClick={() => setShowPass(prev => ({ ...prev, current: !prev.current }))}
                           style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                         >
-                          {showPass.current ? '🐵' : '🙈'}
+                          {showPass.current ? '😵' : '🙈'}
                         </button>
                       </div>
                     </div>
@@ -1898,7 +2013,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                             onClick={() => setShowPass(prev => ({ ...prev, new: !prev.new }))}
                             style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px' }}
                           >
-                            {showPass.new ? '🐵' : '🙈'}
+                            {showPass.new ? '😵' : '🙈'}
                           </button>
                         </div>
                       </div>
@@ -2209,7 +2324,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                         onChange={e => setResetData({ ...resetData, confirmNewPass: e.target.value })}
                       />
                       <button type="button" onClick={() => setShowPass(p => ({ ...p, resetConfirm: !p.resetConfirm }))} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
-                        {showPass.resetConfirm ? '🐵' : '🙈'}
+                        {showPass.resetConfirm ? '😵' : '🙈'}
                       </button>
                     </div>
                   </div>
@@ -2261,3 +2376,4 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
     </div>
   );
 }
+

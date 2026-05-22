@@ -170,12 +170,13 @@ app.get('/api/ayarlar', (req, res) => {
 });
 
 app.put('/api/ayarlar', (req, res) => {
-  const { site_adi, logo, favicon, gorsel_kayit_tipi } = req.body;
+  const { site_adi, logo, favicon, gorsel_kayit_tipi, iskonto_sirasi } = req.body;
   const updates = [];
   if (site_adi !== undefined) updates.push(['site_adi', site_adi]);
   if (logo !== undefined) updates.push(['logo', logo]);
   if (favicon !== undefined) updates.push(['favicon', favicon]);
   if (gorsel_kayit_tipi !== undefined) updates.push(['gorsel_kayit_tipi', gorsel_kayit_tipi]);
+  if (iskonto_sirasi !== undefined) updates.push(['iskonto_sirasi', iskonto_sirasi]);
   if (updates.length === 0) return res.json({ success: true });
   let done = 0;
   let hasError = false;
@@ -196,6 +197,32 @@ db.query(`ALTER TABLE urunler DROP COLUMN fiyat_guncelleme_tarihi`, (err) => {
     console.log('✅ Migration: fiyat_guncelleme_tarihi kolonu kaldirildi');
   }
 });
+
+// === YARDIMCI FONKSİYON: Bir kategorinin tüm üst kategorilerini bul ===
+// Örnek: "Barkod Okuyucular" (ID=11) seçilince "OT/VT Ürünleri" (ID=1) de eklenir
+function getAllAncestorIds(categoryId, allCategories) {
+  const ancestors = [];
+  let currentId = categoryId;
+  while (currentId) {
+    const cat = allCategories.find(c => c.id === currentId);
+    if (!cat) break;
+    ancestors.push(currentId);
+    currentId = cat.ust_kategori_id;
+  }
+  return ancestors;
+}
+
+// Seçilen kategori ID'lerine üst kategorileri otomatik ekle
+function expandCategoryIds(selectedIds, callback) {
+  db.query('SELECT id, ust_kategori_id FROM kategoriler', (err, categories) => {
+    if (err || !categories) return callback(selectedIds);
+    const expanded = new Set();
+    selectedIds.forEach(id => {
+      getAllAncestorIds(id, categories).forEach(ancestorId => expanded.add(ancestorId));
+    });
+    callback([...expanded]);
+  });
+}
 
 // Startup migration: fiyat_gecmisi tablosu yoksa olustur
 db.query(`CREATE TABLE IF NOT EXISTS fiyat_gecmisi (
@@ -428,18 +455,30 @@ app.post('/api/markalar', (req, res) => {
 });
 
 app.put('/api/markalar/:id', (req, res) => {
-  const { ad, gorsel } = req.body;
+  const { ad, gorsel, iskonto_orani, iskonto_tipi } = req.body;
   if (!ad || !ad.trim()) return res.status(400).json({ error: 'Marka adı zorunludur.' });
-  db.query('UPDATE markalar SET ad=?, gorsel=? WHERE id=?', [ad.trim(), gorsel || null, req.params.id], (err) => {
+  const iskontoO = iskonto_orani !== undefined ? (iskonto_orani !== null && iskonto_orani !== '' ? String(iskonto_orani).trim() : null) : undefined;
+  const iskontoT = iskonto_tipi !== undefined ? (iskonto_tipi || null) : undefined;
+  let sql = 'UPDATE markalar SET ad=?, gorsel=?';
+  const params = [ad.trim(), gorsel || null];
+  if (iskontoO !== undefined) { sql += ', iskonto_orani=?'; params.push(iskontoO); }
+  if (iskontoT !== undefined) { sql += ', iskonto_tipi=?'; params.push(iskontoT); }
+  sql += ' WHERE id=?';
+  params.push(req.params.id);
+  db.query(sql, params, (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true, ad: ad.trim(), gorsel: gorsel || null });
   });
 });
 
 app.delete('/api/markalar/:id', (req, res) => {
-  db.query('DELETE FROM markalar WHERE id = ?', [req.params.id], (err) => {
+  const markaId = req.params.id;
+  db.query('UPDATE urunler SET marka_id = NULL WHERE marka_id = ?', [markaId], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
+    db.query('DELETE FROM markalar WHERE id = ?', [markaId], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json({ success: true });
+    });
   });
 });
 
@@ -731,8 +770,16 @@ app.post('/api/kategoriler', (req, res) => {
 });
 
 app.put('/api/kategoriler/:id', (req, res) => {
-  const { kategori_adi, ust_kategori_id } = req.body;
-  db.query('UPDATE kategoriler SET kategori_adi = ?, ust_kategori_id = ? WHERE id = ?', [kategori_adi, ust_kategori_id ?? null, req.params.id], (err) => {
+  const { kategori_adi, ust_kategori_id, iskonto_orani, iskonto_tipi } = req.body;
+  const iskontoO = iskonto_orani !== undefined ? (iskonto_orani !== null && iskonto_orani !== '' ? String(iskonto_orani).trim() : null) : undefined;
+  const iskontoT = iskonto_tipi !== undefined ? (iskonto_tipi || null) : undefined;
+  let sql = 'UPDATE kategoriler SET kategori_adi = ?, ust_kategori_id = ?';
+  const params = [kategori_adi, ust_kategori_id ?? null];
+  if (iskontoO !== undefined) { sql += ', iskonto_orani = ?'; params.push(iskontoO); }
+  if (iskontoT !== undefined) { sql += ', iskonto_tipi = ?'; params.push(iskontoT); }
+  sql += ' WHERE id = ?';
+  params.push(req.params.id);
+  db.query(sql, params, (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
@@ -760,6 +807,7 @@ app.get('/api/urunler', (req, res) => {
     LEFT JOIN markalar m ON u.marka_id = m.id
   `;
   db.query(sql, (err, results) => {
+    // iskonto_orani ve iskonto_tipi SELECT *'tan gelir
     if (err) return res.status(500).json({ error: err.message });
     res.json(results.map(r => ({
       ...r,
@@ -769,7 +817,7 @@ app.get('/api/urunler', (req, res) => {
 });
 
 app.post('/api/urunler', (req, res) => {
-  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil, stok_kodu } = req.body;
+  const { urun_adi, fiyat, birim_id, birim_adi, gorsel_yolu, kategori_ids, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil, stok_kodu, iskonto_orani, iskonto_tipi } = req.body;
 
   if (!urun_adi || !urun_adi.trim()) return res.status(400).json({ error: 'Ürün adı zorunludur.' });
   const price = parseFloat(fiyat);
@@ -780,18 +828,23 @@ app.post('/api/urunler', (req, res) => {
   const kdvOrani = (kdv_orani !== undefined && kdv_orani !== null && kdv_orani !== '') ? parseFloat(kdv_orani) : null;
   const kdvDahil = (kdv_dahil !== undefined && kdv_dahil !== null) ? (kdv_dahil ? 1 : 0) : null;
   const stokKodu = (stok_kodu && stok_kodu.trim()) ? stok_kodu.trim() : null;
-  
+  const iskontoOrani = (iskonto_orani !== undefined && iskonto_orani !== null && iskonto_orani !== '') ? String(iskonto_orani).trim() : null;
+  const iskontoTipi = iskonto_tipi || null;
+
   const insertProduct = (bId) => {
-    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil, stok_kodu) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [urun_adi, price, bId, gorsel_yolu, stok, pbId, markaId, kdvOrani, kdvDahil, stokKodu], (err, result) => {
+    db.query('INSERT INTO urunler (urun_adi, fiyat, birim_id, gorsel_yolu, stok_durumu, para_birimi_id, marka_id, kdv_orani, kdv_dahil, stok_kodu, iskonto_orani, iskonto_tipi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [urun_adi, price, bId, gorsel_yolu, stok, pbId, markaId, kdvOrani, kdvDahil, stokKodu, iskontoOrani, iskontoTipi], (err, result) => {
       if (err) {
         if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Bu stok kodu zaten kullanılıyor.' });
         return res.status(500).json({ error: err.message });
       }
       const urunId = result.insertId;
       if (Array.isArray(kategori_ids) && kategori_ids.length > 0) {
-        const values = kategori_ids.map(kid => [urunId, kid]);
-        db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+        // ✅ Üst kategorileri otomatik ekle (örn. "Barkod Okuyucular" seçilince "OT/VT Ürünleri" de eklenir)
+        expandCategoryIds(kategori_ids, (fullIds) => {
+          const values = fullIds.map(kid => [urunId, kid]);
+          db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+        });
       }
       res.json({ id: urunId, urun_adi, fiyat: price, birim_id: bId, gorsel_yolu, kategori_ids, stok_durumu: stok, para_birimi_id: pbId, stok_kodu: stokKodu });
     });
@@ -841,6 +894,10 @@ app.put('/api/urunler/:id', (req, res) => {
       if (kdvOrani !== undefined) { updateSql += ', kdv_orani = ?'; updateParams.push(kdvOrani); }
       if (kdvDahil !== undefined) { updateSql += ', kdv_dahil = ?'; updateParams.push(kdvDahil); }
       if (stokKodu !== undefined) { updateSql += ', stok_kodu = ?'; updateParams.push(stokKodu); }
+      const iskontoOrani = req.body.iskonto_orani !== undefined ? (req.body.iskonto_orani !== null && req.body.iskonto_orani !== '' ? String(req.body.iskonto_orani).trim() : null) : undefined;
+      const iskontoTipi = req.body.iskonto_tipi !== undefined ? (req.body.iskonto_tipi || null) : undefined;
+      if (iskontoOrani !== undefined) { updateSql += ', iskonto_orani = ?'; updateParams.push(iskontoOrani); }
+      if (iskontoTipi !== undefined) { updateSql += ', iskonto_tipi = ?'; updateParams.push(iskontoTipi); }
       if (bilgiDegisti) updateSql += ', bilgi_guncelleme_tarihi = NOW()';
       updateSql += ' WHERE id = ?';
       updateParams.push(req.params.id);
@@ -867,8 +924,11 @@ app.put('/api/urunler/:id', (req, res) => {
             }
             db.query('DELETE FROM urun_kategori_iliskisi WHERE urun_id = ?', [req.params.id], () => {
               if (kategori_ids.length > 0) {
-                const values = kategori_ids.map(kid => [req.params.id, kid]);
-                db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+                // ✅ Üst kategorileri otomatik ekle
+                expandCategoryIds(kategori_ids, (fullIds) => {
+                  const values = fullIds.map(kid => [req.params.id, kid]);
+                  db.query('INSERT INTO urun_kategori_iliskisi (urun_id, kategori_id) VALUES ?', [values]);
+                });
               }
             });
             res.json({ success: true });
@@ -893,6 +953,26 @@ app.delete('/api/urunler/:id', (req, res) => {
   db.query('DELETE FROM urunler WHERE id = ?', [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
+  });
+});
+
+// Startup migrations: iskonto_orani + iskonto_tipi for urunler, kategoriler, markalar
+['urunler', 'kategoriler', 'markalar'].forEach(tbl => {
+  db.query(`ALTER TABLE ${tbl} ADD COLUMN iskonto_orani DECIMAL(10,2) NULL DEFAULT NULL`, (e1) => {
+    if (e1 && e1.code !== 'ER_DUP_FIELDNAME') console.warn(`Migration uyarisi (${tbl}.iskonto_orani):`, e1.message);
+    else if (!e1) console.log(`✅ Migration: ${tbl}.iskonto_orani kolonu eklendi`);
+  });
+  db.query(`ALTER TABLE ${tbl} ADD COLUMN iskonto_tipi ENUM('oran','tutar') NULL DEFAULT NULL`, (e2) => {
+    if (e2 && e2.code !== 'ER_DUP_FIELDNAME') console.warn(`Migration uyarisi (${tbl}.iskonto_tipi):`, e2.message);
+    else if (!e2) console.log(`✅ Migration: ${tbl}.iskonto_tipi kolonu eklendi`);
+  });
+});
+
+// Startup migrations: iskonto_orani kolonunu VARCHAR(100) yap (bileşik "20+20" ifadesi için)
+['urunler', 'kategoriler', 'markalar'].forEach(tbl => {
+  db.query(`ALTER TABLE ${tbl} MODIFY COLUMN iskonto_orani VARCHAR(100) DEFAULT NULL`, (e) => {
+    if (e && e.code !== 'ER_BAD_FIELD_ERROR') { /* kolon yoksa sessiz geç */ }
+    else if (!e) console.log(`✅ Migration: ${tbl}.iskonto_orani VARCHAR(100) yapıldı`);
   });
 });
 
