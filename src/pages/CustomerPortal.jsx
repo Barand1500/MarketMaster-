@@ -946,6 +946,38 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
       >
         <div style={{ position: 'relative' }}>
 
+          {/* Sabitle ve Temizle butonları - mavi kutunun en sağ üst köşesi */}
+          <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <button
+              className={`cp-small-action-btn ${pinnedPath ? 'pinned' : ''}`}
+              title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle'}
+              onClick={() => {
+                if (pinnedPath) {
+                  catBrowserPinnedRef.current = false;
+                  setPinnedPath(null); setPinnedBrands(null);
+                  localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
+                } else {
+                  catBrowserPinnedRef.current = true;
+                  const p = { cats: catColumnPath, brands: selectedMarkalar };
+                  setPinnedPath(p); setPinnedBrands(selectedMarkalar);
+                  localStorage.setItem('cp_pinned_path', JSON.stringify(p));
+                  localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
+                }
+              }}
+            >
+              {pinnedPath ? '📌' : '📍'}
+            </button>
+            {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
+              <button
+                className="cp-small-action-btn clear"
+                title="Filtreleri temizle"
+                onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div className="cp-column-browser">
 
             {/* ¦¦ Markalar sütunu ¦¦ */}
@@ -977,46 +1009,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           {/* ¦¦ Ana Kategori sütunu ¦¦ */}
           <div className="cp-col-panel">
             <div className="cp-col-body">
-              {/* İlk satır: Tümü + Sabitle/Temizle */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 8px 8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <button
-                  className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
-                  style={{ margin: 0 }}
-                  onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
-                >
-                  Tümü
-                </button>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginLeft: 'auto' }}>
-                  <button
-                    className={`cp-small-action-btn ${pinnedPath ? 'pinned' : ''}`}
-                    title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle'}
-                    onClick={() => {
-                      if (pinnedPath) {
-                        catBrowserPinnedRef.current = false;
-                        setPinnedPath(null); setPinnedBrands(null);
-                        localStorage.removeItem('cp_pinned_path'); localStorage.removeItem('cp_pinned_brands');
-                      } else {
-                        catBrowserPinnedRef.current = true;
-                        const p = { cats: catColumnPath, brands: selectedMarkalar };
-                        setPinnedPath(p); setPinnedBrands(selectedMarkalar);
-                        localStorage.setItem('cp_pinned_path', JSON.stringify(p));
-                        localStorage.setItem('cp_pinned_brands', JSON.stringify(selectedMarkalar));
-                      }
-                    }}
-                  >
-                    {pinnedPath ? '📌' : '📍'}
-                  </button>
-                  {(catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
-                    <button
-                      className="cp-small-action-btn clear"
-                      title="Filtreleri temizle"
-                      onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
+              <button
+                className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
+                onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
+              >
+                Tümü
+              </button>
               {orderedRoots.filter(cat => catHasProds(cat.id, selectedMarkalar)).map(cat => {
                 const isActive = catColumnPath[0] === cat.id;
                 const hasChildren = categories.some(c => c.parentId === cat.id && catHasProds(c.id, selectedMarkalar));
