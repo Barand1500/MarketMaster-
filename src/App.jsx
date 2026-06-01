@@ -46,6 +46,15 @@ export default function App() {
   const [showF1Help, setShowF1Help] = useState(false);
   const [f1Sections, setF1Sections] = useState([]);
 
+  // 🔍 DEBUG: Session durumunu logla
+  useEffect(() => {
+    console.log('🔍 App.jsx Session Durumu:');
+    console.log('  - Loading:', loading);
+    console.log('  - Session:', session);
+    console.log('  - Role:', session?.role);
+    console.log('  - User:', session?.user?.name || session?.customer?.name);
+  }, [session, loading]);
+
   // F1 → tüm bölümlerin yardımını toplu göster
   useEffect(() => {
     const handler = (e) => {
@@ -129,6 +138,7 @@ export default function App() {
 
   // CUSTOMER VIEW
   if (session.role === 'customer') {
+    console.log('📱 CustomerPortal render ediliyor...');
     return (
       <>
         {errorToast}

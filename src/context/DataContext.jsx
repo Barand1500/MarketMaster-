@@ -26,8 +26,10 @@ export function DataProvider({ children }) {
   // VERILERI API'DEN CEK
   useEffect(() => {
     const fetchData = async () => {
+      console.log('🔄 DataContext fetchData başladı...');
       try {
         // --- Kritik veri: bunlar bitince loading kalkar ---
+        console.log('📡 API istekleri gönderiliyor...');
         const [catsRes, prodsRes, unitsRes, settingsRes, markalarRes, kdvRes] = await Promise.all([
           fetch(`${API_URL}/kategoriler`),
           fetch(`${API_URL}/urunler`),
@@ -43,7 +45,7 @@ export function DataProvider({ children }) {
         const settings = settingsRes.ok ? await settingsRes.json() : {};
         const mrk = markalarRes.ok ? await markalarRes.json() : [];
         const kdv = kdvRes.ok ? await kdvRes.json() : [];
-        setMarkalar(Array.isArray(mrk) ? mrk : []);
+        setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
         setKdvOranlari(Array.isArray(kdv) ? kdv : []);
         if (settings && typeof settings === 'object') {
           const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
@@ -51,7 +53,7 @@ export function DataProvider({ children }) {
           try { localStorage.setItem('siteSettings', JSON.stringify(merged)); } catch {}
         }
 
-        setCategories(Array.isArray(cats) ? cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id })) : []);
+        setCategories(Array.isArray(cats) ? cats.map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id, iskontoOrani: c.iskonto_orani != null ? String(c.iskonto_orani) : null, iskontoTipi: c.iskonto_tipi || null })) : []);
         setProducts(Array.isArray(prods) ? prods.map(p => ({ 
           id: p.id, 
           name: p.urun_adi, 
@@ -74,11 +76,24 @@ export function DataProvider({ children }) {
           markaGorsel: p.marka_gorsel || null,
           kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
           kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
-          stokKodu: p.stok_kodu || null
+          stokKodu: p.stok_kodu || null,
+          iskontoOrani: p.iskonto_orani != null ? String(p.iskonto_orani) : null,
+          iskontoTipi: p.iskonto_tipi || null
         })) : []);
         setUnits(Array.isArray(brm) ? brm.map(b => ({ id: b.id, name: b.birim_adi })) : []);
 
+        // 🔍 DEBUG: API verilerini logla
+        console.log('🔍 DataContext API Yüklendi:');
+        console.log('  ✅ Kategoriler:', cats?.length || 0);
+        console.log('  ✅ Ürünler:', prods?.length || 0);
+        console.log('  ✅ Birimler:', brm?.length || 0);
+        console.log('  ✅ Markalar:', mrk?.length || 0);
+        if (!Array.isArray(cats) || cats.length === 0) console.error('❌ Kategoriler boş!');
+        if (!Array.isArray(prods) || prods.length === 0) console.error('❌ Ürünler boş!');
+        if (!Array.isArray(brm) || brm.length === 0) console.error('❌ Birimler boş!');
+
         // Loading bitti — kullanıcı artık sayfayı görebilir
+        console.log('✅ setLoading(false) çağrılıyor...');
         setLoading(false);
 
         // --- İkincil veri: arkaplanda yükle (admin panel için) ---
@@ -110,7 +125,10 @@ export function DataProvider({ children }) {
         }).catch(() => {});
 
       } catch (error) {
-        console.error("Veri yukleme hatasi:", error);
+        console.error("❌ DataContext Veri Yükleme Hatası:");
+        console.error("  - Hata Mesajı:", error.message);
+        console.error("  - Stack:", error.stack);
+        console.error("  - API URL:", API_URL);
         setApiError('Sunucuya bağlanılamadı. Backend\'in çalıştığından ve .env dosyasının doğru ayarlandığından emin olun.');
         setLoading(false);
       }
@@ -164,15 +182,24 @@ export function DataProvider({ children }) {
       setCategories(prev => [...prev, { id: data.id, name: data.kategori_adi, parentId: data.ust_kategori_id ? parseInt(data.ust_kategori_id) : null }]);
     } catch { setApiError('Kategori eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
-  const updateCategory = async (id, name, parentId = null) => {
+  const updateCategory = async (id, name, parentId = null, iskontoOrani = undefined, iskontoTipi = undefined) => {
     try {
+      const body = { kategori_adi: name, ust_kategori_id: parentId ? parseInt(parentId) : null };
+      if (iskontoOrani !== undefined) body.iskonto_orani = iskontoOrani;
+      if (iskontoTipi !== undefined) body.iskonto_tipi = iskontoTipi;
       const res = await fetch(`${API_URL}/kategoriler/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kategori_adi: name, ust_kategori_id: parentId ? parseInt(parentId) : null })
+        body: JSON.stringify(body)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, name, parentId: parentId ? parseInt(parentId) : null } : c));
+      setCategories(prev => prev.map(c => {
+        if (c.id !== id) return c;
+        const updated = { ...c, name, parentId: parentId ? parseInt(parentId) : null };
+        if (iskontoOrani !== undefined) updated.iskontoOrani = iskontoOrani;
+        if (iskontoTipi !== undefined) updated.iskontoTipi = iskontoTipi;
+        return updated;
+      }));
     } catch { setApiError('Kategori güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const deleteCategory = async (id) => {
@@ -301,20 +328,29 @@ export function DataProvider({ children }) {
       return { ok: true, id: data.id };
     } catch { setApiError('Marka eklenemedi. Sunucu bağlantısını kontrol edin.'); return { ok: false }; }
   };
-  const updateMarka = async (id, ad, gorsel, gorselFile = null) => {
+  const updateMarka = async (id, ad, gorsel, gorselFile = null, iskontoOrani = undefined, iskontoTipi = undefined) => {
     try {
       let gorselDeger = gorsel;
       if (gorselFile instanceof File) {
         const uploaded = await uploadGorsel(gorselFile, 'marka');
         if (uploaded) gorselDeger = uploaded;
       }
+      const body = { ad, gorsel: gorselDeger };
+      if (iskontoOrani !== undefined) body.iskonto_orani = iskontoOrani;
+      if (iskontoTipi !== undefined) body.iskonto_tipi = iskontoTipi;
       const res = await fetch(`${API_URL}/markalar/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ad, gorsel: gorselDeger })
+        body: JSON.stringify(body)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMarkalar(prev => prev.map(m => m.id === id ? { ...m, ad, gorsel: gorselDeger } : m));
+      setMarkalar(prev => prev.map(m => {
+        if (m.id !== id) return m;
+        const updated = { ...m, ad, gorsel: gorselDeger };
+        if (iskontoOrani !== undefined) updated.iskontoOrani = iskontoOrani;
+        if (iskontoTipi !== undefined) updated.iskontoTipi = iskontoTipi;
+        return updated;
+      }));
     } catch { setApiError('Marka güncellenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const deleteMarka = async (id) => {
@@ -404,7 +440,9 @@ export function DataProvider({ children }) {
           marka_id: product.marka_id || null,
           kdv_orani: product.kdv_orani !== undefined ? product.kdv_orani : null,
           kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null,
-          stok_kodu: product.stok_kodu || null
+          stok_kodu: product.stok_kodu || null,
+          iskonto_orani: product.iskonto_orani !== undefined ? product.iskonto_orani : null,
+          iskonto_tipi: product.iskonto_tipi || null
         })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -428,6 +466,8 @@ export function DataProvider({ children }) {
         kdvOrani: product.kdv_orani ?? null,
         kdvDahil: product.kdv_dahil ?? null,
         stokKodu: data.stok_kodu || null,
+        iskontoOrani: product.iskonto_orani ?? null,
+        iskontoTipi: product.iskonto_tipi || null,
       }]);
     } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
@@ -449,7 +489,9 @@ export function DataProvider({ children }) {
       marka_id: updates.marka_id !== undefined ? updates.marka_id : current.markaId,
       kdv_orani: updates.kdv_orani !== undefined ? updates.kdv_orani : current.kdvOrani,
       kdv_dahil: updates.kdv_dahil !== undefined ? updates.kdv_dahil : current.kdvDahil,
-      stok_kodu: updates.stok_kodu !== undefined ? updates.stok_kodu : current.stokKodu
+      stok_kodu: updates.stok_kodu !== undefined ? updates.stok_kodu : current.stokKodu,
+      iskonto_orani: updates.iskonto_orani !== undefined ? updates.iskonto_orani : current.iskontoOrani,
+      iskonto_tipi: updates.iskonto_tipi !== undefined ? updates.iskonto_tipi : current.iskontoTipi
     };
     // Yerel durumu aninda guncelle (Sayfa yenilemeden tarihlerin degismesi icin)
     const now = new Date().toISOString();
@@ -467,6 +509,8 @@ export function DataProvider({ children }) {
     if (updates.kdv_orani !== undefined) localMapped.kdvOrani = updates.kdv_orani;
     if (updates.kdv_dahil !== undefined) localMapped.kdvDahil = updates.kdv_dahil;
     if (updates.stok_kodu !== undefined) localMapped.stokKodu = updates.stok_kodu;
+    if (updates.iskonto_orani !== undefined) localMapped.iskontoOrani = updates.iskonto_orani;
+    if (updates.iskonto_tipi !== undefined) localMapped.iskontoTipi = updates.iskonto_tipi;
     setProducts(prev => prev.map(p => p.id === id ? {
       ...p,
       ...updates,

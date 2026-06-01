@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import PageHeader from '../components/PageHeader';
 import SectionHelpButton from '../components/SectionHelpButton';
@@ -11,6 +11,14 @@ const KUR_TURU_LABEL = {
   efektif_satis: 'Efektif Satış',
 };
 
+const DEFAULT_ISKONTO_SIRASI = ['urun', 'kategori', 'marka', 'musteri'];
+const ISKONTO_LABELS = {
+  urun:     { icon: '📦', label: 'Ürün İskontosu',     desc: 'Ürün kartına doğrudan tanımlanan iskonto' },
+  kategori: { icon: '📁', label: 'Kategori İskontosu', desc: 'Ürünün ait olduğu kategoriye tanımlanan iskonto' },
+  marka:    { icon: '🏷️', label: 'Marka İskontosu',    desc: 'Ürünün markasına tanımlanan iskonto' },
+  musteri:  { icon: '👤', label: 'Müşteri İskontosu',  desc: 'Müşteriye doğrudan tanımlanan kişisel iskonto' },
+};
+
 export default function Settings() {
   const { siteSettings, updateSiteSettings, products } = useData();
 
@@ -19,6 +27,51 @@ export default function Settings() {
   const [favicon, setFavicon] = useState(siteSettings.favicon || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null); // { ok, text }
+
+  // ── İskonto Öncelik Sırası ──────────────────────────────────────────
+  const parseIskontoSirasi = (raw) => {
+    if (!raw) return DEFAULT_ISKONTO_SIRASI;
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length === 4 && arr.every(k => ISKONTO_LABELS[k])) return arr;
+    } catch {}
+    return DEFAULT_ISKONTO_SIRASI;
+  };
+  const [iskontoSirasi, setIskontoSirasi] = useState(() => parseIskontoSirasi(siteSettings?.iskonto_sirasi));
+  const [iskontoSirasiDirty, setIskontoSirasiDirty] = useState(false);
+  const [iskontoUyariModal, setIskontoUyariModal] = useState(false);
+  const [iskontoKaydetYukleniyor, setIskontoKaydetYukleniyor] = useState(false);
+  const [iskontoKaydetMsg, setIskontoKaydetMsg] = useState(null);
+  const iskontoDragItem = useRef(null);
+  const iskontoDragOver = useRef(null);
+  const [iskontoDragIdx, setIskontoDragIdx] = useState(null);
+
+  useEffect(() => {
+    if (siteSettings?.iskonto_sirasi) setIskontoSirasi(parseIskontoSirasi(siteSettings.iskonto_sirasi));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteSettings?.iskonto_sirasi]);
+
+  const handleIskontoMove = (from, to) => {
+    const arr = [...iskontoSirasi];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    setIskontoSirasi(arr);
+    setIskontoSirasiDirty(true);
+  };
+
+  const handleIskontoSirasiKaydet = async () => {
+    setIskontoUyariModal(false);
+    setIskontoKaydetYukleniyor(true);
+    setIskontoKaydetMsg(null);
+    const result = await updateSiteSettings({ iskonto_sirasi: JSON.stringify(iskontoSirasi) });
+    if (result.success) {
+      setIskontoKaydetMsg({ ok: true, text: 'İndirim sıralaması başarıyla kaydedildi.' });
+      setIskontoSirasiDirty(false);
+    } else {
+      setIskontoKaydetMsg({ ok: false, text: result.error || 'Kaydedilemedi.' });
+    }
+    setIskontoKaydetYukleniyor(false);
+  };
 
   // GÖRSEL SAKLAMA
   const [gorselTipi, setGorselTipi] = useState(siteSettings?.gorsel_kayit_tipi || 'veritabani');
@@ -1049,8 +1102,13 @@ export default function Settings() {
       {/* FİYAT TANIMLARI KARTI */}
       <div className="card settings-card" style={{ flex: '1 1 320px', minWidth: 0, width: '100%' }}>
         <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 className="toolbar-title">🏷️ Fiyat Tanımları</h2>
+          <h2 className="toolbar-title">🏷️ Fiyat Tanımları</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }}>
+            <button
+              className="lite-add-btn"
+              onClick={() => { setFtAddForm({ ad: '', bas: '', bit: '' }); setFtAddErr(''); }}
+              title="Yeni fiyat tanımı ekle"
+            >+</button>
             <SectionHelpButton title="Fiyat Tanımları" content={
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
@@ -1068,10 +1126,6 @@ export default function Settings() {
             </div>
             } />
           </div>
-          <button
-            onClick={() => { setFtAddForm({ ad: '', bas: '', bit: '' }); setFtAddErr(''); }}
-            style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', marginLeft: 'auto', lineHeight: 1 }}
-          >+ Yeni</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px' }}>
           {fiyatTanimlari.length === 0 && !ftAddForm && (
@@ -1168,6 +1222,130 @@ export default function Settings() {
         <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>Ad veya tarihe çift tıklayarak düzenleyebilirsiniz.</div>
       </div>
 
+      {/* İNDİRİM ÖNCELİK SIRASI KARTI */}
+      <div className="card" style={{ marginTop: '0' }}>
+        <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
+          <div>
+            <h2 className="toolbar-title">🎯 İndirim Öncelik Sırası</h2>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>Birden fazla iskonto tanımlandığında hangisinin önce uygulanacağını belirleyin.</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {iskontoSirasiDirty && (
+              <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', border: '1px solid #fbbf24', borderRadius: '8px', padding: '3px 10px', fontWeight: '700' }}>⚠️ Kaydedilmemiş değişiklik</span>
+            )}
+            <SectionHelpButton title="İndirim Öncelik Sırası" content={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #7c3aed' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🎯 Sıralama Mantığı</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Bir ürüne birden fazla iskonto tanımlıysa sistem bu listedeki sırayı takip eder. En üstteki kaynakta iskonto varsa diğerlerine bakılmaz; yoksa bir alta geçilir.</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #059669' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📎 Sıralamayı Değiştirme</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Satırları <strong>sürükle-bırak</strong> ile yeniden sıralayabilirsiniz. İsterseniz sağdaki <strong>▲ ▼</strong> oklarla da taşıyabilirsiniz. Değişiklik yaptıktan sonra “Sıralamayı Kaydet” butonuna bastığınızda bir onay ekranı çıkar; onayla<br />dıktan sonra kayıt gerçekleşir.</div>
+                </div>
+                <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #0891b2' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>💎 Özel Fiyat Listesi (Sabit)</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>En üste sabitlenmiş “Özel Fiyat Listesi” her zaman en yüksek önceliktedir ve sıralamanın dışındadır. Müşteriye doğrudan atanmış fiyat listesi varsa bu sıralama devreye girmez.</div>
+                </div>
+                <div style={{ background: '#fffbeb', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>⚠️ Önemli</div>
+                  <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Sıralamayı kaydetmeniz müşteri portalındaki tüm fiyat görüntülemelerini <strong>anlık olarak etkiler</strong></div>
+                </div>
+              </div>
+            } />
+          </div>
+        </div>
+
+        {/* P1 — her zaman en üstte, sabit */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#f0fdf4', border: '2px solid #86efac', borderRadius: '12px', marginBottom: '8px', opacity: 0.85 }}>
+          <div style={{ width: '24px', height: '24px', borderRadius: '8px', background: '#22c55e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900', flexShrink: 0 }}>1</div>
+          <span style={{ fontSize: '18px' }}>💎</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: '700', fontSize: '13px', color: '#15803d' }}>Özel Fiyat Listesi</div>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>Müşteriye atanmış fiyat listesindeki iskonto — her zaman en yüksek öncelik, değiştirilemez</div>
+          </div>
+          <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', borderRadius: '6px', padding: '2px 8px', fontWeight: '800', letterSpacing: '0.4px' }}>SABİT</span>
+        </div>
+
+        {/* Sıralanabilir 4 katman */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+          {iskontoSirasi.map((key, idx) => {
+            const info = ISKONTO_LABELS[key];
+            return (
+              <div
+                key={key}
+                draggable
+                onDragStart={() => { iskontoDragItem.current = idx; setIskontoDragIdx(idx); }}
+                onDragEnter={() => { iskontoDragOver.current = idx; }}
+                onDragOver={e => e.preventDefault()}
+                onDragEnd={() => {
+                  if (iskontoDragItem.current !== null && iskontoDragOver.current !== null && iskontoDragItem.current !== iskontoDragOver.current) {
+                    handleIskontoMove(iskontoDragItem.current, iskontoDragOver.current);
+                  }
+                  iskontoDragItem.current = null;
+                  iskontoDragOver.current = null;
+                  setIskontoDragIdx(null);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 14px', background: iskontoDragIdx === idx ? '#f0fdf4' : '#f8fafc',
+                  border: `1.5px solid ${iskontoDragIdx === idx ? 'var(--primary)' : '#e2e8f0'}`,
+                  borderRadius: '12px', cursor: 'grab', transition: 'all 0.15s', userSelect: 'none',
+                  opacity: iskontoDragIdx === idx ? 0.7 : 1,
+                }}
+              >
+                <div style={{ width: '24px', height: '24px', borderRadius: '8px', background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900', flexShrink: 0 }}>{idx + 2}</div>
+                <span style={{ fontSize: '16px', flexShrink: 0 }}>⋮⋮</span>
+                <span style={{ fontSize: '18px', flexShrink: 0 }}>{info.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#0f172a' }}>{info.label}</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>{info.desc}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+                  <button
+                    onClick={() => idx > 0 && handleIskontoMove(idx, idx - 1)}
+                    disabled={idx === 0}
+                    style={{ width: '22px', height: '22px', borderRadius: '6px', border: '1px solid #e2e8f0', background: idx === 0 ? '#f8fafc' : '#fff', color: idx === 0 ? '#cbd5e1' : '#475569', cursor: idx === 0 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}
+                    title="Yukarı taşı"
+                  >▲</button>
+                  <button
+                    onClick={() => idx < iskontoSirasi.length - 1 && handleIskontoMove(idx, idx + 1)}
+                    disabled={idx === iskontoSirasi.length - 1}
+                    style={{ width: '22px', height: '22px', borderRadius: '6px', border: '1px solid #e2e8f0', background: idx === iskontoSirasi.length - 1 ? '#f8fafc' : '#fff', color: idx === iskontoSirasi.length - 1 ? '#cbd5e1' : '#475569', cursor: idx === iskontoSirasi.length - 1 ? 'default' : 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}
+                    title="Aşağı taşı"
+                  >▼</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Mesaj */}
+        {iskontoKaydetMsg && (
+          <div style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '12px', background: iskontoKaydetMsg.ok ? '#f0fdf4' : '#fef2f2', color: iskontoKaydetMsg.ok ? '#15803d' : '#dc2626', border: `1px solid ${iskontoKaydetMsg.ok ? '#86efac' : '#fca5a5'}` }}>
+            {iskontoKaydetMsg.ok ? '✅ ' : '❌ '}{iskontoKaydetMsg.text}
+          </div>
+        )}
+
+        {/* Butonlar */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setIskontoUyariModal(true)}
+            disabled={!iskontoSirasiDirty || iskontoKaydetYukleniyor}
+            className="btn-primary"
+            style={{ minWidth: '180px', opacity: (!iskontoSirasiDirty || iskontoKaydetYukleniyor) ? 0.5 : 1, cursor: (!iskontoSirasiDirty || iskontoKaydetYukleniyor) ? 'not-allowed' : 'pointer' }}
+          >
+            {iskontoKaydetYukleniyor ? '⏳ Kaydediliyor...' : '💾 Sıralamayı Kaydet'}
+          </button>
+          {iskontoSirasiDirty && (
+            <button
+              onClick={() => { setIskontoSirasi(parseIskontoSirasi(siteSettings?.iskonto_sirasi)); setIskontoSirasiDirty(false); setIskontoKaydetMsg(null); }}
+              style={{ padding: '10px 18px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
+            >↩ Geri Al</button>
+          )}
+        </div>
+      </div>
+
       {/* Para Birimi Silme Onay Modali */}
       {pbSilOnay && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPbSilOnay(null)}>
@@ -1256,6 +1434,35 @@ export default function Settings() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={handleRestoreConfirmed} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Geri Yükle</button>
               <button onClick={() => setRestoreConfirm(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* İNDİRİM SIRASI KAYDET UYARI MODALI */}
+      {iskontoUyariModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setIskontoUyariModal(false)}>
+          <div style={{ background: '#fff', borderRadius: '18px', padding: '28px 24px', maxWidth: '440px', width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '36px', textAlign: 'center', marginBottom: '12px' }}>🎯</div>
+            <div style={{ fontWeight: '800', fontSize: '16px', color: '#0f172a', textAlign: 'center', marginBottom: '10px' }}>İndirim Sıralamasını Kaydet</div>
+            <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', fontSize: '13px', color: '#92400e', lineHeight: '1.7' }}>
+              <strong>⚠️ Bu değişiklik müşteri portalını etkiler.</strong><br />
+              Yeni sıralama kaydedildikten sonra tüm müşteriler için indirim hesaplama sırası değişecektir. Mevcut siparişler etkilenmez, yalnızca yeni fiyat görüntülemeleri bu sırayı kullanır.
+            </div>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Yeni sıralama</div>
+              {iskontoSirasi.map((key, idx) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: idx < 3 ? '1px solid #f1f5f9' : 'none' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#94a3b8', width: '16px' }}>{idx + 2}</span>
+                  <span>{ISKONTO_LABELS[key].icon}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>{ISKONTO_LABELS[key].label}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={handleIskontoSirasiKaydet} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '800', fontSize: '14px', cursor: 'pointer' }}>Evet, Kaydet</button>
+              <button onClick={() => setIskontoUyariModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>İptal</button>
             </div>
           </div>
         </div>
