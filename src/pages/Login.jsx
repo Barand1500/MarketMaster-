@@ -1,261 +1,120 @@
 import { useState } from 'react';
-import { useData } from '../context/DataContext';
 import '../styles/Login.css';
 
+const API_URL = "/api"; // Production: Aynı domain üzerinden
+
 export default function Login({ onLogin }) {
-  const { users, customers, siteSettings } = useData();
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
+  const [eposta, setEposta] = useState('');
+  const [sifre, setSifre] = useState('');
   const [error, setError] = useState('');
-  const [forgot, setForgot] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotError, setForgotError] = useState('');
-  const [forgotMsg, setForgotMsg] = useState('');
-  const [forgotStep, setForgotStep] = useState('email'); // 'email', 'verify', 'newpass'
-  const [resetData, setResetData] = useState({ code: '', newPass: '', confirmNewPass: '' });
-  const [showPass, setShowPass] = useState({ reset: false, resetConfirm: false });
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identity: user, password: pass })
+        credentials: 'include', // Cookie göndermek için gerekli
+        body: JSON.stringify({ eposta, sifre })
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        throw new Error('Bilgileriniz hatali. Lütfen kontrol edip tekrar deneyin.');
+        // Erişim yoksa özel sayfa
+        if (data.erisim_yok) {
+          window.location.href = '/erisim-yok';
+          return;
+        }
+        throw new Error(data.error || 'Giriş başarısız');
       }
 
-      const data = await res.json();
-      
-      // Backend'den gelen veriyi frontend formatina maple
-      const mappedUser = {
-        id: data.user.id,
-        username: data.user.kullanici_adi || data.user.ad_soyad,
-        contact: data.user.ad_soyad,
-        role: data.role,
-        allowedPages: data.role === 'staff' ? (data.user.yetkiler || []) : [],
-        ...data.user,
-        name: data.user.ad_soyad,
-        taxId: data.user.vkn_tc,
-        phone: data.user.telefon,
-        email: data.user.eposta,
-        address: data.user.adres || '',
-        discount: data.user.iskonto_orani || '0',
-        fiyatTanimlariId: data.user.fiyat_tanimlari_id ? parseInt(data.user.fiyat_tanimlari_id) : null
-      };
-      // Hashlenmiş şifreyi session'da saklama
-      delete mappedUser.sifre;
+      // Başarılı giriş - cookie zaten set edildi
+      onLogin({
+        id: data.kullanici.id,
+        eposta: data.kullanici.eposta,
+        role: 'customer', // Lisans-based auth için varsayılan
+        ilk_giris_mi: data.kullanici.ilk_giris_mi
+      });
 
-      onLogin(mappedUser);
     } catch (err) {
       setError(err.message);
-    }
-  };
-
-  const API_URL = "/api"; // Production: Aynı domain üzerinden
-
-  const handleForgot = async (e) => {
-    e.preventDefault();
-    setForgotError('');
-    setForgotMsg('');
-
-    if (forgotStep === 'email') {
-      try {
-        const res = await fetch(`${API_URL}/send-reset-code`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: forgotEmail })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setForgotMsg(data.message);
-          setForgotStep('verify');
-        } else {
-          setForgotError(data.error);
-        }
-      } catch { setForgotError('Bağlantı hatası.'); }
-    } else if (forgotStep === 'verify') {
-      if (resetData.code.length !== 6) return setForgotError('Lütfen 6 haneli kodu girin.');
-      try {
-        const res = await fetch(`${API_URL}/verify-reset-code`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: forgotEmail, code: resetData.code })
-        });
-        if (res.ok) {
-          setForgotStep('newpass');
-        } else {
-          const data = await res.json();
-          setForgotError(data.error || 'Kod geçersiz.');
-        }
-      } catch { setForgotError('Bağlantı hatası.'); }
-    } else if (forgotStep === 'newpass') {
-      if (resetData.newPass.length < 6) return setForgotError('Şifre en az 6 karakter olmalıdır.');
-      if (resetData.newPass !== resetData.confirmNewPass) return setForgotError('Şifreler uyuşmuyor.');
-      try {
-        const res = await fetch(`${API_URL}/reset-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: forgotEmail, code: resetData.code, newPassword: resetData.newPass })
-        });
-        if (res.ok) {
-          setForgotMsg('Şifreniz başarıyla güncellendi! Giriş yapabilirsiniz.');
-          setTimeout(() => {
-            setForgot(false);
-            setForgotStep('email');
-            setForgotEmail('');
-            setResetData({ code: '', newPass: '', confirmNewPass: '' });
-          }, 3000);
-        } else {
-          setForgotError('Bir hata oluştu.');
-        }
-      } catch { setForgotError('Bağlantı hatası.'); }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="login-bg">
-      <div className="login-card">
-        <div className="login-logo">
-          {siteSettings?.logo
-            ? <img src={siteSettings.logo} alt="logo" style={{ height: '56px', width: '56px', objectFit: 'contain', borderRadius: '12px' }} />
-            : <span>🍉</span>
-          }
+    <div className="login-container">
+      <div className="login-box">
+        <div className="login-header">
+          <h1>Bostan Giriş</h1>
+          <p>Lisans doğrulamalı giriş sistemi</p>
         </div>
-        <h1 className="login-title">{siteSettings?.site_adi || 'Bostan Manav'}</h1>
-        <p className="login-sub">Yönetim ekranına veya müşteri paneline giriş yapın</p>
 
-        {!forgot ? (
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="field">
-              <label>Kullanıcı Adı / E-posta / Telefon</label>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="eposta">E-posta</label>
+            <input
+              id="eposta"
+              type="email"
+              value={eposta}
+              onChange={(e) => setEposta(e.target.value)}
+              placeholder="ornek@guzelteknoloji.com"
+              required
+              autoFocus
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="sifre">Şifre</label>
+            <div className="password-input">
               <input
-                type="text"
-                placeholder="Kullanıcı adı, telefon veya e-posta"
-                value={user}
-                onChange={e => { setUser(e.target.value); setError(''); }}
-                autoFocus
+                id="sifre"
+                type={showPassword ? 'text' : 'password'}
+                value={sifre}
+                onChange={(e) => setSifre(e.target.value)}
+                placeholder="••••••••"
+                required
+                disabled={loading}
               />
+              <button
+                type="button"
+                className="toggle-password"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
             </div>
-            <div className="field">
-              <label>Şifre</label>
-              <input
-                type="password"
-                placeholder="••••••"
-                value={pass}
-                onChange={e => { setPass(e.target.value); setError(''); }}
-              />
+          </div>
+
+          {error && (
+            <div className="error-message">
+              ⚠️ {error}
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 12px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
-              <p style={{ margin: 0, fontSize: '12px', color: '#92400e', fontWeight: '600', lineHeight: '1.5' }}>
-                Müşteriler <strong>e-posta, telefon veya VKN/TC</strong> ile giriş yapabilir.<br/>
-                Personeller ise <strong>kullanıcı adı</strong> ile giriş yapar.
-              </p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 12px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>💡</span>
-              <p style={{ margin: 0, fontSize: '12px', color: '#1e40af', fontWeight: '600', lineHeight: '1.5' }}>
-                Kullanıcı adında <strong>büyük-küçük harf duyarlıdır</strong>.<br/>
-                <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>Ercan</code> ile <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>ercan</code> farklıdır!
-              </p>
-            </div>
-            {error && <p className="login-error">{error}</p>}
-            <button type="submit" className="login-btn">Giriş Yap</button>
-            <button type="button" className="forgot-link" onClick={() => setForgot(true)}>
-              Şifremi Unuttum
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleForgot} className="login-form">
-            <p className="forgot-info">
-              {forgotStep === 'email' && 'Şifrenizi sıfırlamak için sisteme kayıtlı olan e-posta adresinizi giriniz.'}
-              {forgotStep === 'verify' && `${forgotEmail} adresine gönderilen 6 haneli kodu giriniz.`}
-              {forgotStep === 'newpass' && 'Lütfen yeni şifrenizi belirleyiniz.'}
+          )}
+
+          <button 
+            type="submit" 
+            className="login-button"
+            disabled={loading}
+          >
+            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          </button>
+
+          <div className="login-footer">
+            <p>
+              🔒 Bu sistem panel lisans doğrulaması kullanır
             </p>
-
-            {forgotStep === 'email' && (
-              <div className="field">
-                <label>E-posta Adresi</label>
-                <input 
-                  type="email" 
-                  placeholder="ornek@mail.com" 
-                  value={forgotEmail}
-                  onChange={e => { setForgotEmail(e.target.value); setForgotError(''); }}
-                  autoFocus 
-                  required
-                />
-              </div>
-            )}
-
-            {forgotStep === 'verify' && (
-              <div className="field">
-                <label>Doğrulama Kodu</label>
-                <input 
-                  type="text" 
-                  placeholder="000000" 
-                  maxLength="6"
-                  style={{ textAlign: 'center', fontSize: '20px', letterSpacing: '4px' }}
-                  value={resetData.code}
-                  onChange={e => { setResetData({ ...resetData, code: e.target.value }); setForgotError(''); }}
-                  autoFocus 
-                  required
-                />
-              </div>
-            )}
-
-            {forgotStep === 'newpass' && (
-              <>
-                <div className="field">
-                  <label>Yeni Şifre</label>
-                  <div style={{ position: 'relative' }}>
-                    <input 
-                      type={showPass.reset ? 'text' : 'password'}
-                      placeholder="Yeni şifre" 
-                      value={resetData.newPass}
-                      onChange={e => { setResetData({ ...resetData, newPass: e.target.value }); setForgotError(''); }}
-                      autoFocus 
-                      required
-                    />
-                    <button type="button" onClick={() => setShowPass(p => ({ ...p, reset: !p.reset }))} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>
-                      {showPass.reset ? '🐵' : '🙈'}
-                    </button>
-                  </div>
-                </div>
-                <div className="field">
-                  <label>Yeni Şifre (Tekrar)</label>
-                  <div style={{ position: 'relative' }}>
-                    <input 
-                      type={showPass.resetConfirm ? 'text' : 'password'}
-                      placeholder="Yeni şifre tekrar" 
-                      value={resetData.confirmNewPass}
-                      onChange={e => { setResetData({ ...resetData, confirmNewPass: e.target.value }); setForgotError(''); }}
-                      required
-                    />
-                    <button type="button" onClick={() => setShowPass(p => ({ ...p, resetConfirm: !p.resetConfirm }))} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>
-                      {showPass.resetConfirm ? '🐵' : '🙈'}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {forgotError && <p className="login-error" style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', fontWeight: '600' }}>⚠️ {forgotError}</p>}
-            {forgotMsg && <p className="login-success" style={{ color: 'var(--primary)', fontSize: '12px', marginTop: '4px', fontWeight: '600' }}>✅ {forgotMsg}</p>}
-            
-            <button type="submit" className="login-btn" style={{ marginTop: '16px' }}>
-              {forgotStep === 'email' ? 'Kod Gönder' : (forgotStep === 'verify' ? 'Kodu Doğrula' : 'Şifreyi Güncelle')}
-            </button>
-            <button type="button" className="forgot-link" onClick={() => { setForgot(false); setForgotStep('email'); setForgotError(''); setForgotMsg(''); }}>
-              ← Giriş Ekranına Dön
-            </button>
-          </form>
-        )}
+          </div>
+        </form>
       </div>
     </div>
   );

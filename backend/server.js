@@ -54,9 +54,14 @@ function checkDailyLimit() {
 }
 
 const multer = require('multer');
+const cookieParser = require('cookie-parser');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: true, // veya spesifik origin: 'http://localhost:5173'
+  credentials: true // Cookie göndermek için gerekli
+}));
+app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '50mb', type: 'text/plain' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -120,6 +125,9 @@ db.getConnection((err, connection) => {
     connection.release();
   }
 });
+
+// DB'yi app.locals'a ata (route'lardan erişim için)
+app.locals.db = db;
 
 // Startup migration: Yeni kolonlari ekle (MySQL uyumlu, kolon varsa sessizce atla)
 ['bilgi_guncelleme_tarihi'].forEach(col => {
@@ -197,6 +205,10 @@ db.query(`ALTER TABLE urunler DROP COLUMN fiyat_guncelleme_tarihi`, (err) => {
     console.log('✅ Migration: fiyat_guncelleme_tarihi kolonu kaldirildi');
   }
 });
+
+// --- AUTH ROUTES ---
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
 
 // === YARDIMCI FONKSİYON: Bir kategorinin tüm üst kategorilerini bul ===
 // Örnek: "Barkod Okuyucular" (ID=11) seçilince "OT/VT Ürünleri" (ID=1) de eklenir

@@ -88,3 +88,17 @@ CREATE TABLE IF NOT EXISTS fiyat_gecmisi (
     fiyat_tanimi_id INT NULL DEFAULT NULL,   -- fiyat_tanimlari.id (fiyat_satiri tipi için)
     FOREIGN KEY (urun_id) REFERENCES urunler(id) ON DELETE CASCADE
 );
+
+-- 9. KULLANICILAR TABLOSU (Lisans Bazlı Giriş İçin)
+-- NOT: Şifreler düz metin olarak saklanıyor (güvenlik riski, sonradan hash'e geçilmeli)
+CREATE TABLE IF NOT EXISTS kullanicilar (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    eposta VARCHAR(255) NOT NULL UNIQUE,
+    sifre VARCHAR(255) NOT NULL COMMENT 'DÜZ METİN - GÜVENLİK RİSKİ',
+    aktif BOOLEAN DEFAULT TRUE,
+    ilk_giris_mi BOOLEAN DEFAULT TRUE,
+    son_giris_tarihi TIMESTAMP NULL DEFAULT NULL,
+    musteri_id INT NULL DEFAULT NULL COMMENT 'Panel müşteri id (opsiyonel)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
