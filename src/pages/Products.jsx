@@ -543,46 +543,109 @@ export default function Products() {
     return result;
   };
 
-  // Kategori seçim paneli (add-row ve edit için ortak)
+  // Kategori seçim paneli (add-row ve edit için ortak) - Drill-down navigasyon
   const CatDropPanel = ({ currentIds, onToggle, onClose, search, setSearch }) => {
-    const tree = buildCategoryTree(search);
+    const [currentParent, setCurrentParent] = useState(null);
+    const [navHistory, setNavHistory] = useState([]);
+    
+    // Görünür kategorileri al (arama varsa tüm eşleşenler, yoksa currentParent'ın çocukları)
+    const getVisibleCategories = () => {
+      if (search) {
+        return categories
+          .filter(c => c.kategori_adi?.toLowerCase().includes(search.toLowerCase()))
+          .map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id }));
+      }
+      return categories
+        .filter(c => (c.ust_kategori_id || null) === currentParent)
+        .sort((a, b) => (a.sira || 0) - (b.sira || 0))
+        .map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id }));
+    };
+    
+    const visibleCats = getVisibleCategories();
     const selectedCount = currentIds.length;
+    const currentCat = currentParent ? categories.find(c => c.id === currentParent) : null;
+    
+    // Kategori tıklama - alt kategorisi varsa içine gir, yoksa checkbox toggle
+    const handleCategoryClick = (cat, e) => {
+      e.stopPropagation();
+      const hasChildren = categories.some(c => c.ust_kategori_id === cat.id);
+      if (hasChildren && !search) {
+        setNavHistory([...navHistory, currentParent]);
+        setCurrentParent(cat.id);
+      }
+    };
+    
+    // Geri butonu
+    const handleBack = () => {
+      const newHistory = [...navHistory];
+      const prevParent = newHistory.pop();
+      setNavHistory(newHistory);
+      setCurrentParent(prevParent);
+    };
+    
     return (
       <div className="cat-drop-panel" onClick={e => e.stopPropagation()}>
         <div className="cat-drop-header">
-          <div className="cat-drop-title">
-            <span className="cat-drop-icon">📂</span>
-            <span>Kategori Seç</span>
-            {selectedCount > 0 && <span className="cat-count-badge">{selectedCount}</span>}
-          </div>
-        </div>
-        <div className="cat-drop-search">
-          <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Kategori ara..." value={search} onChange={e => setSearch(e.target.value)} autoFocus />
-          {search && <button className="search-clear" onClick={() => setSearch('')}>✕</button>}
-        </div>
-        <div className="cat-drop-scroll">
-          {tree.length === 0 && (
-            <div className="cat-empty-state">
-              <span className="empty-icon">📭</span>
-              <span className="empty-text">Sonuç bulunamadı</span>
+          {currentParent && !search ? (
+            <button className="cat-back-btn" onClick={handleBack}>
+              <span>‹</span>
+              <span>Geri</span>
+            </button>
+          ) : (
+            <div className="cat-drop-title">
+              <span className="cat-drop-icon">📂</span>
+              <span>Kategoriler</span>
             </div>
           )}
-          {tree.map(c => (
-            <label 
-              key={c.id} 
-              className="cat-label" 
-              onClick={e => e.stopPropagation()}
-              style={{ paddingLeft: `${12 + (c.level || 0) * 18}px` }}
-            >
-              <input type="checkbox" checked={currentIds.includes(c.id)} onChange={() => onToggle(c.id)} />
-              <span className="cat-label-text">
-                {c.level > 0 && <span className="cat-parent-prefix">{'↳ '.repeat(c.level)}</span>}
-                {c.name}
-              </span>
-            </label>
-          ))}
+          {selectedCount > 0 && <span className="cat-count-badge">{selectedCount}</span>}
         </div>
+        
+        {currentCat && !search && (
+          <div className="cat-breadcrumb">
+            {currentCat.kategori_adi}
+          </div>
+        )}
+        
+        <div className="cat-drop-search">
+          <span className="search-icon">🔍</span>
+          <input 
+            type="text" 
+            placeholder="Ara..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+          />
+          {search && <button className="search-clear" onClick={() => setSearch('')}>✕</button>}
+        </div>
+        
+        <div className="cat-drop-scroll">
+          {visibleCats.length === 0 && (
+            <div className="cat-empty-state">
+              <span className="empty-icon">📭</span>
+              <span className="empty-text">Sonuç yok</span>
+            </div>
+          )}
+          {visibleCats.map(c => {
+            const hasChildren = categories.some(sub => sub.ust_kategori_id === c.id);
+            const isSelected = currentIds.includes(c.id);
+            return (
+              <div 
+                key={c.id} 
+                className={`cat-item ${hasChildren && !search ? 'has-children' : ''} ${isSelected ? 'selected' : ''}`}
+                onClick={(e) => handleCategoryClick(c, e)}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={isSelected} 
+                  onChange={() => onToggle(c.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="cat-name">{c.name}</span>
+                {hasChildren && !search && <span className="cat-arrow">›</span>}
+              </div>
+            );
+          })}
+        </div>
+        
         <div className="cat-drop-footer">
           <button className="cat-drop-close-btn" onClick={onClose}>
             <span>✓</span>
