@@ -46,7 +46,6 @@ export default function App() {
   const [page, setPage] = useState('products');
   const [showF1Help, setShowF1Help] = useState(false);
   const [f1Sections, setF1Sections] = useState([]);
-  const [authChecked, setAuthChecked] = useState(false);
 
   // 🔍 DEBUG: Session durumunu logla
   useEffect(() => {
@@ -56,38 +55,6 @@ export default function App() {
     console.log('  - Role:', session?.role);
     console.log('  - User:', session?.user?.name || session?.customer?.name);
   }, [session, loading]);
-
-  // ⚡ JWT Cookie Auth: Sayfa yüklendiğinde /api/auth/me ile session doğrula
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/me', {
-          credentials: 'include'
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setSessionState({
-            id: data.kullanici.id,
-            eposta: data.kullanici.eposta,
-            role: 'customer', // Lisans-based auth
-            aktif: data.kullanici.aktif
-          });
-        } else {
-          // Token yoksa veya geçersizse - session temizle
-          setSessionState(null);
-          setStoredSession(null);
-        }
-      } catch (err) {
-        console.error('Auth check hatası:', err);
-        setSessionState(null);
-      } finally {
-        setAuthChecked(true);
-      }
-    }
-
-    checkAuth();
-  }, []);
 
   // F1 → tüm bölümlerin yardımını toplu göster
   useEffect(() => {
@@ -136,8 +103,7 @@ export default function App() {
     return <ErisimYok />;
   }
 
-  // Auth check tamamlanana kadar loading göster
-  if (!authChecked || loading) {
+  if (loading) {
     const cachedSettings = (() => { try { const s = localStorage.getItem('siteSettings'); return s ? JSON.parse(s) : null; } catch { return null; } })();
     const hasCache = cachedSettings && cachedSettings.site_adi;
     return (
