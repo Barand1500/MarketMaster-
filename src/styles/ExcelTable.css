@@ -171,30 +171,6 @@
   min-height: 40px;
 }
 
-.cat-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: #10b981;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-
-.cat-back-btn:hover {
-  background: #f0fdf4;
-}
-
-.cat-back-btn span:first-child {
-  font-size: 18px;
-  font-weight: 700;
-}
-
 .cat-drop-title {
   display: flex;
   align-items: center;
@@ -202,6 +178,35 @@
   font-size: 13px;
   font-weight: 700;
   color: #1e293b;
+}
+
+.cat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.cat-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0fdf4;
+  border: 1px solid #d1fae5;
+  color: #10b981;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.cat-back-btn:hover {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
 }
 
 .cat-drop-icon {
@@ -384,15 +389,19 @@
 
 .cat-item .cat-arrow {
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   margin-left: auto;
   flex-shrink: 0;
-  transition: color 0.15s;
+  transition: all 0.15s;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.cat-item.has-children:hover .cat-arrow {
+.cat-item .cat-arrow:hover {
   color: #10b981;
+  background: #f0fdf4;
 }
 
 .cat-drop-footer {

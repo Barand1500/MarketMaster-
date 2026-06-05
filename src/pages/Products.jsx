@@ -565,14 +565,17 @@ export default function Products() {
     const selectedCount = currentIds.length;
     const currentCat = currentParent ? categories.find(c => c.id === currentParent) : null;
     
-    // Kategori tıklama - alt kategorisi varsa içine gir, yoksa checkbox toggle
-    const handleCategoryClick = (cat, e) => {
+    // Ok işaretine tıklayınca alt kategoriye gir
+    const handleArrowClick = (catId, e) => {
       e.stopPropagation();
-      const hasChildren = categories.some(c => c.ust_kategori_id === cat.id);
-      if (hasChildren && !search) {
-        setNavHistory([...navHistory, currentParent]);
-        setCurrentParent(cat.id);
-      }
+      setNavHistory([...navHistory, currentParent]);
+      setCurrentParent(catId);
+    };
+    
+    // Satıra tıklayınca kategoriyi seç
+    const handleRowClick = (catId, e) => {
+      e.stopPropagation();
+      onToggle(catId);
     };
     
     // Geri butonu
@@ -586,18 +589,18 @@ export default function Products() {
     return (
       <div className="cat-drop-panel" onClick={e => e.stopPropagation()}>
         <div className="cat-drop-header">
-          {currentParent && !search ? (
-            <button className="cat-back-btn" onClick={handleBack}>
-              <span>‹</span>
-              <span>Geri</span>
-            </button>
-          ) : (
-            <div className="cat-drop-title">
-              <span className="cat-drop-icon">📂</span>
-              <span>Kategoriler</span>
-            </div>
-          )}
-          {selectedCount > 0 && <span className="cat-count-badge">{selectedCount}</span>}
+          <div className="cat-drop-title">
+            <span className="cat-drop-icon">📂</span>
+            <span>Kategoriler</span>
+          </div>
+          <div className="cat-header-actions">
+            {currentParent && !search && (
+              <button className="cat-back-btn" onClick={handleBack} title="Geri">
+                <span>‹</span>
+              </button>
+            )}
+            {selectedCount > 0 && <span className="cat-count-badge">{selectedCount}</span>}
+          </div>
         </div>
         
         {currentCat && !search && (
@@ -631,16 +634,24 @@ export default function Products() {
               <div 
                 key={c.id} 
                 className={`cat-item ${hasChildren && !search ? 'has-children' : ''} ${isSelected ? 'selected' : ''}`}
-                onClick={(e) => handleCategoryClick(c, e)}
+                onClick={(e) => handleRowClick(c.id, e)}
               >
                 <input 
                   type="checkbox" 
                   checked={isSelected} 
-                  onChange={() => onToggle(c.id)}
+                  onChange={() => {}}  
                   onClick={(e) => e.stopPropagation()}
                 />
                 <span className="cat-name">{c.name}</span>
-                {hasChildren && !search && <span className="cat-arrow">›</span>}
+                {hasChildren && !search && (
+                  <span 
+                    className="cat-arrow" 
+                    onClick={(e) => handleArrowClick(c.id, e)}
+                    title="Alt kategorilere gir"
+                  >
+                    ›
+                  </span>
+                )}
               </div>
             );
           })}
