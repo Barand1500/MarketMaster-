@@ -721,11 +721,11 @@ export default function Settings() {
 
   const handleKategoriSiralamaKaydet = async () => {
     console.log('💾 Kategori Sıralama Kaydı Başlatılıyor...');
-    console.log('📦 Gönderilecek Kategoriler:', lokalKategoriler.map((k, idx) => ({ id: k.id, ad: k.ad, parentId: k.parentId, yeniSira: idx })));
+    console.log('📦 Gönderilecek Kategoriler:', lokalKategoriler.map(k => ({ id: k.id, ad: k.ad, parentId: k.parentId, mevcutSira: k.sira })));
     try {
-      // Her kategoriye sira değeri ata (index bazlı)
-      const updates = lokalKategoriler.map((kat, idx) => {
-        const payload = { kategori_adi: kat.ad, ust_kategori_id: kat.parentId || null, sira: idx };
+      // Her kategorinin mevcut sira değerini kullan (swap edilmiş değerler korunsun)
+      const updates = lokalKategoriler.map(kat => {
+        const payload = { kategori_adi: kat.ad, ust_kategori_id: kat.parentId || null, sira: kat.sira };
         console.log(`🔄 Kategori ${kat.id} güncelleniyor:`, payload);
         return fetch(`/api/kategoriler/${kat.id}`, {
           method: 'PUT',
