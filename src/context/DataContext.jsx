@@ -49,7 +49,7 @@ export function DataProvider({ children }) {
         setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
         setKdvOranlari(Array.isArray(kdv) ? kdv : []);
         if (settings && typeof settings === 'object') {
-          const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
+          const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', varsayilan_gorsel_tipi: 'elma', varsayilan_gorsel_url: '', ...settings };
           setSiteSettings(merged);
           try { localStorage.setItem('siteSettings', JSON.stringify(merged)); } catch {}
         }

@@ -164,7 +164,7 @@ const calcIskontoEfektif = (expr, tipi) => {
 };
 
 // Ürün bileşeni — memo ile gereksiz re-render önlenir
-const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, categories, markalar, iskontoSirasi }) => {
+const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, categories, markalar, iskontoSirasi, siteSettings }) => {
   const [hovered, setHovered] = useState(false);
   const hoverTimerRef = useRef(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -294,9 +294,13 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
         {/* Görsel */}
         <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '80px' }}>
           <div className="thumb-box" style={{ width: '68px', height: '68px' }}>
-            {p.image
-              ? <div className="thumb-container" style={{ width: '100%', height: '100%' }}><img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
-              : <span style={{ fontSize: '32px' }}>🍎</span>}
+            {p.image ? (
+              <div className="thumb-container" style={{ width: '100%', height: '100%' }}><img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
+            ) : siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+              <img src={siteSettings.varsayilan_gorsel_url} alt="Varsayılan" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            ) : (
+              <span style={{ fontSize: '32px' }}>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
+            )}
           </div>
         </td>
         {/* Ürün Adı */}
@@ -377,8 +381,10 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
         </div>
         {p.image ? (
           <img src={p.image} alt={p.name} className="product-image" />
+        ) : siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+          <img src={siteSettings.varsayilan_gorsel_url} alt="Varsayılan" className="product-image" />
         ) : (
-          <span style={{ fontSize: '60px' }}>🍎</span>
+          <span style={{ fontSize: '60px' }}>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
         )}
       </div>
       <div className="card-body">
@@ -1437,7 +1443,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                   <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
                 ) : viewMode === 'grid' ? (
                   <div className="product-grid">
-                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}
+                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}
                   </div>
                 ) : (
                   <div className="product-list-view">
@@ -1450,7 +1456,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                         {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
                         <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
                       </tr></thead>
-                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
+                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}</tbody>
                     </table>
                   </div>
                 )}
@@ -1943,7 +1949,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
             <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{filteredProducts.length} Ürün</span>
           </h2>
           {viewMode === 'grid'
-            ? <div className="product-grid">{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</div>
+            ? <div className="product-grid">{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}</div>
             : (
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1955,7 +1961,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                     {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
                     <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
                   </tr></thead>
-                  <tbody>{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
+                  <tbody>{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}</tbody>
                 </table>
               </div>
             )
@@ -1985,7 +1991,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{catProducts.length} Ürün</span>
             </h2>
             {viewMode === 'grid'
-              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</div>
+              ? <div className="product-grid">{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}</div>
               : (
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
@@ -1997,7 +2003,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                       {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
                       <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
                     </tr></thead>
-                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
+                    <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} siteSettings={siteSettings} />)}</tbody>
                   </table>
                 </div>
               )

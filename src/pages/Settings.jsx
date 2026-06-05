@@ -25,6 +25,8 @@ export default function Settings() {
   const [siteAdi, setSiteAdi] = useState(siteSettings.site_adi || 'Bostan Manav');
   const [logo, setLogo] = useState(siteSettings.logo || '');
   const [favicon, setFavicon] = useState(siteSettings.favicon || '');
+  const [varsayilanGorselTipi, setVarsayilanGorselTipi] = useState(siteSettings.varsayilan_gorsel_tipi || 'elma');
+  const [varsayilanGorselUrl, setVarsayilanGorselUrl] = useState(siteSettings.varsayilan_gorsel_url || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null); // { ok, text }
 
@@ -389,6 +391,7 @@ export default function Settings() {
 
   const logoRef = useRef(null);
   const faviconRef = useRef(null);
+  const varsayilanGorselRef = useRef(null);
   const markaLogoRef = useRef(null); // Yeni marka logo ref
   const markaDuzenleLogoRef = useRef(null); // Düzenleme için marka logo ref
 
@@ -414,6 +417,15 @@ export default function Settings() {
     if (file.size > 200 * 1024) { setMsg({ ok: false, text: 'Favicon dosyası en fazla 200 KB olabilir.' }); return; }
     const b64 = await readFileAsBase64(file);
     setFavicon(b64);
+    e.target.value = '';
+  };
+
+  const handleVarsayilanGorselChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { setMsg({ ok: false, text: 'Görsel dosyası en fazla 500 KB olabilir.' }); return; }
+    const b64 = await readFileAsBase64(file);
+    setVarsayilanGorselUrl(b64);
     e.target.value = '';
   };
 
@@ -444,7 +456,7 @@ export default function Settings() {
   const handleSave = async () => {
     if (!siteAdi.trim()) return setMsg({ ok: false, text: 'Site adı boş bırakılamaz.' });
     setSaving(true); setMsg(null);
-    const result = await updateSiteSettings({ site_adi: siteAdi, logo, favicon });
+    const result = await updateSiteSettings({ site_adi: siteAdi, logo, favicon, varsayilan_gorsel_tipi: varsayilanGorselTipi, varsayilan_gorsel_url: varsayilanGorselUrl });
     if (result.success) {
       setMsg({ ok: true, text: 'Ayarlar başarıyla kaydedildi.' });
       // Favicon güncelle
@@ -1148,18 +1160,70 @@ export default function Settings() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '0 4px 8px' }}>
 
-          {/* Site Adı */}
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '7px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
-              Site Adı
-            </label>
-            <input
-              style={inputStyle}
-              value={siteAdi}
-              onChange={e => setSiteAdi(e.target.value)}
-              placeholder="Bostan Manav"
-            />
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '5px' }}>Yükleme ekranında ve tarayıcı başlığında görünür.</div>
+          {/* Site Adı + Varsayılan Görsel yan yana */}
+          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            
+            {/* Site Adı */}
+            <div style={{ flex: '1 1 240px', minWidth: '200px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '7px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                Site Adı
+              </label>
+              <input
+                style={inputStyle}
+                value={siteAdi}
+                onChange={e => setSiteAdi(e.target.value)}
+                placeholder="Bostan Manav"
+              />
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '5px' }}>Yükleme ekranında ve tarayıcı başlığında görünür.</div>
+            </div>
+
+            {/* Varsayılan Ürün Görseli */}
+            <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748b', display: 'block', marginBottom: '7px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                Varsayılan Ürün Görseli
+              </label>
+              <select
+                style={inputStyle}
+                value={varsayilanGorselTipi}
+                onChange={e => {
+                  setVarsayilanGorselTipi(e.target.value);
+                  if (e.target.value !== 'ozel') setVarsayilanGorselUrl('');
+                }}
+              >
+                <option value="elma">🍎 Elma</option>
+                <option value="kutu">📦 Paket</option>
+                <option value="ozel">🖼️ Özel Resim</option>
+              </select>
+              {varsayilanGorselTipi === 'ozel' && (
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {varsayilanGorselUrl ? (
+                    <img src={varsayilanGorselUrl} alt="Varsayılan" style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#f8fafc', padding: '4px' }} />
+                  ) : (
+                    <div style={{ width: '60px', height: '60px', borderRadius: '8px', border: '2px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', background: '#f8fafc' }}>📷</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input ref={varsayilanGorselRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleVarsayilanGorselChange} />
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                      onClick={() => varsayilanGorselRef.current && varsayilanGorselRef.current.click()}
+                    >
+                      📂 Seç
+                    </button>
+                    {varsayilanGorselUrl && (
+                      <button
+                        onClick={() => setVarsayilanGorselUrl('')}
+                        style={{ padding: '5px 10px', fontSize: '11px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '5px' }}>Resmi olmayan ürünlerde gösterilir.</div>
+            </div>
+
           </div>
 
           {/* Logo + Favicon yan yana */}

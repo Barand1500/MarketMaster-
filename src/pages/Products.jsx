@@ -1184,7 +1184,13 @@ export default function Products() {
                     return (
                       <tr key={p.id}>
                         <td style={{ width: '80px' }}>
-                          <div className="thumb-box">{validImg(p.image) ? <img src={p.image} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px' }} /> : <span>🍎</span>}</div>
+                          <div className="thumb-box">{validImg(p.image) ? (
+                            <img src={p.image} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px' }} />
+                          ) : siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+                            <img src={siteSettings.varsayilan_gorsel_url} style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '8px' }} />
+                          ) : (
+                            <span>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
+                          )}</div>
                         </td>
                         <td><span className="edit-txt">{p.name}</span></td>
                         <td colSpan="6" style={{ color: '#94a3b8', fontSize: '12px', fontStyle: 'italic' }}>Fiyat eklenmemiş</td>
@@ -1212,7 +1218,13 @@ export default function Products() {
                         {idx === 0 && (
                           <>
                             <td rowSpan={allRows.length} style={{ width: '80px', verticalAlign: 'middle' }}>
-                              <div className="thumb-box">{validImg(p.image) ? <img src={p.image} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px' }} /> : <span>🍎</span>}</div>
+                              <div className="thumb-box">{validImg(p.image) ? (
+                                <img src={p.image} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px' }} />
+                              ) : siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+                                <img src={siteSettings.varsayilan_gorsel_url} style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '8px' }} />
+                              ) : (
+                                <span>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
+                              )}</div>
                             </td>
                             <td rowSpan={allRows.length} style={{ verticalAlign: 'middle' }}>
                               <span className="edit-txt">{p.name}</span>
@@ -1483,7 +1495,13 @@ export default function Products() {
                             }} style={{ cursor: 'zoom-in' }} />
                             <button className="img-clear" onClick={() => removeImage(p.id)}>×</button>
                           </div>
-                        ) : <span onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }}>🍎</span>}
+                        ) : (
+                          siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+                            <img src={siteSettings.varsayilan_gorsel_url} onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }} style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '8px', cursor: 'pointer' }} />
+                          ) : (
+                            <span onDoubleClick={() => { setEditing({ id: p.id, field: 'image' }); setTimeout(() => editFileRef.current.click(), 50); }}>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
+                          )
+                        )}
                         <input type="file" ref={editFileRef} hidden accept="image/*" onChange={e => handleFile(e, null, true)} />
                       </div>
                     </td>
@@ -1751,7 +1769,13 @@ export default function Products() {
         {pagedProducts.map(p => (
           <div key={p.id} className="mobile-product-card">
             <div className="mobile-card-img" onClick={() => validImg(p.image) && setMobileLightbox(p.image)} style={{ cursor: validImg(p.image) ? 'zoom-in' : 'default' }}>
-              {validImg(p.image) ? <img src={p.image} alt={p.name} /> : <span>🍎</span>}
+              {validImg(p.image) ? (
+                <img src={p.image} alt={p.name} />
+              ) : siteSettings?.varsayilan_gorsel_tipi === 'ozel' && siteSettings?.varsayilan_gorsel_url ? (
+                <img src={siteSettings.varsayilan_gorsel_url} alt="Varsayılan" style={{ objectFit: 'contain' }} />
+              ) : (
+                <span>{siteSettings?.varsayilan_gorsel_tipi === 'kutu' ? '📦' : '🍎'}</span>
+              )}
             </div>
             <div className="mobile-card-info">
               <div className="mobile-card-name">{p.name}</div>

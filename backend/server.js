@@ -178,13 +178,15 @@ app.get('/api/ayarlar', (req, res) => {
 });
 
 app.put('/api/ayarlar', (req, res) => {
-  const { site_adi, logo, favicon, gorsel_kayit_tipi, iskonto_sirasi } = req.body;
+  const { site_adi, logo, favicon, gorsel_kayit_tipi, iskonto_sirasi, varsayilan_gorsel_tipi, varsayilan_gorsel_url } = req.body;
   const updates = [];
   if (site_adi !== undefined) updates.push(['site_adi', site_adi]);
   if (logo !== undefined) updates.push(['logo', logo]);
   if (favicon !== undefined) updates.push(['favicon', favicon]);
   if (gorsel_kayit_tipi !== undefined) updates.push(['gorsel_kayit_tipi', gorsel_kayit_tipi]);
   if (iskonto_sirasi !== undefined) updates.push(['iskonto_sirasi', iskonto_sirasi]);
+  if (varsayilan_gorsel_tipi !== undefined) updates.push(['varsayilan_gorsel_tipi', varsayilan_gorsel_tipi]);
+  if (varsayilan_gorsel_url !== undefined) updates.push(['varsayilan_gorsel_url', varsayilan_gorsel_url]);
   if (updates.length === 0) return res.json({ success: true });
   let done = 0;
   let hasError = false;
