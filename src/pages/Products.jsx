@@ -575,7 +575,9 @@ export default function Products() {
   const fmtPrice = (n, sembol) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ' + (sembol || '₺');
 
   // Sayfalama hesaplama
-  const filteredProducts = products.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()));
+  const filteredProducts = products
+    .filter(p => p.name?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => b.id - a.id);
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const pagedProducts = filteredProducts.slice((safePage - 1) * pageSize, safePage * pageSize);
