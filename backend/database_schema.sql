@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS kategoriler (
     id INT PRIMARY KEY AUTO_INCREMENT,
     kategori_adi VARCHAR(100) NOT NULL,
     ust_kategori_id INT DEFAULT NULL,
+    sira INT DEFAULT 0,
     FOREIGN KEY (ust_kategori_id) REFERENCES kategoriler(id) ON DELETE SET NULL
 );
 

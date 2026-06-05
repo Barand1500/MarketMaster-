@@ -268,6 +268,7 @@ db.query(`CREATE TABLE IF NOT EXISTS markalar (
   id INT PRIMARY KEY AUTO_INCREMENT,
   ad VARCHAR(100) NOT NULL,
   gorsel LONGTEXT DEFAULT NULL,
+  sira INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`, (err) => {
   if (err) console.warn('markalar tablo olusturma hatasi:', err.message);
@@ -278,6 +279,24 @@ db.query(`CREATE TABLE IF NOT EXISTS markalar (
 db.query("ALTER TABLE markalar MODIFY COLUMN gorsel LONGTEXT DEFAULT NULL", (err) => {
   if (err && err.code !== 'ER_BAD_FIELD_ERROR') { /* zaten dogru tip */ }
   else if (!err) console.log('✅ Migration: markalar.gorsel LONGTEXT yapıldı');
+});
+
+// Startup migration: markalar.sira kolonu
+db.query('ALTER TABLE markalar ADD COLUMN sira INT DEFAULT 0', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') {
+    console.warn('Migration uyarisi (markalar.sira):', err.message);
+  } else if (!err) {
+    console.log('✅ Migration: markalar.sira kolonu eklendi');
+  }
+});
+
+// Startup migration: kategoriler.sira kolonu
+db.query('ALTER TABLE kategoriler ADD COLUMN sira INT DEFAULT 0', (err) => {
+  if (err && err.code !== 'ER_DUP_FIELDNAME') {
+    console.warn('Migration uyarisi (kategoriler.sira):', err.message);
+  } else if (!err) {
+    console.log('✅ Migration: kategoriler.sira kolonu eklendi');
+  }
 });
 
 // Startup migration: urunler.marka_id kolonu
@@ -451,7 +470,7 @@ app.delete('/api/fiyat-tanimlari/:id', (req, res) => {
 
 // --- MARKALAR API ---
 app.get('/api/markalar', (req, res) => {
-  db.query('SELECT * FROM markalar ORDER BY ad', (err, results) => {
+  db.query('SELECT * FROM markalar ORDER BY sira ASC, ad ASC', (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
@@ -462,12 +481,16 @@ app.post('/api/markalar', (req, res) => {
   if (!ad || !ad.trim()) return res.status(400).json({ error: 'Marka adı zorunludur.' });
   db.query('INSERT INTO markalar (ad, gorsel) VALUES (?, ?)', [ad.trim(), gorsel || null], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ id: result.insertId, ad: ad.trim(), gorsel: gorsel || null });
+    // Yeni eklenen markayı sira değeriyle birlikte döndür
+    db.query('SELECT * FROM markalar WHERE id = ?', [result.insertId], (err2, rows) => {
+      if (err2 || !rows.length) return res.json({ id: result.insertId, ad: ad.trim(), gorsel: gorsel || null, sira: 0 });
+      res.json(rows[0]);
+    });
   });
 });
 
 app.put('/api/markalar/:id', (req, res) => {
-  const { ad, gorsel, iskonto_orani, iskonto_tipi } = req.body;
+  const { ad, gorsel, iskonto_orani, iskonto_tipi, sira } = req.body;
   if (!ad || !ad.trim()) return res.status(400).json({ error: 'Marka adı zorunludur.' });
   const iskontoO = iskonto_orani !== undefined ? (iskonto_orani !== null && iskonto_orani !== '' ? String(iskonto_orani).trim() : null) : undefined;
   const iskontoT = iskonto_tipi !== undefined ? (iskonto_tipi || null) : undefined;
@@ -475,6 +498,7 @@ app.put('/api/markalar/:id', (req, res) => {
   const params = [ad.trim(), gorsel || null];
   if (iskontoO !== undefined) { sql += ', iskonto_orani=?'; params.push(iskontoO); }
   if (iskontoT !== undefined) { sql += ', iskonto_tipi=?'; params.push(iskontoT); }
+  if (sira !== undefined) { sql += ', sira=?'; params.push(sira); }
   sql += ' WHERE id=?';
   params.push(req.params.id);
   db.query(sql, params, (err) => {
@@ -766,7 +790,7 @@ app.delete('/api/birimler/:id', (req, res) => {
 
 // --- KATEGORILER API ---
 app.get('/api/kategoriler', (req, res) => {
-  db.query('SELECT * FROM kategoriler', (err, results) => {
+  db.query('SELECT * FROM kategoriler ORDER BY sira ASC, kategori_adi ASC', (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
@@ -777,18 +801,23 @@ app.post('/api/kategoriler', (req, res) => {
   db.query('INSERT INTO kategoriler (kategori_adi, ust_kategori_id) VALUES (?, ?)', 
     [kategori_adi, ust_kategori_id || null], (err, result) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ id: result.insertId, kategori_adi, ust_kategori_id });
+    // Yeni eklenen kategoriyi sira değeriyle birlikte döndür
+    db.query('SELECT * FROM kategoriler WHERE id = ?', [result.insertId], (err2, rows) => {
+      if (err2 || !rows.length) return res.json({ id: result.insertId, kategori_adi, ust_kategori_id, sira: 0 });
+      res.json(rows[0]);
+    });
   });
 });
 
 app.put('/api/kategoriler/:id', (req, res) => {
-  const { kategori_adi, ust_kategori_id, iskonto_orani, iskonto_tipi } = req.body;
+  const { kategori_adi, ust_kategori_id, iskonto_orani, iskonto_tipi, sira } = req.body;
   const iskontoO = iskonto_orani !== undefined ? (iskonto_orani !== null && iskonto_orani !== '' ? String(iskonto_orani).trim() : null) : undefined;
   const iskontoT = iskonto_tipi !== undefined ? (iskonto_tipi || null) : undefined;
   let sql = 'UPDATE kategoriler SET kategori_adi = ?, ust_kategori_id = ?';
   const params = [kategori_adi, ust_kategori_id ?? null];
   if (iskontoO !== undefined) { sql += ', iskonto_orani = ?'; params.push(iskontoO); }
   if (iskontoT !== undefined) { sql += ', iskonto_tipi = ?'; params.push(iskontoT); }
+  if (sira !== undefined) { sql += ', sira = ?'; params.push(sira); }
   sql += ' WHERE id = ?';
   params.push(req.params.id);
   db.query(sql, params, (err) => {

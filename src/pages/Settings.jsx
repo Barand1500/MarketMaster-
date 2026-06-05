@@ -20,7 +20,7 @@ const ISKONTO_LABELS = {
 };
 
 export default function Settings() {
-  const { siteSettings, updateSiteSettings, products } = useData();
+  const { siteSettings, updateSiteSettings, products, categories, markalar, fetchData } = useData();
 
   const [siteAdi, setSiteAdi] = useState(siteSettings.site_adi || 'Bostan Manav');
   const [logo, setLogo] = useState(siteSettings.logo || '');
@@ -389,6 +389,8 @@ export default function Settings() {
 
   const logoRef = useRef(null);
   const faviconRef = useRef(null);
+  const markaLogoRef = useRef(null); // Yeni marka logo ref
+  const markaDuzenleLogoRef = useRef(null); // Düzenleme için marka logo ref
 
   const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -412,6 +414,30 @@ export default function Settings() {
     if (file.size > 200 * 1024) { setMsg({ ok: false, text: 'Favicon dosyası en fazla 200 KB olabilir.' }); return; }
     const b64 = await readFileAsBase64(file);
     setFavicon(b64);
+    e.target.value = '';
+  };
+
+  const handleMarkaLogoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { 
+      setYonetimMsg({ ok: false, text: 'Logo dosyası en fazla 500 KB olabilir.' }); 
+      return; 
+    }
+    const b64 = await readFileAsBase64(file);
+    setYeniMarkaGorsel(b64);
+    e.target.value = '';
+  };
+
+  const handleMarkaDuzenleLogoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { 
+      setYonetimMsg({ ok: false, text: 'Logo dosyası en fazla 500 KB olabilir.' }); 
+      return; 
+    }
+    const b64 = await readFileAsBase64(file);
+    setMarkaDuzenle(s => ({ ...s, gorsel: b64 }));
     e.target.value = '';
   };
 
@@ -514,6 +540,521 @@ export default function Settings() {
     }
     setRestoreLoading(false);
   };
+
+  // ── Yönetim: Kategori ve Marka Yönetimi ──────────────────────────────────────────
+  const [yonetimMsg, setYonetimMsg] = useState(null); // { ok, text }
+  const [yeniKategori, setYeniKategori] = useState('');
+  const [yeniUstKategoriId, setYeniUstKategoriId] = useState(null);
+  const [yeniMarka, setYeniMarka] = useState('');
+  const [yeniMarkaGorsel, setYeniMarkaGorsel] = useState(''); // Logo URL
+  const [kategoriDuzenle, setKategoriDuzenle] = useState(null); // { id, ad }
+  const [markaDuzenle, setMarkaDuzenle] = useState(null); // { id, ad, gorsel }
+  const [draggedKategori, setDraggedKategori] = useState(null);
+  const [draggedMarka, setDraggedMarka] = useState(null);
+  const [lokalKategoriler, setLokalKategoriler] = useState([]);
+  const [lokalMarkalar, setLokalMarkalar] = useState([]);
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set()); // Kapalı kategoriler
+  
+  // Kategori seçici için state'ler
+  const [katSeciciAcik, setKatSeciciAcik] = useState(false); // Yeni kategori için
+  const [katSeciciDuzenleAcik, setKatSeciciDuzenleAcik] = useState(false); // Düzenle için
+  const [katSeciciArama, setKatSeciciArama] = useState('');
+  const katSeciciRef = useRef(null);
+  const katSeciciDuzenleRef = useRef(null);
+
+  // Kategori/Marka sıralaması için lokal state'i güncelle
+  useEffect(() => {
+    if (categories) {
+      // Backend'den gelen field adı: kategori_adi
+      setLokalKategoriler([...categories].map(k => ({ id: k.id, ad: k.kategori_adi, sira: k.sira || 0, parentId: k.parentId })).sort((a, b) => a.sira - b.sira));
+    }
+  }, [categories]);
+  useEffect(() => {
+    if (markalar) setLokalMarkalar([...markalar].sort((a, b) => (a.sira || 0) - (b.sira || 0)));
+  }, [markalar]);
+
+  const handleKategoriEkle = async () => {
+    if (!yeniKategori.trim()) return;
+    console.log('🆕 Kategori Ekleme:', { kategori_adi: yeniKategori.trim(), ust_kategori_id: yeniUstKategoriId });
+    try {
+      const r = await fetch('/api/kategoriler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kategori_adi: yeniKategori.trim(), ust_kategori_id: yeniUstKategoriId })
+      });
+      const data = await r.json();
+      console.log('✅ Kategori Ekleme Yanıtı:', data);
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Kategori eklendi.' });
+        setYeniKategori('');
+        setYeniUstKategoriId(null);
+        await fetchData();
+      } else {
+        console.error('❌ Kategori Ekleme Hatası:', data.error);
+        setYonetimMsg({ ok: false, text: data.error || 'Eklenemedi.' });
+      }
+    } catch (err) {
+      console.error('❌ Kategori Ekleme Sunucu Hatası:', err);
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası: ' + err.message });
+    }
+  };
+
+  const handleMarkaEkle = async () => {
+    if (!yeniMarka.trim()) return;
+    try {
+      const r = await fetch('/api/markalar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad: yeniMarka.trim(), gorsel: yeniMarkaGorsel || null })
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Marka eklendi.' });
+        setYeniMarka('');
+        setYeniMarkaGorsel('');
+        await fetchData();
+      } else {
+        setYonetimMsg({ ok: false, text: data.error || 'Eklenemedi.' });
+      }
+    } catch {
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası.' });
+    }
+  };
+
+  const handleKategoriGuncelle = async () => {
+    if (!kategoriDuzenle || !kategoriDuzenle.ad.trim()) return;
+    
+    // Kategori kendi üst kategorisi olamaz
+    if (kategoriDuzenle.parentId === kategoriDuzenle.id) {
+      setYonetimMsg({ ok: false, text: 'Kategori kendi üst kategorisi olamaz.' });
+      return;
+    }
+    
+    // Circular dependency kontrolü (bir kategori kendi child'ının child'ı olamaz)
+    const wouldCreateCycle = (parentId, childId) => {
+      if (!parentId) return false;
+      if (parentId === childId) return true;
+      const parent = lokalKategoriler.find(k => k.id === parentId);
+      if (!parent) return false;
+      return wouldCreateCycle(parent.parentId, childId);
+    };
+    
+    if (wouldCreateCycle(kategoriDuzenle.parentId, kategoriDuzenle.id)) {
+      setYonetimMsg({ ok: false, text: 'Bir kategori, kendi alt kategorilerinden birinin altına taşınamaz.' });
+      return;
+    }
+
+    try {
+      const r = await fetch(`/api/kategoriler/${kategoriDuzenle.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          kategori_adi: kategoriDuzenle.ad.trim(), 
+          ust_kategori_id: kategoriDuzenle.parentId || null 
+        })
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Kategori güncellendi.' });
+        setKategoriDuzenle(null);
+        await fetchData();
+      } else {
+        setYonetimMsg({ ok: false, text: data.error || 'Güncellenemedi.' });
+      }
+    } catch {
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası.' });
+    }
+  };
+
+  const handleMarkaGuncelle = async () => {
+    if (!markaDuzenle || !markaDuzenle.ad.trim()) return;
+    try {
+      const r = await fetch(`/api/markalar/${markaDuzenle.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad: markaDuzenle.ad.trim(), gorsel: markaDuzenle.gorsel || null })
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Marka güncellendi.' });
+        setMarkaDuzenle(null);
+        await fetchData();
+      } else {
+        setYonetimMsg({ ok: false, text: data.error || 'Güncellenemedi.' });
+      }
+    } catch {
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası.' });
+    }
+  };
+
+  const handleKategoriSil = async (id) => {
+    if (!confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) return;
+    try {
+      const r = await fetch(`/api/kategoriler/${id}`, { method: 'DELETE' });
+      const data = await r.json();
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Kategori silindi.' });
+        await fetchData();
+      } else {
+        setYonetimMsg({ ok: false, text: data.error || 'Silinemedi.' });
+      }
+    } catch {
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası.' });
+    }
+  };
+
+  const handleMarkaSil = async (id) => {
+    if (!confirm('Bu markayı silmek istediğinizden emin misiniz?')) return;
+    try {
+      const r = await fetch(`/api/markalar/${id}`, { method: 'DELETE' });
+      const data = await r.json();
+      if (r.ok) {
+        setYonetimMsg({ ok: true, text: 'Marka silindi.' });
+        await fetchData();
+      } else {
+        setYonetimMsg({ ok: false, text: data.error || 'Silinemedi.' });
+      }
+    } catch {
+      setYonetimMsg({ ok: false, text: 'Sunucu hatası.' });
+    }
+  };
+
+  const handleKategoriSiralamaKaydet = async () => {
+    console.log('💾 Kategori Sıralama Kaydı Başlatılıyor...');
+    console.log('📦 Gönderilecek Kategoriler:', lokalKategoriler.map((k, idx) => ({ id: k.id, ad: k.ad, parentId: k.parentId, yeniSira: idx })));
+    try {
+      // Her kategoriye sira değeri ata (index bazlı)
+      const updates = lokalKategoriler.map((kat, idx) => {
+        const payload = { kategori_adi: kat.ad, ust_kategori_id: kat.parentId || null, sira: idx };
+        console.log(`🔄 Kategori ${kat.id} güncelleniyor:`, payload);
+        return fetch(`/api/kategoriler/${kat.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(async res => {
+          const data = await res.json();
+          console.log(`${res.ok ? '✅' : '❌'} Kategori ${kat.id} yanıtı:`, data);
+          if (!res.ok) throw new Error(`Kategori ${kat.id}: ${data.error || res.statusText}`);
+          return data;
+        });
+      });
+      await Promise.all(updates);
+      console.log('✅ Tüm kategori sıraları başarıyla kaydedildi');
+      setYonetimMsg({ ok: true, text: 'Kategori sıralaması kaydedildi.' });
+      await fetchData();
+    } catch (err) {
+      console.error('❌ Kategori Sıralama Hatası:', err.message);
+      setYonetimMsg({ ok: false, text: 'Sıralama kaydedilemedi: ' + err.message });
+    }
+  };
+
+  const handleMarkaSiralamaKaydet = async () => {
+    console.log('💾 Marka Sıralama Kaydı Başlatılıyor...');
+    console.log('📦 Gönderilecek Markalar:', lokalMarkalar.map((m, idx) => ({ id: m.id, ad: m.ad, yeniSira: idx })));
+    try {
+      const updates = lokalMarkalar.map((mrk, idx) => {
+        const payload = { ad: mrk.ad, gorsel: mrk.gorsel || null, sira: idx };
+        console.log(`🔄 Marka ${mrk.id} güncelleniyor:`, payload);
+        return fetch(`/api/markalar/${mrk.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(async res => {
+          const data = await res.json();
+          console.log(`${res.ok ? '✅' : '❌'} Marka ${mrk.id} yanıtı:`, data);
+          if (!res.ok) throw new Error(`Marka ${mrk.id}: ${data.error || res.statusText}`);
+          return data;
+        });
+      });
+      await Promise.all(updates);
+      console.log('✅ Tüm marka sıraları başarıyla kaydedildi');
+      setYonetimMsg({ ok: true, text: 'Marka sıralaması kaydedildi.' });
+      await fetchData();
+    } catch (err) {
+      console.error('❌ Marka Sıralama Hatası:', err.message);
+      setYonetimMsg({ ok: false, text: 'Sıralama kaydedilemedi: ' + err.message });
+    }
+  };
+
+  const moveKategori = (fromIdx, toIdx) => {
+    const hierarchicalList = buildHierarchicalList();
+    const draggedItem = hierarchicalList[fromIdx];
+    const targetItem = hierarchicalList[toIdx];
+    
+    // Aynı parent'a sahip olup olmadıklarını kontrol et
+    if (draggedItem.parentId !== targetItem.parentId) {
+      setYonetimMsg({ ok: false, text: 'Sadece aynı seviyedeki kategoriler arasında sıralama yapabilirsiniz. Farklı seviyeye taşımak için düzenleme modunda üst kategori seçin.' });
+      return;
+    }
+
+    // Aynı parent içinde sıralama değiştir
+    const arr = [...lokalKategoriler];
+    const fromItemIndex = arr.findIndex(k => k.id === draggedItem.id);
+    const toItemIndex = arr.findIndex(k => k.id === targetItem.id);
+    const [item] = arr.splice(fromItemIndex, 1);
+    arr.splice(toItemIndex, 0, item);
+    setLokalKategoriler(arr);
+  };
+
+  // Hiyerarşik kategori listesi oluştur (ana kategoriler ve altlarındakiler sıralı)
+  const buildHierarchicalList = () => {
+    const result = [];
+    const addChildren = (parentId, depth = 0) => {
+      if (depth > 10) return; // Sonsuz döngü koruması
+      const children = lokalKategoriler
+        .filter(k => k.parentId === parentId)
+        .sort((a, b) => a.sira - b.sira);
+      children.forEach(child => {
+        result.push(child);
+        addChildren(child.id, depth + 1);
+      });
+    };
+    // Önce root kategorileri ekle
+    const roots = lokalKategoriler
+      .filter(k => !k.parentId || k.parentId === null)
+      .sort((a, b) => a.sira - b.sira);
+    roots.forEach(root => {
+      result.push(root);
+      addChildren(root.id, 1);
+    });
+    return result;
+  };
+
+  // Kategori hierarchy yardımcı fonksiyonlar
+  const getLevel = (katId) => {
+    let level = 0;
+    let current = lokalKategoriler.find(k => k.id === katId);
+    while (current && current.parentId) {
+      level++;
+      current = lokalKategoriler.find(k => k.id === current.parentId);
+      if (level > 10) break; // Sonsuz döngü koruması
+    }
+    return level;
+  };
+
+  const hasChildren = (katId) => {
+    return lokalKategoriler.some(k => k.parentId === katId);
+  };
+
+  const isAnyParentCollapsed = (katId) => {
+    let current = lokalKategoriler.find(k => k.id === katId);
+    while (current && current.parentId) {
+      if (collapsedCategories.has(current.parentId)) return true;
+      current = lokalKategoriler.find(k => k.id === current.parentId);
+    }
+    return false;
+  };
+
+  const toggleCollapse = (katId) => {
+    const newSet = new Set(collapsedCategories);
+    if (newSet.has(katId)) {
+      newSet.delete(katId);
+    } else {
+      newSet.add(katId);
+    }
+    setCollapsedCategories(newSet);
+  };
+
+  const moveMarka = (fromIdx, toIdx) => {
+    const arr = [...lokalMarkalar];
+    const [item] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, item);
+    setLokalMarkalar(arr);
+  };
+
+  // Kategori seçici dropdown render
+  const renderKategoriSecici = (seciliId, onSelect, isOpen, setIsOpen, dropRef, excludeId = null) => {
+    const filtrelenmisKategoriler = lokalKategoriler
+      .filter(k => k.id !== excludeId) // Düzenlenirken kendi kategorisini hariç tut
+      .filter(k => katSeciciArama === '' || k.ad.toLowerCase().includes(katSeciciArama.toLowerCase()))
+      .sort((a, b) => {
+        const siraA = a.sira !== undefined ? a.sira : 0;
+        const siraB = b.sira !== undefined ? b.sira : 0;
+        if (siraA !== siraB) return siraA - siraB;
+        return a.ad.localeCompare(b.ad);
+      });
+
+    const seciliKategori = lokalKategoriler.find(k => k.id === seciliId);
+    const getKategoriYol = (kat) => {
+      if (!kat) return '';
+      if (!kat.parentId) return kat.ad;
+      const parent = lokalKategoriler.find(k => k.id === kat.parentId);
+      return parent ? `${getKategoriYol(parent)} › ${kat.ad}` : kat.ad;
+    };
+
+    // Hiyerarşik liste oluştur
+    const buildHiyerarsikListe = () => {
+      const parents = filtrelenmisKategoriler.filter(k => !k.parentId);
+      const result = [];
+      parents.forEach(p => {
+        result.push({ ...p, level: 0 });
+        const children = filtrelenmisKategoriler.filter(k => k.parentId === p.id);
+        children.forEach(c => result.push({ ...c, level: 1 }));
+      });
+      // Orphan'ları ekle
+      filtrelenmisKategoriler.filter(k => k.parentId && !lokalKategoriler.find(p => p.id === k.parentId)).forEach(k => {
+        result.push({ ...k, level: 0 });
+      });
+      return result;
+    };
+
+    return (
+      <div ref={dropRef} style={{ position: 'relative', width: '100%' }}>
+        <div
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '8px',
+            padding: '8px 12px',
+            outline: 'none',
+            color: seciliId ? '#0f172a' : '#94a3b8',
+            cursor: 'pointer',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            userSelect: 'none',
+            transition: 'all 0.2s'
+          }}
+        >
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {seciliId ? getKategoriYol(seciliKategori) : 'Ana Kategori (üst kategori yok)'}
+          </span>
+          <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: '8px' }}>
+            {isOpen ? '▲' : '▼'}
+          </span>
+        </div>
+
+        {isOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              right: 0,
+              background: '#fff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '8px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+              zIndex: 100,
+              maxHeight: '300px',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Arama kutusu */}
+            <div style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
+              <input
+                autoFocus
+                type="text"
+                placeholder="Kategori ara..."
+                value={katSeciciArama}
+                onChange={e => setKatSeciciArama(e.target.value)}
+                style={{
+                  width: '100%',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Kategoriler listesi */}
+            <div style={{ overflowY: 'auto', maxHeight: '240px' }}>
+              {/* Ana Kategori seçeneği */}
+              <div
+                onClick={() => {
+                  onSelect(null);
+                  setIsOpen(false);
+                  setKatSeciciArama('');
+                }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: !seciliId ? 'var(--primary)' : '#64748b',
+                  background: !seciliId ? '#f0fdf4' : '#fff',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { if (seciliId) e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseLeave={e => { if (seciliId) e.currentTarget.style.background = '#fff'; }}
+              >
+                <span style={{ fontSize: '14px' }}>🏠</span>
+                <span>Ana Kategori</span>
+                {!seciliId && <span style={{ marginLeft: 'auto', color: 'var(--primary)' }}>✓</span>}
+              </div>
+
+              {/* Kategoriler */}
+              {buildHiyerarsikListe().length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: '#94a3b8' }}>
+                  Sonuç bulunamadı
+                </div>
+              ) : (
+                buildHiyerarsikListe().map(kat => (
+                  <div
+                    key={kat.id}
+                    onClick={() => {
+                      onSelect(kat.id);
+                      setIsOpen(false);
+                      setKatSeciciArama('');
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      paddingLeft: `${12 + kat.level * 20}px`,
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: seciliId === kat.id ? 'var(--primary)' : '#0f172a',
+                      background: seciliId === kat.id ? '#f0fdf4' : '#fff',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => { if (seciliId !== kat.id) e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (seciliId !== kat.id) e.currentTarget.style.background = '#fff'; }}
+                  >
+                    <span style={{ fontSize: '14px' }}>{kat.level > 0 ? '↳' : '📁'}</span>
+                    <span style={{ flex: 1 }}>{kat.ad}</span>
+                    {seciliId === kat.id && <span style={{ color: 'var(--primary)' }}>✓</span>}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (katSeciciRef.current && !katSeciciRef.current.contains(e.target)) {
+        setKatSeciciAcik(false);
+        setKatSeciciArama('');
+      }
+      if (katSeciciDuzenleRef.current && !katSeciciDuzenleRef.current.contains(e.target)) {
+        setKatSeciciDuzenleAcik(false);
+        setKatSeciciArama('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const helpContent = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1343,6 +1884,346 @@ export default function Settings() {
               style={{ padding: '10px 18px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
             >↩ Geri Al</button>
           )}
+        </div>
+      </div>
+
+      {/* YÖNETİM KARTI */}
+      <div className="card" style={{ marginTop: '0' }}>
+        <div className="table-header-toolbar" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '20px' }}>
+          <h2 className="toolbar-title">⚙️ Yönetim</h2>
+          <SectionHelpButton title="Kategori ve Marka Yönetimi" content={
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid var(--primary)' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>📁 Kategori Yönetimi</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Yeni kategori adını yazıp <strong>➕ Ekle</strong> butonuna basın. Alt kategori eklemek için önce üst kategoriyi seçin. Kategorileri <strong>sürükle-bırak</strong> ile sıralayıp <strong>💾 Sıralamayı Kaydet</strong> ile kaydedin.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🔽 Açma/Kapatma</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Alt kategorisi olan kategorilerde <strong>▶/▼</strong> ikonu görünür. Tıklayarak alt kategorileri gösterebilir veya gizleyebilirsiniz. Üst kategoriyi taşırsanız alt kategoriler de takip eder.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>✏️ Kategori Düzenleme</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Kategori adına <strong>çift tıklayın</strong>, düzenleme modu açılır. Adı değiştirip <strong>✓</strong> ile kaydedin veya <strong>✕</strong> ile iptal edin. <strong>🗑️</strong> butonu ile kategoriyi silebilirsiniz.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #8b5cf6' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🏷️ Marka Yönetimi</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Yeni marka adını ve opsiyonel olarak <strong>Logo URL</strong> girin, <strong>➕ Ekle</strong> ile kaydedin. Markaları sürükle-bırak ile sıralayabilirsiniz. Düzenlemek için <strong>✏️</strong> ikonuna tıklayın.</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a', marginBottom: '4px' }}>🖼️ Marka Logosu</div>
+                <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>Marka eklerken veya düzenlerken <strong>Logo URL</strong> alanına görsel bağlantısı yapıştırın. Logo otomatik olarak önizlenir ve müşteri portalında gösterilir.</div>
+              </div>
+              <div style={{ background: '#fff5f5', borderRadius: '12px', padding: '14px 16px', borderLeft: '4px solid #ef4444' }}>
+                <div style={{ fontWeight: '800', fontSize: '13px', color: '#991b1b', marginBottom: '4px' }}>⚠️ Silme İşlemi</div>
+                <div style={{ fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' }}>Bir kategori veya marka silmeden önce onay istenecektir. Silinen kategoriye veya markaya bağlı ürünler etkilenmez, sadece bağlantı kopar.</div>
+              </div>
+              <div className="help-tip">
+                <strong>💡 İpucu:</strong> Sıralama değişikliklerini mutlaka <strong>💾 Sıralamayı Kaydet</strong> butonu ile kaydedin, aksi halde müşteri ekranına yansımaz.
+              </div>
+            </div>
+          } />
+        </div>
+
+        {/* Mesaj */}
+        {yonetimMsg && (
+          <div style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '16px', background: yonetimMsg.ok ? '#f0fdf4' : '#fef2f2', color: yonetimMsg.ok ? '#15803d' : '#dc2626', border: `1px solid ${yonetimMsg.ok ? '#86efac' : '#fca5a5'}` }}>
+            {yonetimMsg.ok ? '✅ ' : '❌ '}{yonetimMsg.text}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+
+          {/* KATEGORİ YÖNETİMİ */}
+          <div style={{ flex: '1 1 400px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>📁</span>
+              Kategori Yönetimi
+            </div>
+
+            {/* Yeni Kategori Ekle */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  style={{ flex: 1, fontSize: '13px', fontWeight: '600', border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', outline: 'none' }}
+                  placeholder="Yeni kategori adı..."
+                  value={yeniKategori}
+                  onChange={e => setYeniKategori(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleKategoriEkle(); }}
+                />
+                <button
+                  onClick={handleKategoriEkle}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  ➕ Ekle
+                </button>
+              </div>
+              
+              {/* Üst Kategori Seçici */}
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '2px', marginTop: '4px' }}>
+                📂 Üst Kategori Seç (İsteğe Bağlı)
+              </div>
+              {renderKategoriSecici(
+                yeniUstKategoriId,
+                (id) => setYeniUstKategoriId(id),
+                katSeciciAcik,
+                setKatSeciciAcik,
+                katSeciciRef
+              )}
+            </div>
+
+            {/* Kategoriler Listesi */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
+              {buildHierarchicalList().map((kat, idx) => {
+                const level = getLevel(kat.id);
+                const hasChild = hasChildren(kat.id);
+                const isCollapsed = collapsedCategories.has(kat.id);
+                const isHidden = isAnyParentCollapsed(kat.id);
+
+                if (isHidden) return null; // Parent kapalıysa bu kategoriyi gizle
+
+                return (
+                <div
+                  key={kat.id}
+                  draggable={!kategoriDuzenle}
+                  onDragStart={() => setDraggedKategori(idx)}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedKategori !== null && draggedKategori !== idx) {
+                      moveKategori(draggedKategori, idx);
+                    }
+                    setDraggedKategori(null);
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 12px',
+                    paddingLeft: `${12 + level * 24}px`, // Hierarchical indentation
+                    background: '#fff',
+                    border: '1.5px solid #e2e8f0', borderRadius: '10px',
+                    cursor: kategoriDuzenle ? 'default' : 'grab',
+                    opacity: draggedKategori === idx ? 0.5 : 1
+                  }}
+                >
+                  {/* Açma/Kapatma İkonu */}
+                  {hasChild ? (
+                    <span
+                      onClick={() => toggleCollapse(kat.id)}
+                      style={{
+                        fontSize: '12px', color: '#64748b', cursor: 'pointer',
+                        userSelect: 'none', flexShrink: 0, width: '16px', textAlign: 'center'
+                      }}
+                    >
+                      {isCollapsed ? '▶' : '▼'}
+                    </span>
+                  ) : (
+                    <span style={{ width: '16px', flexShrink: 0 }}></span>
+                  )}
+
+                  <span style={{ fontSize: '14px', color: '#94a3b8', flexShrink: 0 }}>⋮⋮</span>
+                  {kategoriDuzenle?.id === kat.id ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          autoFocus
+                          style={{ flex: 1, fontSize: '13px', fontWeight: '600', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '6px 10px', outline: 'none' }}
+                          value={kategoriDuzenle.ad}
+                          onChange={e => setKategoriDuzenle(s => ({ ...s, ad: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleKategoriGuncelle(); if (e.key === 'Escape') setKategoriDuzenle(null); }}
+                        />
+                        <button onClick={handleKategoriGuncelle} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#22c55e', color: '#fff', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>✓</button>
+                        <button onClick={() => setKategoriDuzenle(null)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>✕</button>
+                      </div>
+                      
+                      {/* Üst Kategori Seçici (Düzenle) */}
+                      <div style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', marginBottom: '2px' }}>
+                        📂 Üst Kategori
+                      </div>
+                      {renderKategoriSecici(
+                        kategoriDuzenle.parentId,
+                        (id) => setKategoriDuzenle(s => ({ ...s, parentId: id })),
+                        katSeciciDuzenleAcik,
+                        setKatSeciciDuzenleAcik,
+                        katSeciciDuzenleRef,
+                        kategoriDuzenle.id // Kendi kategorisini hariç tut
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        onDoubleClick={() => setKategoriDuzenle({ id: kat.id, ad: kat.ad, parentId: kat.parentId })}
+                        style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0f172a', cursor: 'text' }}
+                      >
+                        {kat.ad}
+                      </span>
+                      <button onClick={() => handleKategoriSil(kat.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                    </>
+                  )}
+                </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={handleKategoriSiralamaKaydet}
+              style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+            >
+              💾 Sıralamayı Kaydet
+            </button>
+          </div>
+
+          {/* MARKA YÖNETİMİ */}
+          <div style={{ flex: '1 1 400px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px' }}>🏷️</span>
+              Marka Yönetimi
+            </div>
+
+            {/* Yeni Marka Ekle */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  style={{ flex: 1, fontSize: '13px', fontWeight: '600', border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', outline: 'none' }}
+                  placeholder="Yeni marka adı..."
+                  value={yeniMarka}
+                  onChange={e => setYeniMarka(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleMarkaEkle(); }}
+                />
+                <button
+                  onClick={handleMarkaEkle}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  ➕ Ekle
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  ref={markaLogoRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleMarkaLogoChange}
+                />
+                <button
+                  onClick={() => markaLogoRef.current.click()}
+                  style={{ flex: 1, fontSize: '12px', fontWeight: '600', border: '1.5px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px', background: '#fff', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}
+                >
+                  📷 Logo Seç (İsteğe Bağlı)
+                </button>
+                {yeniMarkaGorsel && (
+                  <>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '6px', overflow: 'hidden', border: '1.5px solid #e2e8f0', flexShrink: 0 }}>
+                      <img src={yeniMarkaGorsel} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} onError={e => e.target.style.display = 'none'} />
+                    </div>
+                    <button
+                      onClick={() => setYeniMarkaGorsel('')}
+                      style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Markalar Listesi */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
+              {lokalMarkalar.map((mrk, idx) => (
+                <div
+                  key={mrk.id}
+                  draggable={!markaDuzenle}
+                  onDragStart={() => setDraggedMarka(idx)}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedMarka !== null && draggedMarka !== idx) {
+                      moveMarka(draggedMarka, idx);
+                    }
+                    setDraggedMarka(null);
+                  }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '8px',
+                    padding: '10px 12px', background: '#fff',
+                    border: '1.5px solid #e2e8f0', borderRadius: '10px',
+                    cursor: markaDuzenle ? 'default' : 'grab',
+                    opacity: draggedMarka === idx ? 0.5 : 1
+                  }}
+                >
+                  {markaDuzenle?.id === mrk.id ? (
+                    <>
+                      {/* Düzenleme Modu */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '14px', color: '#94a3b8', flexShrink: 0 }}>⋮⋮</span>
+                        <input
+                          autoFocus
+                          style={{ flex: 1, fontSize: '13px', fontWeight: '600', border: '1.5px solid var(--primary)', borderRadius: '6px', padding: '6px 10px', outline: 'none' }}
+                          placeholder="Marka adı"
+                          value={markaDuzenle.ad}
+                          onChange={e => setMarkaDuzenle(s => ({ ...s, ad: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleMarkaGuncelle(); if (e.key === 'Escape') setMarkaDuzenle(null); }}
+                        />
+                        <button onClick={handleMarkaGuncelle} style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#22c55e', color: '#fff', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>✓</button>
+                        <button onClick={() => setMarkaDuzenle(null)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>✕</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '30px' }}>
+                        <input
+                          ref={markaDuzenleLogoRef}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleMarkaDuzenleLogoChange}
+                        />
+                        <button
+                          onClick={() => markaDuzenleLogoRef.current.click()}
+                          style={{ flex: 1, fontSize: '11px', fontWeight: '600', border: '1.5px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', background: '#fff', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
+                        >
+                          📷 {markaDuzenle.gorsel ? 'Logoyu Değiştir' : 'Logo Seç'}
+                        </button>
+                        {markaDuzenle.gorsel && (
+                          <>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '6px', overflow: 'hidden', border: '1.5px solid #e2e8f0', flexShrink: 0 }}>
+                              <img src={markaDuzenle.gorsel} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} onError={e => e.target.style.display = 'none'} />
+                            </div>
+                            <button
+                              onClick={() => setMarkaDuzenle(s => ({ ...s, gorsel: '' }))}
+                              style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}
+                            >
+                              ✕
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Görüntüleme Modu */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '14px', color: '#94a3b8', flexShrink: 0 }}>⋮⋮</span>
+                        {mrk.gorsel && (
+                          <div style={{ width: '32px', height: '32px', borderRadius: '6px', overflow: 'hidden', border: '1.5px solid #e2e8f0', flexShrink: 0 }}>
+                            <img src={mrk.gorsel} alt={mrk.ad} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} onError={e => e.target.style.display = 'none'} />
+                          </div>
+                        )}
+                        <span
+                          onDoubleClick={() => setMarkaDuzenle({ id: mrk.id, ad: mrk.ad, gorsel: mrk.gorsel || '' })}
+                          style={{ flex: 1, fontSize: '13px', fontWeight: '600', color: '#0f172a', cursor: 'text' }}
+                        >
+                          {mrk.ad}
+                        </span>
+                        <button onClick={() => setMarkaDuzenle({ id: mrk.id, ad: mrk.ad, gorsel: mrk.gorsel || '' })} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        <button onClick={() => handleMarkaSil(mrk.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleMarkaSiralamaKaydet}
+              style={{ marginTop: '12px', width: '100%', padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+            >
+              💾 Sıralamayı Kaydet
+            </button>
+          </div>
+
         </div>
       </div>
 

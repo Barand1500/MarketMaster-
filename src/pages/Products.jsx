@@ -479,22 +479,66 @@ export default function Products() {
   // Hiyerarşik kategori listesi oluştur (üst › alt sıralı)
   const buildCategoryTree = (search = '') => {
     const s = search.toLowerCase();
-    const parents = categories.filter(c => !c.parentId && (
-      !s || c.name.toLowerCase().includes(s) || categories.some(ch => ch.parentId === c.id && ch.name.toLowerCase().includes(s))
-    ));
+    
+    // Recursive fonksiyon - tüm alt kategorileri getir
+    const addChildrenRecursive = (parentId, level, result) => {
+      const children = categories.filter(c => c.parentId === parentId)
+        .sort((a, b) => {
+          const siraA = a.sira !== undefined ? a.sira : 0;
+          const siraB = b.sira !== undefined ? b.sira : 0;
+          if (siraA !== siraB) return siraA - siraB;
+          return a.name.localeCompare(b.name);
+        });
+      
+      children.forEach(child => {
+        // Arama varsa ve eşleşmiyorsa atla
+        if (s && !child.name.toLowerCase().includes(s)) {
+          // Ama alt kategorilerinde eşleşme var mı kontrol et
+          const hasMatchingDescendant = (catId) => {
+            const descendants = categories.filter(c => c.parentId === catId);
+            return descendants.some(d => 
+              d.name.toLowerCase().includes(s) || hasMatchingDescendant(d.id)
+            );
+          };
+          if (!hasMatchingDescendant(child.id)) return;
+        }
+        
+        result.push({ ...child, isSub: level > 0, level });
+        addChildrenRecursive(child.id, level + 1, result);
+      });
+    };
+    
+    // Ana kategorileri bul
+    const parents = categories.filter(c => !c.parentId)
+      .sort((a, b) => {
+        const siraA = a.sira !== undefined ? a.sira : 0;
+        const siraB = b.sira !== undefined ? b.sira : 0;
+        if (siraA !== siraB) return siraA - siraB;
+        return a.name.localeCompare(b.name);
+      });
+    
     const result = [];
     parents.forEach(p => {
-      const children = categories.filter(c => c.parentId === p.id && (!s || c.name.toLowerCase().includes(s) || p.name.toLowerCase().includes(s)));
-      const parentMatches = !s || p.name.toLowerCase().includes(s);
-      if (parentMatches || children.length > 0) {
-        result.push({ ...p, isSub: false });
-        children.forEach(ch => result.push({ ...ch, isSub: true, parentName: p.name }));
+      // Arama varsa parent veya childlarında eşleşme kontrolü
+      const matchesSearch = !s || p.name.toLowerCase().includes(s);
+      const hasMatchingDescendant = (catId) => {
+        const descendants = categories.filter(c => c.parentId === catId);
+        return descendants.some(d => 
+          d.name.toLowerCase().includes(s) || hasMatchingDescendant(d.id)
+        );
+      };
+      
+      if (matchesSearch || hasMatchingDescendant(p.id)) {
+        result.push({ ...p, isSub: false, level: 0 });
+        addChildrenRecursive(p.id, 1, result);
       }
     });
+    
     // Üst kategorisi olmayan (orphan) alt kategoriler de ekle
     categories.filter(c => c.parentId && !categories.find(p => p.id === c.parentId)).forEach(c => {
-      if (!s || c.name.toLowerCase().includes(s)) result.push({ ...c, isSub: false });
+      if (!s || c.name.toLowerCase().includes(s)) result.push({ ...c, isSub: false, level: 0 });
     });
+    
     return result;
   };
 
@@ -509,10 +553,15 @@ export default function Products() {
         <div className="cat-drop-scroll">
           {tree.length === 0 && <div style={{ padding: '8px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>Sonuç yok</div>}
           {tree.map(c => (
-            <label key={c.id} className={`cat-label${c.isSub ? ' cat-sub' : ''}`} onClick={e => e.stopPropagation()}>
+            <label 
+              key={c.id} 
+              className="cat-label" 
+              onClick={e => e.stopPropagation()}
+              style={{ paddingLeft: `${8 + (c.level || 0) * 20}px` }}
+            >
               <input type="checkbox" checked={currentIds.includes(c.id)} onChange={() => onToggle(c.id)} />
               <span className="cat-label-text">
-                {c.isSub && <span className="cat-parent-prefix">↳ </span>}
+                {c.level > 0 && <span className="cat-parent-prefix">{'↳ '.repeat(c.level)}</span>}
                 {c.name}
               </span>
             </label>
@@ -625,17 +674,25 @@ export default function Products() {
     }
 
     if (showModal === 'categories') {
-      let list = categories.map(c => ({ ...c, path: getCategoryPath(c) }));
-      if (modalSearch.trim()) {
-        list = list.filter(c => c.path.toLowerCase().includes(modalSearch.toLowerCase()));
-      } else {
-        list.sort((a, b) => a.path.localeCompare(b.path));
-      }
-      if (list.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
-      return list.map(c => (
-        <div key={c.id} className="pm-item" style={{ padding: '6px 10px', background: editingCatId === c.id ? 'rgba(34,197,94,0.05)' : undefined, borderRadius: editingCatId === c.id ? 8 : undefined }}>
+      // Hiyerarşik listeyi buildCategoryTree ile oluştur
+      const tree = buildCategoryTree(modalSearch);
+      if (tree.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
+      
+      return tree.map(c => (
+        <div 
+          key={c.id} 
+          className="pm-item" 
+          style={{ 
+            padding: '6px 10px', 
+            paddingLeft: `${10 + (c.level || 0) * 20}px`,
+            background: editingCatId === c.id ? 'rgba(34,197,94,0.05)' : undefined, 
+            borderRadius: editingCatId === c.id ? 8 : undefined 
+          }}
+        >
           <div className="pm-item-left">
-            <span className="pm-item-icon" style={{ fontSize: '12px' }}>{c.parentId ? '↳' : '📁'}</span>
+            <span className="pm-item-icon" style={{ fontSize: '12px' }}>
+              {c.level > 0 ? '↳' : '📁'}
+            </span>
             <div>
               <div
                 className="pm-item-name"
@@ -650,7 +707,7 @@ export default function Products() {
               >
                 {c.name}
               </div>
-              {c.parentId && <div className="pm-item-path">{c.path}</div>}
+              {c.parentId && <div className="pm-item-path">{getCategoryPath(c)}</div>}
             </div>
           </div>
           {/* İskonto + Sil — gruplanmış sağ taraf */}
@@ -757,7 +814,14 @@ export default function Products() {
     }
 
     if (showModal === 'markalar') {
-      const filtered = markalar.filter(m => m.ad.toLowerCase().includes(modalSearch.toLowerCase()));
+      const filtered = markalar
+        .filter(m => m.ad.toLowerCase().includes(modalSearch.toLowerCase()))
+        .sort((a, b) => {
+          const siraA = a.sira !== undefined ? a.sira : 0;
+          const siraB = b.sira !== undefined ? b.sira : 0;
+          if (siraA !== siraB) return siraA - siraB;
+          return a.ad.localeCompare(b.ad);
+        });
       if (filtered.length === 0) return <div className="pm-empty">Sonuç bulunamadı.</div>;
       return filtered.map(m => (
         <div key={m.id} className="pm-item">
@@ -1717,7 +1781,15 @@ export default function Products() {
               <label className="mobile-label">Kategoriler</label>
               <input className="mobile-input" placeholder="Kategori ara..." value={mobileEditCatSearch} onChange={e => setMobileEditCatSearch(e.target.value)} />
               <div className="mobile-cat-list">
-                {categories.filter(c => c.name.toLowerCase().includes(mobileEditCatSearch.toLowerCase())).map(c => (
+                {categories
+                  .filter(c => c.name.toLowerCase().includes(mobileEditCatSearch.toLowerCase()))
+                  .sort((a, b) => {
+                    const siraA = a.sira !== undefined ? a.sira : 0;
+                    const siraB = b.sira !== undefined ? b.sira : 0;
+                    if (siraA !== siraB) return siraA - siraB;
+                    return getCategoryPath(a).localeCompare(getCategoryPath(b));
+                  })
+                  .map(c => (
                   <label key={c.id} className="mobile-cat-row">
                     <input type="checkbox" checked={mobileEdit.categoryIds.includes(c.id)} onChange={() => {
                       setMobileEdit(prev => ({
@@ -1841,7 +1913,15 @@ export default function Products() {
               <label className="mobile-label">Kategoriler</label>
               <input className="mobile-input" placeholder="Kategori ara..." value={mobileAddCatSearch} onChange={e => setMobileAddCatSearch(e.target.value)} />
               <div className="mobile-cat-list">
-                {categories.filter(c => c.name.toLowerCase().includes(mobileAddCatSearch.toLowerCase())).map(c => (
+                {categories
+                  .filter(c => c.name.toLowerCase().includes(mobileAddCatSearch.toLowerCase()))
+                  .sort((a, b) => {
+                    const siraA = a.sira !== undefined ? a.sira : 0;
+                    const siraB = b.sira !== undefined ? b.sira : 0;
+                    if (siraA !== siraB) return siraA - siraB;
+                    return getCategoryPath(a).localeCompare(getCategoryPath(b));
+                  })
+                  .map(c => (
                   <label key={c.id} className="mobile-cat-row">
                     <input type="checkbox" checked={newRow.categoryIds.includes(c.id)} onChange={() => {
                       setNewRow(prev => ({
@@ -1894,7 +1974,15 @@ export default function Products() {
                     )}
                     <select className="lite-select" value={modalParent} onChange={e => setModalParent(e.target.value)}>
                       <option value="">— Ana Kategori (İsteğe Bağlı) —</option>
-                      {categories.filter(c => c.id !== editingCatId).map(c => <option key={c.id} value={c.id}>{getCategoryPath(c)}</option>)}
+                      {categories
+                        .filter(c => c.id !== editingCatId)
+                        .sort((a, b) => {
+                          const siraA = a.sira !== undefined ? a.sira : 0;
+                          const siraB = b.sira !== undefined ? b.sira : 0;
+                          if (siraA !== siraB) return siraA - siraB;
+                          return getCategoryPath(a).localeCompare(getCategoryPath(b));
+                        })
+                        .map(c => <option key={c.id} value={c.id}>{getCategoryPath(c)}</option>)}
                     </select>
                   </>
                 )}

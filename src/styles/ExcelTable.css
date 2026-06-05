@@ -174,7 +174,6 @@
   font-size: 12px !important; transition: background 0.12s !important;
   text-align: left !important; justify-content: flex-start !important;
 }
-.cat-label.cat-sub { padding-left: 20px !important; }
 .cat-label:hover { background: #f0fdf4 !important; }
 .cat-label input[type="checkbox"] { 
   width: 14px !important; height: 14px !important; accent-color: #10b981 !important; 
