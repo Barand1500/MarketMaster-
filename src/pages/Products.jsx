@@ -440,7 +440,7 @@ export default function Products() {
   };
 
   const removeImage = (id) => {
-    if (id === 'new') setNewRow(p => ({ ...p, image: '' }));
+    if (id === 'new') setNewRow(p => ({ ...p, image: '', imageFile: null }));
     else updateProduct(id, { image: '' });
   };
 
@@ -450,7 +450,7 @@ export default function Products() {
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
     const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
     addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
-    setNewRow({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
+    setNewRow({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
   };
 
@@ -1851,7 +1851,7 @@ export default function Products() {
                   const file = e.target.files[0]; if (!file) return;
                   setNewRow(prev => ({ ...prev, imageFile: file, image: URL.createObjectURL(file) }));
                 }} />
-                {newRow.image && <button className="mobile-img-clear" onClick={() => setNewRow(prev => ({ ...prev, image: '' }))}>Görseli Kaldır</button>}
+                {newRow.image && <button className="mobile-img-clear" onClick={() => setNewRow(prev => ({ ...prev, image: '', imageFile: null }))}>Görseli Kaldır</button>}
               </div>
 
               {/* Ad */}
