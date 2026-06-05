@@ -135,7 +135,7 @@ export default function Products() {
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
+  const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: null, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -449,8 +449,8 @@ export default function Products() {
     const pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
     const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
-    addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
-    setNewRow({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
+    addProduct({ ...newRow, birim_id: newRow.birim_id || units[0]?.id || 1, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_dahil, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
+    setNewRow({ name: '', price: '', birim_id: null, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
   };
 
@@ -1277,7 +1277,7 @@ export default function Products() {
                 <td>
                   <select className="lite-select" value={newRow.kdv_id || ''} onChange={e => {
                     const id = e.target.value ? parseInt(e.target.value) : null;
-                    setNewRow(p => ({ ...p, kdv_id: id, kdv_dahil: id ? true : null }));
+                    setNewRow(p => ({ ...p, kdv_id: id, kdv_dahil: null }));
                   }}>
                     <option value="">KDV Yok</option>
                     {kdvOranlari.map(k => (
@@ -1296,7 +1296,7 @@ export default function Products() {
                   </button>
                 </td>
                 <td>
-                  <select className="lite-select" value={newRow.birim_id} onChange={e => setNewRow({...newRow, birim_id: parseInt(e.target.value)})}>
+                  <select className="lite-select" value={newRow.birim_id || units[0]?.id || ''} onChange={e => setNewRow({...newRow, birim_id: parseInt(e.target.value)})}>
                     {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </td>
@@ -1428,7 +1428,7 @@ export default function Products() {
                             onChange={e => {
                               const id = e.target.value ? parseInt(e.target.value) : null;
                               const kdvItem = kdvOranlari.find(k => k.id === id);
-                              updateProduct(p.id, { kdv_orani: kdvItem?.oran ?? null, kdv_dahil: kdvItem != null ? (p.kdvDahil ?? true) : null });
+                              updateProduct(p.id, { kdv_orani: kdvItem?.oran ?? null, kdv_dahil: kdvItem != null ? (p.kdvDahil !== null && p.kdvDahil !== undefined ? p.kdvDahil : 1) : null });
                               setEditing(null);
                             }}>
                             <option value="">KDV Yok</option>
@@ -1458,10 +1458,10 @@ export default function Products() {
                         <span className="no-data">YOK</span>
                       )}
                     </td>
-                    <td onDoubleClick={() => setEditing({ id: p.id, field: 'unit' })}>
-                      {editing?.id === p.id && editing?.field === 'unit' ? (
-                        <select autoFocus className="lite-select" defaultValue={p.unit} onBlur={e => handleBlur(p.id, 'unit', e.target.value)} onChange={e => handleBlur(p.id, 'unit', e.target.value)}>
-                          {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                    <td onDoubleClick={() => setEditing({ id: p.id, field: 'birim' })}>
+                      {editing?.id === p.id && editing?.field === 'birim' ? (
+                        <select autoFocus className="lite-select" defaultValue={p.birimId} onBlur={e => handleBlur(p.id, 'birim_id', parseInt(e.target.value))} onChange={e => handleBlur(p.id, 'birim_id', parseInt(e.target.value))}>
+                          {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                         </select>
                       ) : (
                         <span className="badge-unit">{p.unit}</span>
