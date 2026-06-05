@@ -340,16 +340,10 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
         {/* Son Güncelleme (Birleştirilmiş) */}
         <td className="cp-date-col" style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            {fmtDate(p.lastPriceChange) ? (
+            {fmtDate(p.lastPriceChange) || fmtDate(p.createdAt) ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>Fiyat:</span>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
-              </div>
-            ) : <span style={{ fontSize: '10px', color: '#e2e8f0' }}>—</span>}
-            {fmtDate(p.lastInfoChange) ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>Bilgi:</span>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange) || fmtDate(p.createdAt)}</span>
               </div>
             ) : <span style={{ fontSize: '10px', color: '#e2e8f0' }}>—</span>}
           </div>
@@ -1053,6 +1047,157 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           </div>
         </div>
       </div>
+
+      {/* ===== İLK EKRAN TOOLBAR (header altında) ===== */}
+      {!showBrandsView && selectedCatId === null && selectedMarkalar.length === 0 && (
+        <div className="info-strip" style={{ marginTop: '16px', marginBottom: '12px' }}>
+          <div className="info-left">
+            <div className="search-discount-bar">
+              <button
+                onClick={() => { setShowSearch(v => !v); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 50); else setSearch(''); }}
+                className="strip-search-btn"
+                style={{ background: showSearch ? 'var(--primary)' : '#f1f5f9', color: showSearch ? '#fff' : '#64748b' }}
+                title="Ürün ara"
+              >🔍</button>
+              {discount > 0 && !showSearch && !customer.fiyatTanimlariId && (
+                <div className="discount-badge-premium">
+                  <span className="badge-icon">✨</span>
+                  <span className="badge-text">
+                    Hesabınıza Özel <strong className="discount-value">%{discount}</strong> İndirim Uygulanıyor
+                  </span>
+                </div>
+              )}
+              <div style={{ overflow: 'hidden', width: showSearch ? 'min(240px, 50vw)' : '0', transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)', opacity: showSearch ? 1 : 0, flexShrink: 0 }}>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Ürün ara..."
+                  value={search}
+                  onChange={e => { setSearch(e.target.value); setSearchTyping(true); clearTimeout(searchTypingTimer.current); searchTypingTimer.current = setTimeout(() => setSearchTyping(false), 700); }}
+                  onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setSearch(''); setSearchTyping(false); clearTimeout(searchTypingTimer.current); } }}
+                  className={`portal-search-input${searchTyping ? ' typing' : ''}`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="info-right">
+            <button
+              type="button"
+              className="update-time-box"
+              onClick={refreshProducts}
+              title="Ürünleri yenile"
+            >
+              <span className="pulse-dot"></span>
+              Son Güncelleme: <strong>{lastRefreshed.toLocaleTimeString('tr-TR')}</strong>
+            </button>
+            <div className="kur-panel-wrap" ref={kurPanelRef} style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', gap: '0', background: '#f1f5f9', borderRadius: '10px', padding: '3px' }}>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  title="Kart Görünümü"
+                  style={{ width: '30px', height: '28px', border: 'none', borderRadius: '7px 0 0 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                    background: viewMode === 'grid' ? '#fff' : 'transparent',
+                    boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                    color: viewMode === 'grid' ? 'var(--primary)' : '#94a3b8' }}
+                >⊞</button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  title="Liste Görünümü"
+                  style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                    background: viewMode === 'list' ? '#fff' : 'transparent',
+                    boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                    color: viewMode === 'list' ? 'var(--primary)' : '#94a3b8' }}
+                >☰</button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSortDrop(v => !v); setShowKurPanel(false); }}
+                  title="Sırala"
+                  style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.15s',
+                    background: sortBy !== 'default' ? 'var(--primary)' : (showSortDrop ? '#fff' : 'transparent'),
+                    boxShadow: showSortDrop ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                    color: sortBy !== 'default' ? '#fff' : (showSortDrop ? 'var(--primary)' : '#94a3b8') }}
+                >↕</button>
+                <button
+                  type="button"
+                  onClick={() => { setShowKurPanel(v => !v); setShowSortDrop(false); }}
+                  title="Döviz kurları"
+                  style={{ width: '30px', height: '28px', border: 'none', borderRadius: '0 7px 7px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', transition: 'all 0.15s',
+                    background: showKurPanel ? '#fff' : 'transparent',
+                    boxShadow: showKurPanel ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                    color: showKurPanel ? 'var(--primary)' : '#94a3b8' }}
+                >₺</button>
+              </div>
+              {showKurPanel && (
+                <div className="kur-panel-dropdown">
+                  <div className="kur-panel-title">Döviz Kurları</div>
+                  {paraBirimleri.filter(pb => pb.id !== 1).map(pb => (
+                    <div key={pb.id} className="kur-panel-row">
+                      <span className="kur-panel-sym">{pb.sembol} {pb.kisa_ad}</span>
+                      <span className="kur-panel-val">{Number(pb.kur).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ₺</span>
+                    </div>
+                  ))}
+                  {paraBirimleri.filter(pb => pb.id !== 1).length === 0 && (
+                    <div className="kur-panel-empty">Döviz yok</div>
+                  )}
+                </div>
+              )}
+              {showSortDrop && (
+                <>
+                  <div className="dropdown-overlay" onClick={() => setShowSortDrop(false)} />
+                  <div className="portal-dropdown-panel" style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '210px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.13)', border: '1px solid #e2e8f0', zIndex: 9001, overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 8px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', padding: '0 6px 4px' }}>Sıralama</div>
+                    </div>
+                    <div style={{ padding: '4px 8px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {sortOptions.map(opt => {
+                        const active = sortBy === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => { setSortBy(opt.value); setShowSortDrop(false); }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              padding: '8px 10px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%',
+                              background: active ? 'rgba(34,197,94,0.08)' : 'transparent',
+                              color: active ? 'var(--primary)' : '#374151',
+                              fontWeight: active ? '700' : '500', fontSize: '13px',
+                              transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f8fafc'; }}
+                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <span style={{
+                              width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                              border: `2px solid ${active ? 'var(--primary)' : '#cbd5e1'}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: active ? 'var(--primary)' : 'transparent',
+                              transition: 'all 0.15s',
+                            }}>
+                              {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff', display: 'block' }} />}
+                            </span>
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {sortBy !== 'default' && (
+                      <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 8px' }}>
+                        <button
+                          onClick={() => { setSortBy('default'); setShowSortDrop(false); }}
+                          style={{ width: '100%', padding: '7px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}
+                        >
+                          ✕ Sıralamayı Sıfırla
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== MARKALAR SAYFASI (header altında, kategoriler gibi) ===== */}
       {showBrandsView && (
