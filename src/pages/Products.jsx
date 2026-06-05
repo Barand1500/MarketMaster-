@@ -122,7 +122,7 @@ const formatIskontoDisplay = (expr, tipi) => {
 };
 
 export default function Products() {
-  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, markalar, addMarka, updateMarka, deleteMarka, kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari, siteSettings } = useData();
+  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, markalar, addMarka, updateMarka, deleteMarka, kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari, refetchProducts, siteSettings } = useData();
 
   // Para birimleri
   const [paraBirimleri, setParaBirimleri] = useState([{ id: 1, ad: 'Türk Lirası', kisa_ad: 'TRY', sembol: '₺' }]);
@@ -444,14 +444,15 @@ export default function Products() {
     else updateProduct(id, { image: '' });
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newRow.name.trim() || !newRow.price) return;
     const pb = paraBirimleri.find(x => x.id === (newRow.para_birimi_id || 1));
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
     const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
-    addProduct({ ...newRow, birim_id: newRow.birim_id || units[0]?.id || 1, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_dahil, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
+    await addProduct({ ...newRow, birim_id: newRow.birim_id || units[0]?.id || 1, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_dahil, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
     setNewRow({ name: '', price: '', birim_id: null, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
+    await refetchProducts();
   };
 
   const handleBlur = (id, field, value) => {
