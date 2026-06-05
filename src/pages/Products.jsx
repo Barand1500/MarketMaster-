@@ -122,7 +122,7 @@ const formatIskontoDisplay = (expr, tipi) => {
 };
 
 export default function Products() {
-  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, markalar, addMarka, updateMarka, deleteMarka, kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari, refetchProducts, siteSettings } = useData();
+  const { categories, products, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, units, addUnit, updateUnit, deleteUnit, markalar, addMarka, updateMarka, deleteMarka, kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari, refetchProducts, uploadingImage, siteSettings } = useData();
 
   // Para birimleri
   const [paraBirimleri, setParaBirimleri] = useState([{ id: 1, ad: 'Türk Lirası', kisa_ad: 'TRY', sembol: '₺' }]);
@@ -133,7 +133,7 @@ export default function Products() {
   }, []);
 
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
-  const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
+  const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/') || src.startsWith('blob:'));
 
   const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: null, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: 0, iskonto_tipi: 'oran', iskonto_orani: '' });
   const [editing, setEditing] = useState(null); // { id, field }
@@ -2353,6 +2353,20 @@ export default function Products() {
       {pmTooltip && (
         <div className="pm-float-tooltip" style={{ left: pmTooltip.x, top: pmTooltip.y }}>
           {pmTooltipText || 'Düzenlemek için çift tıklayınız'}
+        </div>
+      )}
+
+      {/* ===================== GÖRSEL YÜKLEME MODAL ===================== */}
+      {uploadingImage && (
+        <div className="upload-modal-overlay">
+          <div className="upload-modal">
+            <div className="upload-spinner"></div>
+            <h3>Görsel Yükleniyor...</h3>
+            <p>Lütfen bekleyiniz</p>
+            <div className="upload-progress-bar">
+              <div className="upload-progress-fill"></div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -13,6 +13,7 @@ export function DataProvider({ children }) {
   const [markalar, setMarkalar] = useState([]);
   const [kdvOranlari, setKdvOranlari] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [siteSettings, setSiteSettings] = useState(() => {
     try {
@@ -428,17 +429,22 @@ export function DataProvider({ children }) {
   // Görsel dosya yükleme yardımcısı
   const uploadGorsel = async (file, tip) => {
     console.log('🖼️ uploadGorsel çağrıldı - Dosya:', file.name, 'Tip:', tip);
-    const form = new FormData();
-    form.append('gorsel', file);
-    const res = await fetch(`${API_URL}/upload/${tip}`, { method: 'POST', body: form });
-    console.log('📤 Upload response status:', res.status);
-    if (!res.ok) {
-      console.error('❌ Upload başarısız:', res.status, res.statusText);
-      return null;
+    setUploadingImage(true);
+    try {
+      const form = new FormData();
+      form.append('gorsel', file);
+      const res = await fetch(`${API_URL}/upload/${tip}`, { method: 'POST', body: form });
+      console.log('📤 Upload response status:', res.status);
+      if (!res.ok) {
+        console.error('❌ Upload başarısız:', res.status, res.statusText);
+        return null;
+      }
+      const data = await res.json();
+      console.log('✅ Upload başarılı:', data);
+      return data.url || null;
+    } finally {
+      setUploadingImage(false);
     }
-    const data = await res.json();
-    console.log('✅ Upload başarılı:', data);
-    return data.url || null;
   };
 
   // PRODUCTS
@@ -740,7 +746,7 @@ export function DataProvider({ children }) {
       units, addUnit, updateUnit, deleteUnit,
       markalar, addMarka, updateMarka, deleteMarka,
       kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari,
-      loading, apiError, clearApiError: () => setApiError(null), refetchProducts,
+      loading, uploadingImage, apiError, clearApiError: () => setApiError(null), refetchProducts,
       siteSettings, updateSiteSettings,
       fetchData: fetchDataWrapper
     }}>
