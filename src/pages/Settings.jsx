@@ -787,12 +787,22 @@ export default function Settings() {
       return;
     }
 
-    // Aynı parent içinde sıralama değiştir
-    const arr = [...lokalKategoriler];
-    const fromItemIndex = arr.findIndex(k => k.id === draggedItem.id);
-    const toItemIndex = arr.findIndex(k => k.id === targetItem.id);
-    const [item] = arr.splice(fromItemIndex, 1);
-    arr.splice(toItemIndex, 0, item);
+    // Aynı parent içindeki kardeş kategorileri al
+    const siblings = lokalKategoriler.filter(k => k.parentId === draggedItem.parentId);
+    const draggedSibling = siblings.find(k => k.id === draggedItem.id);
+    const targetSibling = siblings.find(k => k.id === targetItem.id);
+    
+    // Sira değerlerini swap et
+    const tempSira = draggedSibling.sira;
+    draggedSibling.sira = targetSibling.sira;
+    targetSibling.sira = tempSira;
+    
+    // Tüm kategori listesini güncelle
+    const arr = lokalKategoriler.map(k => {
+      if (k.id === draggedSibling.id) return { ...k, sira: draggedSibling.sira };
+      if (k.id === targetSibling.id) return { ...k, sira: targetSibling.sira };
+      return k;
+    });
     setLokalKategoriler(arr);
   };
 
