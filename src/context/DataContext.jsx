@@ -427,40 +427,52 @@ export function DataProvider({ children }) {
 
   // Görsel dosya yükleme yardımcısı
   const uploadGorsel = async (file, tip) => {
+    console.log('🖼️ uploadGorsel çağrıldı - Dosya:', file.name, 'Tip:', tip);
     const form = new FormData();
     form.append('gorsel', file);
     const res = await fetch(`${API_URL}/upload/${tip}`, { method: 'POST', body: form });
-    if (!res.ok) return null;
+    console.log('📤 Upload response status:', res.status);
+    if (!res.ok) {
+      console.error('❌ Upload başarısız:', res.status, res.statusText);
+      return null;
+    }
     const data = await res.json();
+    console.log('✅ Upload başarılı:', data);
     return data.url || null;
   };
 
   // PRODUCTS
   const addProduct = async (product) => {
+    console.log('➕ addProduct çağrıldı - Product:', product);
+    console.log('🔍 imageFile var mı?', product.imageFile instanceof File, product.imageFile);
     try {
       let gorselYolu = product.image;
       if (product.imageFile instanceof File) {
+        console.log('📸 ImageFile bulundu, upload ediliyor...');
         const uploaded = await uploadGorsel(product.imageFile, 'urun');
         if (uploaded) gorselYolu = uploaded;
+        console.log('🖼️ Upload sonucu gorselYolu:', gorselYolu);
       }
+      const payload = {
+        urun_adi: product.name,
+        fiyat: product.price,
+        birim_id: product.birim_id,
+        gorsel_yolu: gorselYolu,
+        kategori_ids: product.categoryIds,
+        stok_durumu: product.inStock,
+        para_birimi_id: product.para_birimi_id || 1,
+        marka_id: product.marka_id || null,
+        kdv_orani: product.kdv_orani !== undefined ? product.kdv_orani : null,
+        kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null,
+        stok_kodu: product.stok_kodu || null,
+        iskonto_orani: product.iskonto_orani !== undefined ? product.iskonto_orani : null,
+        iskonto_tipi: product.iskonto_tipi || null
+      };
+      console.log('📦 Backend\'e gönderilen payload:', payload);
       const res = await fetch(`${API_URL}/urunler`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          urun_adi: product.name,
-          fiyat: product.price,
-          birim_adi: product.unit,
-          gorsel_yolu: gorselYolu,
-          kategori_ids: product.categoryIds,
-          stok_durumu: product.inStock,
-          para_birimi_id: product.para_birimi_id || 1,
-          marka_id: product.marka_id || null,
-          kdv_orani: product.kdv_orani !== undefined ? product.kdv_orani : null,
-          kdv_dahil: product.kdv_dahil !== undefined ? product.kdv_dahil : null,
-          stok_kodu: product.stok_kodu || null,
-          iskonto_orani: product.iskonto_orani !== undefined ? product.iskonto_orani : null,
-          iskonto_tipi: product.iskonto_tipi || null
-        })
+        body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -489,16 +501,20 @@ export function DataProvider({ children }) {
     } catch { setApiError('Ürün eklenemedi. Sunucu bağlantısını kontrol edin.'); }
   };
   const updateProduct = async (id, updates) => {
+    console.log('🔄 updateProduct çağrıldı - ID:', id, 'Updates:', updates);
+    console.log('🔍 imageFile var mı?', updates.imageFile instanceof File, updates.imageFile);
     const current = products.find(p => p.id === id);
     let gorselYolu = updates.image !== undefined ? updates.image : current.image;
     if (updates.imageFile instanceof File) {
+      console.log('📸 ImageFile bulundu, upload ediliyor...');
       const uploaded = await uploadGorsel(updates.imageFile, 'urun');
       if (uploaded) gorselYolu = uploaded;
+      console.log('🖼️ Upload sonucu gorselYolu:', gorselYolu);
     }
     const fullData = {
       urun_adi: updates.name || current.name,
       fiyat: updates.price !== undefined ? updates.price : current.price,
-      birim_adi: updates.unit || current.unit,
+      birim_id: updates.birim_id || current.birimId,
       gorsel_yolu: gorselYolu,
       stok_durumu: updates.inStock !== undefined ? updates.inStock : current.inStock,
       kategori_ids: updates.categoryIds || current.categoryIds,
