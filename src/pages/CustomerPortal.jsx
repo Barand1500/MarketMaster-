@@ -101,7 +101,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
             <Pr n={dispN(crossedPrice)} sembol={dispS} numStyle={{ color: '#94a3b8', fontSize: '15px', fontWeight: '700' }} symRatio={0.75} />
           </span>
         </td>
-        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+        <td className="cp-col-indirim" style={{ padding: '8px 32px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
             <span className="card-indirim-pct">Sana Özel</span>
             {discount > 0 && <span className="card-indirim-label">{indirimLabel}</span>}
@@ -126,7 +126,7 @@ const ListPriceSection = ({ price, discountedPrice, discount, sembol, kisaAd, ku
               : <Pr n={dispN(price)} sembol={dispS} numStyle={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }} />}
           </span>
         </td>
-        <td className="cp-col-indirim" style={{ padding: '8px 10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+        <td className="cp-col-indirim" style={{ padding: '8px 32px', textAlign: 'center', whiteSpace: 'nowrap' }}>
           {discount > 0 && (
             <span className="card-indirim-badge" style={{ display: 'inline-flex' }}>
               <span className="card-indirim-pct">İndirim</span>
@@ -289,15 +289,15 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
     return (
       <tr className="cp-list-row" style={{ borderBottom: '1px solid #e2e8f0' }} {...hoverHandlers}>
         {/* Görsel */}
-        <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '52px' }}>
-          <div className="thumb-box">
+        <td className="cp-col-img" style={{ padding: '8px 10px 8px 14px', width: '80px' }}>
+          <div className="thumb-box" style={{ width: '68px', height: '68px' }}>
             {p.image
-              ? <div className="thumb-container"><img src={p.image} alt={p.name} /></div>
-              : <span style={{ fontSize: '20px' }}>🍎</span>}
+              ? <div className="thumb-container" style={{ width: '100%', height: '100%' }}><img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
+              : <span style={{ fontSize: '32px' }}>🍎</span>}
           </div>
         </td>
         {/* Ürün Adı */}
-        <td className="cp-col-name" style={{ padding: '10px 10px' }}>
+        <td className="cp-col-name" style={{ padding: '10px 10px', minWidth: '280px', maxWidth: '400px' }}>
           <span style={{ fontWeight: '800', fontSize: '14px', color: '#0f172a', cursor: 'default' }}>{p.name}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
             <span className="badge-unit" tabIndex={0} style={{ cursor: hasMultiUnit ? 'pointer' : 'default', userSelect: 'none', position: 'relative', outline: 'none' }} onClick={(e) => { if (hasMultiUnit) { e.stopPropagation(); setShowUnitDrop(v => !v); } }} onBlur={() => setTimeout(() => setShowUnitDrop(false), 120)}>
@@ -337,25 +337,22 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
           hasExtraCols={hasExtraCols}
           iskontoTipi={effectiveDiscountTipi}
         />
-        {/* Son Fiyat Güncelleme */}
-        <td className="cp-date-col" style={{ padding: '8px 24px 8px 48px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-          {fmtDate(p.lastPriceChange)
-            ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastPriceChange)}</span>
+        {/* Son Güncelleme (Birleştirilmiş) */}
+        <td className="cp-date-col" style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            {fmtDate(p.lastPriceChange) ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>Fiyat:</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange)}</span>
               </div>
-            : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
-          }
-        </td>
-        {/* Son Bilgi Güncelleme */}
-        <td className="cp-date-col" style={{ padding: '8px 14px 8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
-          {fmtDate(p.lastInfoChange)
-            ? <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>{fmtTime(p.lastInfoChange)}</span>
+            ) : <span style={{ fontSize: '10px', color: '#e2e8f0' }}>—</span>}
+            {fmtDate(p.lastInfoChange) ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>Bilgi:</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastInfoChange)}</span>
               </div>
-            : <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: '600' }}>—</span>
-          }
+            ) : <span style={{ fontSize: '10px', color: '#e2e8f0' }}>—</span>}
+          </div>
         </td>
       </tr>
     );
@@ -718,8 +715,13 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
   // Eğer kategori seçiliyse sadece o kategoriyi başlık yap, değilse TÜM kategorileri göster
   const roots = categories.filter(c => !c.parentId);
 
-  // Sıra uygulanmış ana kategoriler (alfabetik)
-  const orderedRoots = [...roots].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  // Sıra uygulanmış ana kategoriler (sira değerine göre, sonra alfabetik)
+  const orderedRoots = [...roots].sort((a, b) => {
+    const siraA = a.sira !== undefined ? a.sira : 999999;
+    const siraB = b.sira !== undefined ? b.sira : 999999;
+    if (siraA !== siraB) return siraA - siraB;
+    return a.name.localeCompare(b.name, 'tr');
+  });
   
   // Kategori breadcrumb yolu oluştur (Meyveler > Tropikal)
   const getCategoryPathForSort = (catId) => {
@@ -754,8 +756,18 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
   const displayCategories = selectedCatId !== null
     ? (categories.find(c => c.id === selectedCatId) ? [categories.find(c => c.id === selectedCatId)] : 
-       [...categories].sort((a, b) => getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr')))
-    : [...categories].sort((a, b) => getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr'));
+       [...categories].sort((a, b) => {
+         const siraA = a.sira !== undefined ? a.sira : 999999;
+         const siraB = b.sira !== undefined ? b.sira : 999999;
+         if (siraA !== siraB) return siraA - siraB;
+         return getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr');
+       }))
+    : [...categories].sort((a, b) => {
+        const siraA = a.sira !== undefined ? a.sira : 999999;
+        const siraB = b.sira !== undefined ? b.sira : 999999;
+        if (siraA !== siraB) return siraA - siraB;
+        return getCategoryPathForSort(a.id).localeCompare(getCategoryPathForSort(b.id), 'tr');
+      });
 
   // Kategori ilişkisi olmayan ürünleri kontrol et
   const uncategorizedProducts = filteredProducts.filter(p => !p.categoryIds || p.categoryIds.length === 0);
@@ -885,7 +897,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               const renderNode = (catId, depth) => {
                 const cat = categories.find(c => c.id === catId);
                 if (!cat) return null;
-                const children = [...categories.filter(c => c.parentId === catId)].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                const children = [...categories.filter(c => c.parentId === catId)].sort((a, b) => {
+                  const siraA = a.sira !== undefined ? a.sira : 999999;
+                  const siraB = b.sira !== undefined ? b.sira : 999999;
+                  if (siraA !== siraB) return siraA - siraB;
+                  return a.name.localeCompare(b.name, 'tr');
+                });
                 const hasChildren = children.length > 0;
                 const isExpanded = expandedCatIds.has(catId);
                 const isSelected = selectedCatId === catId;
@@ -929,21 +946,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </>
       )}
 
-      {/* BREADCRUMB - kategori seçiliyse göster */}
-      {selectedCatId !== null && !catBrowserOpen && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 4px', marginBottom: '4px', flexWrap: 'wrap' }}>
-          <button onClick={() => setSelectedCatId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: '600', padding: '2px 4px', borderRadius: '6px' }}>🏠 Tümü</button>
-          {getBreadcrumb(selectedCatId).map((bc, i, arr) => (
-            <span key={bc.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ color: '#cbd5e1', fontSize: '11px' }}>›</span>
-              <button
-                onClick={() => setSelectedCatId(bc.id)}
-                style={{ background: i === arr.length - 1 ? 'rgba(34,197,94,0.1)' : 'none', border: 'none', cursor: 'pointer', color: i === arr.length - 1 ? 'var(--primary)' : '#64748b', fontSize: '12px', fontWeight: i === arr.length - 1 ? '700' : '600', padding: '2px 8px', borderRadius: '6px' }}
-              >{bc.name}</button>
-            </span>
-          ))}
-        </div>
-      )}
+      {/* BREADCRUMB kaldırıldı - kategori adı zaten başlıkta gösteriliyor */}
 
       {/* ===================== SÜTUN TARAYICI (COLUMN BROWSER) ===================== */}
       <div
@@ -954,7 +957,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         <div style={{ position: 'relative' }}>
 
           {/* Sabitle ve Temizle butonları - mavi kutunun en sağ üst köşesi */}
-          <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10, display: 'flex', flexDirection: 'row', gap: '4px', alignItems: 'center' }}>
             <button
               className={`cp-small-action-btn ${pinnedPath ? 'pinned' : ''}`}
               title={pinnedPath ? 'Sabiti kaldır' : 'Paneli sabitle'}
@@ -987,41 +990,11 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
 
           <div className="cp-column-browser">
 
-            {/* ¦¦ Markalar sütunu ¦¦ */}
-          <div className="cp-col-panel">
-            <div className="cp-col-body">
-              <button
-                className={`cp-col-item ${selectedMarkalar.length === 0 ? 'active' : ''}`}
-                onClick={() => setSelectedMarkalar([])}
-              >
-                Tümü
-              </button>
-              {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).filter(m => brandHasProds(m.id)).map(m => {
-                const isActive = selectedMarkalar.includes(m.id);
-                return (
-                  <button
-                    key={m.id}
-                    className={`cp-col-item cp-brand-item ${isActive ? 'active' : ''}`}
-                    onClick={() => setSelectedMarkalar(isActive ? [] : [m.id])}
-                  >
-                    {m.gorsel && <img src={m.gorsel} alt="" style={{ width: '14px', height: '14px', objectFit: 'contain', borderRadius: '3px', flexShrink: 0 }} />}
-                    {m.ad}
-                    {isActive && <span className="cp-brand-check">•</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+            {/* ¦¦ Markalar sütunu KALDIRILDI - sadece kategoriler gösteriliyor ¦¦ */}
 
           {/* ¦¦ Ana Kategori sütunu ¦¦ */}
           <div className="cp-col-panel">
             <div className="cp-col-body">
-              <button
-                className={`cp-col-item ${catColumnPath.length === 0 ? 'active' : ''}`}
-                onClick={() => { setCatColumnPath([]); localStorage.setItem('cp_cat_path', '[]'); }}
-              >
-                Tümü
-              </button>
               {orderedRoots.filter(cat => catHasProds(cat.id, selectedMarkalar)).map(cat => {
                 const isActive = catColumnPath[0] === cat.id;
                 const hasChildren = categories.some(c => c.parentId === cat.id && catHasProds(c.id, selectedMarkalar));
@@ -1081,18 +1054,110 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         </div>
       </div>
 
-      {/* MOBİL: aktif filtre özeti çipi (column browser kapalıyken) */}
-      {!catBrowserOpen && (catColumnPath.length > 0 || selectedMarkalar.length > 0) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 4px', flexWrap: 'wrap', marginBottom: '4px' }}>
-          {selectedMarkalar.map(id => {
-            const m = markalar.find(m => m.id === id);
-            return m ? <span key={id} className="cp-active-chip">{m.ad} <button onClick={() => setSelectedMarkalar([])} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'inherit', padding: 0 }}>✕</button></span> : null;
-          })}
-          {catColumnPath.map((catId, i) => {
-            const cat = categories.find(c => c.id === catId);
-            return cat ? <span key={catId} className="cp-active-chip cp-active-chip-cat">{i > 0 ? '› ' : ''}{cat.name}</span> : null;
-          })}
-          <button onClick={() => { setCatColumnPath([]); setSelectedMarkalar([]); localStorage.setItem('cp_cat_path', '[]'); }} style={{ fontSize: '11px', border: 'none', background: '#fef2f2', color: '#dc2626', borderRadius: '10px', padding: '2px 8px', cursor: 'pointer', fontWeight: '700' }}>✕ Temizle</button>
+      {/* ===== MARKALAR SAYFASI (header altında, kategoriler gibi) ===== */}
+      {showBrandsView && (
+        <div style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', padding: '0 0 16px', marginBottom: '8px' }}>
+
+          {markalar.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 24px', color: '#94a3b8', fontSize: '14px' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>🏷️</div>
+              Henüz marka eklenmemiş.
+            </div>
+          ) : (() => {
+            // Seçili kategoriye göre filtrele: sadece o kategorideki ürünlerin markalarını göster
+            let filteredMarkalar = markalar;
+            const currentCatId = catColumnPath[catColumnPath.length - 1]; // Column browser'dan seçili kategori
+            if (currentCatId !== undefined) {
+              // Seçili kategorideki ürünleri bul
+              const productsInCategory = products.filter(p => p.categoryIds && p.categoryIds.includes(currentCatId));
+              // Bu ürünlerin marka ID'lerini al
+              const markaIdsInCategory = [...new Set(productsInCategory.map(p => p.markaId || p.marka_id).filter(Boolean))];
+              // Sadece bu markaları göster
+              filteredMarkalar = markalar.filter(m => markaIdsInCategory.includes(m.id));
+            }
+            
+            return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
+              {[...filteredMarkalar].sort((a, b) => {
+                const siraA = a.sira !== undefined ? a.sira : 999999;
+                const siraB = b.sira !== undefined ? b.sira : 999999;
+                if (siraA !== siraB) return siraA - siraB;
+                return a.ad.localeCompare(b.ad, 'tr');
+              }).map((m, i) => {
+                const isActive = selectedMarkalar.includes(m.id);
+                // Ürün sayısı da seçili kategoriye göre hesaplanmalı
+                let productCount;
+                if (currentCatId !== undefined) {
+                  productCount = products.filter(p => 
+                    (p.markaId === m.id || p.marka_id === m.id) && 
+                    p.categoryIds && p.categoryIds.includes(currentCatId)
+                  ).length;
+                } else {
+                  productCount = products.filter(p => p.markaId === m.id || p.marka_id === m.id).length;
+                }
+                const COLORS = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#10b981'];
+                const color = COLORS[m.id % COLORS.length];
+                return (
+                  <div
+                    key={m.id}
+                    className={`brand-card${isActive ? ' brand-card-active' : ''}`}
+                    style={{ position: 'relative' }}
+                    onClick={() => {
+                      setSelectedMarkalar(isActive ? [] : [m.id]);
+                    }}
+                  >
+                    {isActive && (
+                      <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'var(--primary)', color: '#fff', fontSize: '9px', fontWeight: '800', padding: '2px 6px', borderRadius: '8px', lineHeight: 1.4 }}>
+                        📍 Seçili
+                      </div>
+                    )}
+                    {/* Logo veya baş harf */}
+                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', background: m.gorsel ? '#f8fafc' : color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${m.gorsel ? '#e2e8f0' : color + '30'}`, flexShrink: 0 }}>
+                      {m.gorsel
+                        ? <img src={m.gorsel} alt={m.ad} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '6px' }} />
+                        : <span style={{ fontSize: '22px', fontWeight: '900', color: color }}>{m.ad[0]?.toUpperCase()}</span>
+                      }
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', lineHeight: '1.3', wordBreak: 'break-word' }}>{m.ad}</div>
+                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{productCount} ürün</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            );
+          })()}
+
+          {/* Seçili markanın ürünleri */}
+          {selectedMarkalar.length > 0 && (() => {
+            const markaProducts = products.filter(p => p.markaId === selectedMarkalar[0] || p.marka_id === selectedMarkalar[0]);
+            return (
+              <div key={selectedMarkalar[0]} style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', marginTop: '28px' }}>
+                {markaProducts.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
+                ) : viewMode === 'grid' ? (
+                  <div className="product-grid">
+                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}
+                  </div>
+                ) : (
+                  <div className="product-list-view">
+                    <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                      <thead><tr className="th-row">
+                        <th style={{ width: '80px' }}>Görsel</th>
+                        <th style={{ minWidth: '280px' }}>Ürün Adı</th>
+                        <th style={{ textAlign: 'right' }}>Fiyat</th>
+                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
+                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
+                        <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
+                      </tr></thead>
+                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1277,8 +1342,6 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         .cp-pin-col-btn:hover { color: #475569; background: #f1f5f9; }
         .cp-pin-col-btn.pinned { color: var(--primary); background: rgba(34,197,94,0.06); }
         .cp-clear-col { min-width: 120px; max-width: 140px; }
-        .cp-active-chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(34,197,94,0.1); color: var(--primary); border: 1px solid rgba(34,197,94,0.2); border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
-        .cp-active-chip-cat { background: #eff6ff; color: #3b82f6; border-color: #bfdbfe; }
         @media (max-width: 768px) {
           .cp-browser-open { max-height: 720px; }
           .cp-column-browser { flex-direction: column; }
@@ -1683,102 +1746,7 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
         }
       `}</style>
 
-      {/* ===== MARKALAR SAYFASI ===== */}
-      {showBrandsView && (
-        <div style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', padding: '0 0 32px' }}>
-          {/* Başlık + kapat */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>🏷️ Markalar</div>
-              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{markalar.length} marka</div>
-            </div>
-            <button
-              onClick={() => { setShowBrandsView(false); setSelectedMarkalar([]); }}
-              style={{ padding: '6px 14px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#64748b', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}
-            >✕ Kapat</button>
-          </div>
-
-          {markalar.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 24px', color: '#94a3b8', fontSize: '14px' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>🏷️</div>
-              Henüz marka eklenmemiş.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
-              {[...markalar].sort((a, b) => a.ad.localeCompare(b.ad, 'tr')).map((m, i) => {
-                const isActive = selectedMarkalar.includes(m.id);
-                const productCount = products.filter(p => p.markaId === m.id || p.marka_id === m.id).length;
-                const COLORS = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#10b981'];
-                const color = COLORS[m.id % COLORS.length];
-                return (
-                  <div
-                    key={m.id}
-                    className={`brand-card${isActive ? ' brand-card-active' : ''}`}
-                    style={{ position: 'relative' }}
-                    onClick={() => {
-                      setSelectedMarkalar(isActive ? [] : [m.id]);
-                    }}
-                  >
-                    {isActive && (
-                      <div style={{ position: 'absolute', top: '6px', right: '6px', background: 'var(--primary)', color: '#fff', fontSize: '9px', fontWeight: '800', padding: '2px 6px', borderRadius: '8px', lineHeight: 1.4 }}>
-                        📍 Seçili
-                      </div>
-                    )}
-                    {/* Logo veya baş harf */}
-                    <div style={{ width: '56px', height: '56px', borderRadius: '14px', overflow: 'hidden', background: m.gorsel ? '#f8fafc' : color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${m.gorsel ? '#e2e8f0' : color + '30'}`, flexShrink: 0 }}>
-                      {m.gorsel
-                        ? <img src={m.gorsel} alt={m.ad} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '6px' }} />
-                        : <span style={{ fontSize: '22px', fontWeight: '900', color: color }}>{m.ad[0]?.toUpperCase()}</span>
-                      }
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', lineHeight: '1.3', wordBreak: 'break-word' }}>{m.ad}</div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{productCount} ürün</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Seçili markanın ürünleri */}
-          {selectedMarkalar.length > 0 && (() => {
-            const activeMarka = markalar.find(m => m.id === selectedMarkalar[0]);
-            const markaProducts = products.filter(p => p.markaId === selectedMarkalar[0] || p.marka_id === selectedMarkalar[0]);
-            return (
-              <div key={selectedMarkalar[0]} style={{ animation: 'fadeInUp 0.28s cubic-bezier(0.34,1.56,0.64,1)', marginTop: '28px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
-                  <span style={{ width: '5px', height: '24px', background: 'var(--primary)', borderRadius: '3px' }}></span>
-                  {activeMarka?.ad || 'Marka Ürünleri'}
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', background: '#f1f5f9', padding: '4px 10px', borderRadius: '10px', marginLeft: 'auto' }}>{markaProducts.length} Ürün</span>
-                </h2>
-                {markaProducts.length === 0 ? (
-                  <div style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>Bu markaya ait ürün bulunamadı.</div>
-                ) : viewMode === 'grid' ? (
-                  <div className="product-grid">
-                    {applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}
-                  </div>
-                ) : (
-                  <div className="product-list-view">
-                    <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
-                      <thead><tr className="th-row">
-                        <th style={{ width: '52px' }}>Görsel</th>
-                        <th>Ürün Adı</th>
-                        <th style={{ textAlign: 'right' }}>Fiyat</th>
-                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
-                        {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
-                        <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
-                        <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
-                      </tr></thead>
-                      <tbody>{applySorting(markaProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
+      {/* Markalar sayfası yukarıya taşındı - info-strip'ten önce */}
 
       {/* Seçili marka etiketi — brands view kapalıyken */}
       {selectedMarkalar.length > 0 && !showBrandsView && (
@@ -1834,13 +1802,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
               <div className="product-list-view">
                 <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                   <thead><tr className="th-row">
-                    <th style={{ width: '52px' }}>Görsel</th>
-                    <th>Ürün Adı</th>
+                    <th style={{ width: '80px' }}>Görsel</th>
+                    <th style={{ minWidth: '280px' }}>Ürün Adı</th>
                     <th style={{ textAlign: 'right' }}>Fiyat</th>
                     {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
                     {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
-                    <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
-                    <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                    <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
                   </tr></thead>
                   <tbody>{applySorting(visibleProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
                 </table>
@@ -1857,17 +1824,8 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
           : visibleProducts.filter(p => p.categoryIds.includes(cat.id));
         if (catProducts.length === 0) return null;
         
-        // Kategori breadcrumb için parent zincirini oluştur (Meyveler > Tropikal)
-        const getCategoryPath = (catId) => {
-          const path = [];
-          let current = categories.find(c => c.id === catId);
-          while (current) {
-            path.unshift(current.name);
-            current = current.parentId ? categories.find(c => c.id === current.parentId) : null;
-          }
-          return path.join(' > ');
-        };
-        const categoryPathLabel = getCategoryPath(cat.id);
+        // Kategori başlığı (sadece son kategori adı)
+        const categoryPathLabel = cat.name;
         
         const isLast = catIdx === displayCategories.length - 1 || displayCategories.slice(catIdx + 1).every(c => {
           return filteredProducts.filter(p => p.categoryIds.includes(c.id)).length === 0;
@@ -1886,13 +1844,12 @@ export default function CustomerPortal({ customer, onLogout, onSessionUpdate }) 
                 <div className="product-list-view">
                   <table className="excel-table" style={{ tableLayout: 'fixed', width: '100%' }}>
                     <thead><tr className="th-row">
-                      <th style={{ width: '52px' }}>Görsel</th>
-                      <th>Ürün Adı</th>
+                      <th style={{ width: '80px' }}>Görsel</th>
+                      <th style={{ minWidth: '280px' }}>Ürün Adı</th>
                       <th style={{ textAlign: 'right' }}>Fiyat</th>
                       {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'center' }}>İndirim</th>}
                       {(discount > 0 || Object.keys(ozelFiyatlar).length > 0) && <th style={{ textAlign: 'right' }}>Sana Özel Fiyat</th>}
-                      <th className="cp-date-col" style={{ textAlign: 'center', paddingLeft: '48px' }}>Son Fiyat Güncelleme</th>
-                      <th className="cp-date-col" style={{ textAlign: 'center' }}>Son Bilgi Güncelleme</th>
+                      <th className="cp-date-col" style={{ textAlign: 'center', width: '140px' }}>Son Güncelleme</th>
                     </tr></thead>
                     <tbody>{applySorting(catProducts).map(p => <ProductItem key={p.id} p={p} viewMode={viewMode} discount={discount} ozelFiyatlar={ozelFiyatlar[p.id] || null} hasFiyatTipi={!!customer.fiyatTanimlariId} categories={categories} markalar={markalar} iskontoSirasi={siteSettings?.iskonto_sirasi} />)}</tbody>
                   </table>
