@@ -135,7 +135,7 @@ export default function Products() {
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
+  const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -450,7 +450,7 @@ export default function Products() {
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
     const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
     addProduct({ ...newRow, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_id ? (newRow.kdv_dahil ?? true) : null, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
-    setNewRow({ name: '', price: '', unit: 'Kg', categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
+    setNewRow({ name: '', price: '', birim_id: units[0]?.id || 1, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: true, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
   };
 
@@ -1294,8 +1294,8 @@ export default function Products() {
                   </button>
                 </td>
                 <td>
-                  <select className="lite-select" value={newRow.unit} onChange={e => setNewRow({...newRow, unit: e.target.value})}>
-                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                  <select className="lite-select" value={newRow.birim_id} onChange={e => setNewRow({...newRow, birim_id: parseInt(e.target.value)})}>
+                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </td>
                 <td>
@@ -1873,8 +1873,8 @@ export default function Products() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label className="mobile-label">Birim</label>
-                  <select className="mobile-input" value={newRow.unit} onChange={e => setNewRow(prev => ({ ...prev, unit: e.target.value }))}>
-                    {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                  <select className="mobile-input" value={newRow.birim_id} onChange={e => setNewRow(prev => ({ ...prev, birim_id: parseInt(e.target.value) }))}>
+                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
               </div>
