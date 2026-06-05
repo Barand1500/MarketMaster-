@@ -1406,8 +1406,8 @@ export default function Products() {
                     {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </td>
-                <td>
-                  <div className="cat-drop-wrapper" ref={dropRef}>
+                <td className={catDrop ? 'category-cell-open' : ''}>
+                  <div className={`cat-drop-wrapper${catDrop ? ' open' : ''}`} ref={dropRef}>
                     <button className="cat-drop-btn" onClick={(e) => { e.stopPropagation(); setCatDrop(!catDrop); }}>
                       <span>{newRow.categoryIds.length > 0 ? `${newRow.categoryIds.length} Seçili` : 'Seç...'}</span>
                     </button>
@@ -1573,8 +1573,8 @@ export default function Products() {
                         <span className="badge-unit">{p.unit}</span>
                       )}
                     </td>
-                    <td onDoubleClick={(e) => { e.stopPropagation(); setEditing({ id: p.id, field: 'categoryIds' }); setCatSearch(''); }}>
-                      <div className="cat-drop-wrapper" ref={isEditingCats ? editDropRef : null}>
+                    <td className={isEditingCats ? 'category-cell-open' : ''} onDoubleClick={(e) => { e.stopPropagation(); setEditing({ id: p.id, field: 'categoryIds' }); setCatSearch(''); }}>
+                      <div className={`cat-drop-wrapper${isEditingCats ? ' open' : ''}`} ref={isEditingCats ? editDropRef : null}>
                         <div className="badge-group" style={{ cursor: 'default' }}>
                           {p.categoryIds.length > 0 ? (() => {
                             // ✅ Sadece en alt kategorileri göster (üst kategorisi de listede varsa gösterme)
