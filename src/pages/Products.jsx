@@ -552,13 +552,24 @@ export default function Products() {
     const getVisibleCategories = () => {
       if (search) {
         return categories
-          .filter(c => c.kategori_adi?.toLowerCase().includes(search.toLowerCase()))
-          .map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id }));
+          .filter(c => c.name?.toLowerCase().includes(search.toLowerCase()))
+          .sort((a, b) => {
+            const siraA = a.sira !== undefined ? a.sira : 0;
+            const siraB = b.sira !== undefined ? b.sira : 0;
+            if (siraA !== siraB) return siraA - siraB;
+            return a.name.localeCompare(b.name);
+          })
+          .map(c => ({ id: c.id, name: c.name, parentId: c.parentId || null }));
       }
       return categories
-        .filter(c => (c.ust_kategori_id || null) === currentParent)
-        .sort((a, b) => (a.sira || 0) - (b.sira || 0))
-        .map(c => ({ id: c.id, name: c.kategori_adi, parentId: c.ust_kategori_id }));
+        .filter(c => (c.parentId || null) === currentParent)
+        .sort((a, b) => {
+          const siraA = a.sira !== undefined ? a.sira : 0;
+          const siraB = b.sira !== undefined ? b.sira : 0;
+          if (siraA !== siraB) return siraA - siraB;
+          return a.name.localeCompare(b.name);
+        })
+        .map(c => ({ id: c.id, name: c.name, parentId: c.parentId || null }));
     };
     
     const visibleCats = getVisibleCategories();
@@ -605,7 +616,7 @@ export default function Products() {
         
         {currentCat && !search && (
           <div className="cat-breadcrumb">
-            {currentCat.kategori_adi}
+            {currentCat.name}
           </div>
         )}
         
@@ -628,7 +639,7 @@ export default function Products() {
             </div>
           )}
           {visibleCats.map(c => {
-            const hasChildren = categories.some(sub => sub.ust_kategori_id === c.id);
+            const hasChildren = categories.some(sub => sub.parentId === c.id);
             const isSelected = currentIds.includes(c.id);
             return (
               <div 
@@ -639,7 +650,7 @@ export default function Products() {
                 <input 
                   type="checkbox" 
                   checked={isSelected} 
-                  onChange={() => {}}  
+                  onChange={() => onToggle(c.id)}
                   onClick={(e) => e.stopPropagation()}
                 />
                 <span className="cat-name">{c.name}</span>
