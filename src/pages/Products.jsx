@@ -135,7 +135,7 @@ export default function Products() {
   // Geçerli resim kaynağı kontrolü (bozuk/geçersiz gorsel_yolu için)
   const validImg = (src) => src && (src.startsWith('data:image/') || src.startsWith('http') || src.startsWith('/'));
 
-  const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: null, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
+  const [newRow, setNewRow] = useState({ name: '', price: '', birim_id: null, categoryIds: [], image: '', inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: 0, iskonto_tipi: 'oran', iskonto_orani: '' });
   const [editing, setEditing] = useState(null); // { id, field }
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -450,7 +450,7 @@ export default function Products() {
     const kdvItem = kdvOranlari.find(k => k.id === newRow.kdv_id);
     const iskOrani = newRow.iskonto_orani ? parseFloat(newRow.iskonto_orani) : null;
     await addProduct({ ...newRow, birim_id: newRow.birim_id || units[0]?.id || 1, price: parseFloat(newRow.price), pbSembol: pb?.sembol || '₺', pbKisaAd: pb?.kisa_ad || 'TRY', pbKur: parseFloat(pb?.kur) || 1, kdv_orani: kdvItem?.oran ?? null, kdv_dahil: newRow.kdv_dahil, stok_kodu: newRow.stok_kodu || null, iskonto_orani: iskOrani, iskonto_tipi: iskOrani ? newRow.iskonto_tipi : null });
-    setNewRow({ name: '', price: '', birim_id: null, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: null, iskonto_tipi: 'oran', iskonto_orani: '' });
+    setNewRow({ name: '', price: '', birim_id: null, categoryIds: [], image: '', imageFile: null, inStock: true, para_birimi_id: 1, marka_id: null, kdv_id: null, stok_kodu: '', kdv_dahil: 0, iskonto_tipi: 'oran', iskonto_orani: '' });
     setCatDrop(false);
     await refetchProducts();
   };
@@ -1278,7 +1278,7 @@ export default function Products() {
                 <td>
                   <select className="lite-select" value={newRow.kdv_id || ''} onChange={e => {
                     const id = e.target.value ? parseInt(e.target.value) : null;
-                    setNewRow(p => ({ ...p, kdv_id: id, kdv_dahil: null }));
+                    setNewRow(p => ({ ...p, kdv_id: id, kdv_dahil: 0 }));
                   }}>
                     <option value="">KDV Yok</option>
                     {kdvOranlari.map(k => (
@@ -1287,13 +1287,13 @@ export default function Products() {
                   </select>
                   <button
                     style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6,
-                      border: newRow.kdv_id ? `1px solid ${newRow.kdv_dahil ? '#bbf7d0' : '#fecaca'}` : '1px solid #e2e8f0',
-                      background: newRow.kdv_id ? (newRow.kdv_dahil ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
-                      color: newRow.kdv_id ? (newRow.kdv_dahil ? '#16a34a' : '#dc2626') : '#94a3b8',
+                      border: newRow.kdv_id ? `1px solid ${newRow.kdv_dahil === 1 ? '#bbf7d0' : '#fecaca'}` : '1px solid #e2e8f0',
+                      background: newRow.kdv_id ? (newRow.kdv_dahil === 1 ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
+                      color: newRow.kdv_id ? (newRow.kdv_dahil === 1 ? '#16a34a' : '#dc2626') : '#94a3b8',
                       cursor: newRow.kdv_id ? 'pointer' : 'default', fontWeight: 700 }}
-                    onClick={() => newRow.kdv_id && setNewRow(p => ({ ...p, kdv_dahil: !p.kdv_dahil }))}
+                    onClick={() => newRow.kdv_id && setNewRow(p => ({ ...p, kdv_dahil: p.kdv_dahil === 1 ? 0 : 1 }))}
                   >
-                    {newRow.kdv_id ? (newRow.kdv_dahil ? 'Dahil' : 'Hariç') : '—'}
+                    {newRow.kdv_id ? (newRow.kdv_dahil === 1 ? 'Dahil' : 'Hariç') : '—'}
                   </button>
                 </td>
                 <td>
@@ -1439,21 +1439,21 @@ export default function Products() {
                           </select>
                           {p.kdvOrani !== null && p.kdvOrani !== undefined && (
                             <button
-                              style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${p.kdvDahil !== 0 ? '#bbf7d0' : '#fecaca'}`, background: p.kdvDahil !== 0 ? '#f0fdf4' : '#fef2f2', color: p.kdvDahil !== 0 ? '#16a34a' : '#dc2626', cursor: 'pointer', fontWeight: 700 }}
+                              style={{ marginTop: 4, display: 'block', width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${p.kdvDahil === 1 ? '#bbf7d0' : '#fecaca'}`, background: p.kdvDahil === 1 ? '#f0fdf4' : '#fef2f2', color: p.kdvDahil === 1 ? '#16a34a' : '#dc2626', cursor: 'pointer', fontWeight: 700 }}
                               onMouseDown={e => e.preventDefault()}
-                              onClick={() => updateProduct(p.id, { kdv_dahil: p.kdvDahil !== 0 ? 0 : 1 })}
+                              onClick={() => updateProduct(p.id, { kdv_dahil: p.kdvDahil === 1 ? 0 : 1 })}
                             >
-                              {p.kdvDahil !== 0 ? 'Dahil' : 'Hariç'}
+                              {p.kdvDahil === 1 ? 'Dahil' : 'Hariç'}
                             </button>
                           )}
                         </div>
                       ) : p.kdvOrani !== null && p.kdvOrani !== undefined ? (
                         <span className="badge-unit" style={{
-                          background: p.kdvDahil !== 0 ? '#f0fdf4' : '#fef2f2',
-                          color: p.kdvDahil !== 0 ? '#16a34a' : '#dc2626',
-                          border: `1px solid ${p.kdvDahil !== 0 ? '#bbf7d0' : '#fecaca'}`
+                          background: p.kdvDahil === 1 ? '#f0fdf4' : '#fef2f2',
+                          color: p.kdvDahil === 1 ? '#16a34a' : '#dc2626',
+                          border: `1px solid ${p.kdvDahil === 1 ? '#bbf7d0' : '#fecaca'}`
                         }}>
-                          %{parseFloat(p.kdvOrani)} {p.kdvDahil !== 0 ? 'Dahil' : 'Hariç'}
+                          %{parseFloat(p.kdvOrani)} {p.kdvDahil === 1 ? 'Dahil' : 'Hariç'}
                         </span>
                       ) : (
                         <span className="no-data">YOK</span>
