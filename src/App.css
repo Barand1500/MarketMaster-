@@ -225,55 +225,66 @@
 .upload-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.2s ease;
+  animation: fadeIn 0.25s ease;
 }
 
 .upload-modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border-radius: 24px;
+  padding: 40px 48px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25), 0 0 1px rgba(0, 0, 0, 0.1);
   text-align: center;
-  min-width: 320px;
-  animation: slideUp 0.3s ease;
+  min-width: 380px;
+  max-width: 420px;
+  animation: slideUpBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .upload-spinner {
-  width: 60px;
-  height: 60px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #3b82f6;
+  width: 80px;
+  height: 80px;
+  border: 5px solid #e0f2fe;
+  border-top-color: #10b981;
+  border-right-color: #10b981;
   border-radius: 50%;
-  margin: 0 auto 20px;
-  animation: spin 0.8s linear infinite;
+  margin: 0 auto 24px;
+  animation: spin 0.9s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
 }
 
 .upload-modal h3 {
-  margin: 0 0 8px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #1f2937;
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #1e293b, #475569);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .upload-modal p {
-  margin: 0 0 20px;
-  font-size: 14px;
-  color: #6b7280;
+  margin: 0 0 24px;
+  font-size: 15px;
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 .upload-progress-bar {
   width: 100%;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
+  height: 10px;
+  background: linear-gradient(to right, #f1f5f9, #e2e8f0);
+  border-radius: 20px;
   overflow: hidden;
   position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .upload-progress-fill {
@@ -282,10 +293,25 @@
   top: 0;
   height: 100%;
   width: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+  background: linear-gradient(90deg, #10b981, #06d6a0, #10b981);
   background-size: 200% 100%;
-  animation: progressMove 1.5s linear infinite;
-  border-radius: 4px;
+  animation: progressMove 1.8s ease-in-out infinite;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+@keyframes slideUpBounce {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  60% {
+    transform: translateY(-8px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes fadeIn {

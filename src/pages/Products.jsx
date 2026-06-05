@@ -546,19 +546,34 @@ export default function Products() {
   // Kategori seçim paneli (add-row ve edit için ortak)
   const CatDropPanel = ({ currentIds, onToggle, onClose, search, setSearch }) => {
     const tree = buildCategoryTree(search);
+    const selectedCount = currentIds.length;
     return (
       <div className="cat-drop-panel" onClick={e => e.stopPropagation()}>
+        <div className="cat-drop-header">
+          <div className="cat-drop-title">
+            <span className="cat-drop-icon">📂</span>
+            <span>Kategori Seç</span>
+            {selectedCount > 0 && <span className="cat-count-badge">{selectedCount}</span>}
+          </div>
+        </div>
         <div className="cat-drop-search">
+          <span className="search-icon">🔍</span>
           <input type="text" placeholder="Kategori ara..." value={search} onChange={e => setSearch(e.target.value)} autoFocus />
+          {search && <button className="search-clear" onClick={() => setSearch('')}>✕</button>}
         </div>
         <div className="cat-drop-scroll">
-          {tree.length === 0 && <div style={{ padding: '8px', fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>Sonuç yok</div>}
+          {tree.length === 0 && (
+            <div className="cat-empty-state">
+              <span className="empty-icon">📭</span>
+              <span className="empty-text">Sonuç bulunamadı</span>
+            </div>
+          )}
           {tree.map(c => (
             <label 
               key={c.id} 
               className="cat-label" 
               onClick={e => e.stopPropagation()}
-              style={{ paddingLeft: `${8 + (c.level || 0) * 20}px` }}
+              style={{ paddingLeft: `${12 + (c.level || 0) * 18}px` }}
             >
               <input type="checkbox" checked={currentIds.includes(c.id)} onChange={() => onToggle(c.id)} />
               <span className="cat-label-text">
@@ -568,7 +583,12 @@ export default function Products() {
             </label>
           ))}
         </div>
-        <button className="cat-drop-close-btn" onClick={onClose}>Tamam</button>
+        <div className="cat-drop-footer">
+          <button className="cat-drop-close-btn" onClick={onClose}>
+            <span>✓</span>
+            <span>Tamam</span>
+          </button>
+        </div>
       </div>
     );
   };
