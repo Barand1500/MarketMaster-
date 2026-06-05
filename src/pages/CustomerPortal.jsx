@@ -274,6 +274,9 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
   const badgeDiscount = ozelFiyat ? totalDiscountPct : effectiveDiscount;
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
   const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : null;
+  const firstDate = fmtDate(p.createdAt) || fmtDate(p.updatedAt) || '-';
+  const priceUpdateDate = fmtDate(p.lastPriceChange) || firstDate;
+  const infoUpdateDate = fmtDate(p.lastInfoChange) || firstDate;
   const lastPriceUpdate = p.lastPriceChange
     ? new Date(p.lastPriceChange).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null;
@@ -337,15 +340,17 @@ const ProductItem = memo(({ p, viewMode, discount, ozelFiyatlar, hasFiyatTipi, c
           hasExtraCols={hasExtraCols}
           iskontoTipi={effectiveDiscountTipi}
         />
-        {/* Son Güncelleme (Birleştirilmiş) */}
-        <td className="cp-date-col" style={{ padding: '8px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            {fmtDate(p.lastPriceChange) || fmtDate(p.createdAt) ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600' }}>Fiyat:</span>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#0f172a' }}>{fmtDate(p.lastPriceChange) || fmtDate(p.createdAt)}</span>
-              </div>
-            ) : <span style={{ fontSize: '10px', color: '#e2e8f0' }}>—</span>}
+        {/* Son Güncelleme (Liste görünümü) */}
+        <td className="cp-date-col" style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start', lineHeight: 1.15 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700' }}>Fiyat:</span>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a' }}>{priceUpdateDate}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700' }}>Bilgi:</span>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#0f172a' }}>{infoUpdateDate}</span>
+            </div>
           </div>
         </td>
       </tr>
