@@ -67,6 +67,8 @@ export default function Customers() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const filteredCustomers = customers.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
+  const musteriFiyatTanimiAdi = (c) => fiyatTanimlari.find(ft => ft.id === c.fiyatTanimlariId)?.ad || null;
+  const musteriAktifFiyatTanimi = (c) => !!musteriFiyatTanimiAdi(c);
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const pagedCustomers = filteredCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -432,7 +434,7 @@ export default function Customers() {
                     {editing?.id === c.id && editing?.field === 'discount' ? (
                       <input autoFocus type="text" className="lite-input" defaultValue={c.discount} placeholder="0 veya 20+20" onBlur={(e) => handleBlur(c.id, 'discount', e.target.value)} onKeyDown={e => e.key === 'Enter' && e.target.blur()} />
                     ) : (
-                      <span className="edit-txt" style={c.fiyatTanimlariId ? { color: '#94a3b8', textDecoration: 'line-through', opacity: 0.5 } : {}}>{displayDiscount(c.discount)}</span>
+                      <span className="edit-txt" style={musteriAktifFiyatTanimi(c) ? { color: '#94a3b8', textDecoration: 'line-through', opacity: 0.5 } : {}}>{displayDiscount(c.discount)}</span>
                     )}
                   </td>
 
@@ -443,8 +445,8 @@ export default function Customers() {
                         {fiyatTanimlari.map(ft => <option key={ft.id} value={ft.id}>{ft.ad}</option>)}
                       </select>
                     ) : (
-                      <span className="edit-txt" style={c.fiyatTanimlariId ? { color: '#0369a1', fontWeight: '700' } : { color: '#94a3b8' }}>
-                        {fiyatTanimlari.find(ft => ft.id === c.fiyatTanimlariId)?.ad || '—'}
+                      <span className="edit-txt" style={musteriAktifFiyatTanimi(c) ? { color: '#0369a1', fontWeight: '700' } : { color: '#94a3b8' }}>
+                        {musteriFiyatTanimiAdi(c) || '—'}
                       </span>
                     )}
                   </td>

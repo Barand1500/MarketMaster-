@@ -1,6 +1,20 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { resolveGorselUrl } from '../utils/gorselUrl';
 
 const API_URL = "/api"; // Production: Aynı domain üzerinden
+
+const mapCustomerRow = (c) => ({
+  id: c.id,
+  name: c.ad_soyad,
+  taxId: c.vkn_tc,
+  phone: c.telefon,
+  email: c.eposta,
+  password: c.sifre,
+  discount: c.iskonto_orani || '0',
+  address: c.adres,
+  createdAt: c.kayit_tarihi,
+  fiyatTanimlariId: c.fiyat_tanimlari_id ? parseInt(c.fiyat_tanimlari_id) : null
+});
 
 const DataContext = createContext(null);
 
@@ -46,7 +60,7 @@ export function DataProvider({ children }) {
         const settings = settingsRes.ok ? await settingsRes.json() : {};
         const mrk = markalarRes.ok ? await markalarRes.json() : [];
         const kdv = kdvRes.ok ? await kdvRes.json() : [];
-        setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
+        setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, gorsel: resolveGorselUrl(m.gorsel), iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
         setKdvOranlari(Array.isArray(kdv) ? kdv : []);
         if (settings && typeof settings === 'object') {
           const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', varsayilan_gorsel_tipi: 'elma', varsayilan_gorsel_url: '', ...settings };
@@ -61,7 +75,7 @@ export function DataProvider({ children }) {
           price: parseFloat(p.fiyat), 
           unit: p.birim_adi, 
           categoryIds: p.kategori_ids || [], 
-          image: p.gorsel_yolu, 
+          image: resolveGorselUrl(p.gorsel_yolu), 
           inStock: p.stok_durumu === 1 || p.stok_durumu === true,
           updatedAt: p.guncelleme_tarihi,
           lastInfoChange: p.bilgi_guncelleme_tarihi || null,
@@ -74,7 +88,7 @@ export function DataProvider({ children }) {
           pbKurTuru: p.pb_kur_turu || null,
           markaId: p.marka_id || null,
           markaAd: p.marka_ad || null,
-          markaGorsel: p.marka_gorsel || null,
+          markaGorsel: resolveGorselUrl(p.marka_gorsel) || null,
           kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
           kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
           stokKodu: p.stok_kodu || null,
@@ -104,18 +118,7 @@ export function DataProvider({ children }) {
         ]).then(async ([custsRes, staffRes]) => {
           const cust = await custsRes.json();
           const staff = await staffRes.json();
-          setCustomers(Array.isArray(cust) ? cust.map(c => ({ 
-            id: c.id, 
-            name: c.ad_soyad, 
-            taxId: c.vkn_tc, 
-            phone: c.telefon, 
-            email: c.eposta, 
-            password: c.sifre,
-            discount: c.iskonto_orani || '0', 
-            address: c.adres,
-            createdAt: c.kayit_tarihi,
-            fiyatTanimlariId: c.fiyat_tanimlari_id ? parseInt(c.fiyat_tanimlari_id) : null
-          })) : []);
+          setCustomers(Array.isArray(cust) ? cust.map(mapCustomerRow) : []);
           setUsers(Array.isArray(staff) ? staff.map(s => ({ 
             id: s.id, 
             contact: s.ad_soyad, 
@@ -138,6 +141,15 @@ export function DataProvider({ children }) {
     fetchData();
   }, []);
 
+  const refetchCustomers = async () => {
+    try {
+      const res = await fetch(`${API_URL}/musteriler`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const cust = await res.json();
+      setCustomers(Array.isArray(cust) ? cust.map(mapCustomerRow) : []);
+    } catch { setApiError('Müşteri listesi yenilenemedi.'); }
+  };
+
   const refetchProducts = async () => {
     try {
       const res = await fetch(`${API_URL}/urunler`);
@@ -149,7 +161,7 @@ export function DataProvider({ children }) {
         price: parseFloat(p.fiyat),
         unit: p.birim_adi,
         categoryIds: p.kategori_ids || [],
-        image: p.gorsel_yolu,
+        image: resolveGorselUrl(p.gorsel_yolu),
         inStock: p.stok_durumu === 1 || p.stok_durumu === true,
         updatedAt: p.guncelleme_tarihi,
         lastInfoChange: p.bilgi_guncelleme_tarihi || null,
@@ -162,7 +174,7 @@ export function DataProvider({ children }) {
         pbKurTuru: p.pb_kur_turu || null,
         markaId: p.marka_id || null,
         markaAd: p.marka_ad || null,
-        markaGorsel: p.marka_gorsel || null,
+        markaGorsel: resolveGorselUrl(p.marka_gorsel) || null,
         kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
         kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
         stokKodu: p.stok_kodu || null
@@ -336,7 +348,7 @@ export function DataProvider({ children }) {
       setMarkalar(prev => [...prev, { 
         id: data.id, 
         ad: data.ad, 
-        gorsel: data.gorsel,
+        gorsel: resolveGorselUrl(data.gorsel),
         sira: data.sira || 0,
         iskontoOrani: data.iskonto_orani != null ? String(data.iskonto_orani) : null,
         iskontoTipi: data.iskonto_tipi || null
@@ -363,7 +375,7 @@ export function DataProvider({ children }) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setMarkalar(prev => prev.map(m => {
         if (m.id !== id) return m;
-        const updated = { ...m, ad, gorsel: gorselDeger };
+        const updated = { ...m, ad, gorsel: resolveGorselUrl(gorselDeger) };
         if (iskontoOrani !== undefined) updated.iskontoOrani = iskontoOrani;
         if (iskontoTipi !== undefined) updated.iskontoTipi = iskontoTipi;
         if (sira !== undefined) updated.sira = sira;
@@ -489,7 +501,7 @@ export function DataProvider({ children }) {
         price: parseFloat(data.fiyat), 
         unit: product.unit, 
         categoryIds: data.kategori_ids || [], 
-        image: data.gorsel_yolu, 
+        image: resolveGorselUrl(data.gorsel_yolu), 
         inStock: data.stok_durumu === 1 || data.stok_durumu === true || data.stok_durumu === 'true',
         para_birimi_id: data.para_birimi_id || 1,
         pbKisaAd: product.pbKisaAd || 'TRY',
@@ -497,7 +509,7 @@ export function DataProvider({ children }) {
         pbKur: product.pbKur || 1,
         markaId: product.marka_id || null,
         markaAd: marka?.ad || null,
-        markaGorsel: marka?.gorsel || null,
+        markaGorsel: resolveGorselUrl(marka?.gorsel) || null,
         kdvOrani: product.kdv_orani ?? null,
         kdvDahil: product.kdv_dahil ?? null,
         stokKodu: data.stok_kodu || null,
@@ -543,16 +555,20 @@ export function DataProvider({ children }) {
       localMapped.markaId = updates.marka_id;
       const marka = markalar.find(m => m.id === updates.marka_id);
       localMapped.markaAd = marka?.ad || null;
-      localMapped.markaGorsel = marka?.gorsel || null;
+      localMapped.markaGorsel = resolveGorselUrl(marka?.gorsel) || null;
     }
     if (updates.kdv_orani !== undefined) localMapped.kdvOrani = updates.kdv_orani;
     if (updates.kdv_dahil !== undefined) localMapped.kdvDahil = updates.kdv_dahil;
     if (updates.stok_kodu !== undefined) localMapped.stokKodu = updates.stok_kodu;
     if (updates.iskonto_orani !== undefined) localMapped.iskontoOrani = updates.iskonto_orani;
     if (updates.iskonto_tipi !== undefined) localMapped.iskontoTipi = updates.iskonto_tipi;
+    const resolvedImage = updates.imageFile instanceof File && gorselYolu
+      ? resolveGorselUrl(gorselYolu)
+      : (updates.image !== undefined ? resolveGorselUrl(updates.image) : undefined);
     setProducts(prev => prev.map(p => p.id === id ? {
       ...p,
       ...updates,
+      ...(resolvedImage !== undefined ? { image: resolvedImage } : {}),
       ...localMapped,
       updatedAt: now,
       lastInfoChange: isInfoUpdate ? now : p.lastInfoChange,
@@ -699,7 +715,7 @@ export function DataProvider({ children }) {
     const settings = settingsRes.ok ? await settingsRes.json() : {};
     const mrk = markalarRes.ok ? await markalarRes.json() : [];
     const kdv = kdvRes.ok ? await kdvRes.json() : [];
-    setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
+    setMarkalar(Array.isArray(mrk) ? mrk.map(m => ({ ...m, gorsel: resolveGorselUrl(m.gorsel), iskontoOrani: m.iskonto_orani != null ? String(m.iskonto_orani) : null, iskontoTipi: m.iskonto_tipi || null })) : []);
     setKdvOranlari(Array.isArray(kdv) ? kdv : []);
     if (settings && typeof settings === 'object') {
       const merged = { site_adi: 'Bostan Manav', logo: '', favicon: '', ...settings };
@@ -713,7 +729,7 @@ export function DataProvider({ children }) {
       price: parseFloat(p.fiyat), 
       unit: p.birim_adi, 
       categoryIds: p.kategori_ids || [], 
-      image: p.gorsel_yolu, 
+      image: resolveGorselUrl(p.gorsel_yolu), 
       inStock: p.stok_durumu === 1 || p.stok_durumu === true,
       updatedAt: p.guncelleme_tarihi,
       lastInfoChange: p.bilgi_guncelleme_tarihi || null,
@@ -726,7 +742,7 @@ export function DataProvider({ children }) {
       pbKurTuru: p.pb_kur_turu || null,
       markaId: p.marka_id || null,
       markaAd: p.marka_ad || null,
-      markaGorsel: p.marka_gorsel || null,
+      markaGorsel: resolveGorselUrl(p.marka_gorsel) || null,
       kdvOrani: p.kdv_orani !== undefined ? p.kdv_orani : null,
       kdvDahil: p.kdv_dahil !== undefined ? p.kdv_dahil : null,
       stokKodu: p.stok_kodu || null,
@@ -742,7 +758,7 @@ export function DataProvider({ children }) {
       categories, addCategory, updateCategory, deleteCategory,
       products, addProduct, updateProduct, deleteProduct,
       users, addUser, updateUser, updateUserState, deleteUser,
-      customers, addCustomer, updateCustomer, deleteCustomer,
+      customers, addCustomer, updateCustomer, deleteCustomer, refetchCustomers,
       units, addUnit, updateUnit, deleteUnit,
       markalar, addMarka, updateMarka, deleteMarka,
       kdvOranlari, addKdvOrani, updateKdvOrani, deleteKdvOrani, refetchKdvOranlari,
